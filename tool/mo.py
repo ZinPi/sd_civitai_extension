@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 import threading
 import time
@@ -61,6 +62,9 @@ def _cua_so(server: uvicorn.Server) -> None:
     goc.configure(bg="#f3ecdf")
     goc.resizable(False, False)
     goc.geometry("440x210")
+    goc.lift()
+    goc.attributes("-topmost", True)
+    goc.after(800, lambda: goc.attributes("-topmost", False))
 
     chu = tk.Label(
         goc,
@@ -110,9 +114,15 @@ def _cua_so(server: uvicorn.Server) -> None:
     goc.mainloop()
 
 
+def _mo_trinh_duyet() -> None:
+    webbrowser.open(DIA_CHI)
+    if os.name == "nt":
+        os.startfile(DIA_CHI)
+
+
 def main() -> None:
     if cong_dang_mo():
-        webbrowser.open(DIA_CHI)
+        _mo_trinh_duyet()
         _hop_thoai("Tool đang chạy sẵn.\nTrình duyệt đã được mở lại.\nCửa sổ Tạo prompt ảnh lúc nãy dùng để tắt.")
         return
     server = mo_may_chu()
@@ -120,9 +130,16 @@ def main() -> None:
         _hop_thoai("Không mở được trang.\nChụp màn hình này rồi gửi lại.")
         server.should_exit = True
         return
-    webbrowser.open(DIA_CHI)
+    _mo_trinh_duyet()
     _cua_so(server)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        import traceback
+        from pathlib import Path
+
+        Path(__file__).resolve().with_name("loi.txt").write_text(traceback.format_exc(), encoding="utf-8")
+        raise

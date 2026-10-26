@@ -1,7 +1,8 @@
 ﻿@echo off
-chcp 65001 >nul
 cd /d "%~dp0"
 title Tao prompt anh
+
+if not exist "%~dp0mo.py" goto thieufile
 
 set "PY="
 set "PYW="
@@ -13,21 +14,73 @@ if not defined PY if not defined PYW goto chuapython
 if not defined PY set "PY=%PYW%"
 if not defined PYW set "PYW=%PY%"
 
-"%PY%" -c "import uvicorn, fastapi, httpx" >nul 2>&1
+"%PY%" -c "import uvicorn, fastapi, httpx, tkinter" >nul 2>&1
 if errorlevel 1 goto caidat
 goto mo
 
 :caidat
 echo.
-echo Lan dau can cai dat. Cua so den nay se tu tat khi xong.
-echo Doi vai phut. Dung dong cua so.
+echo Lan dau can cai dat. Giu cua so nay mo, doi vai phut.
 echo.
 "%PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 goto loicai
+"%PY%" -c "import tkinter" >nul 2>&1
+if errorlevel 1 goto thieutk
 
 :mo
-start "" "%PYW%" "%~dp0mo.py"
+echo.
+echo Dang mo trang. Giu cua so nay, doi khoang 10 giay.
+echo.
+start "Tao prompt anh" /D "%~dp0" "%PYW%" "%~dp0mo.py"
+set /a LAN=0
+
+:doi
+set /a LAN+=1
+"%PY%" -c "import socket,sys; s=socket.socket(); s.settimeout(0.5); sys.exit(0 if s.connect_ex(('127.0.0.1',8765))==0 else 1)"
+if not errorlevel 1 goto damo
+if %LAN% GEQ 20 goto loimo
+timeout /t 1 /nobreak >nul
+goto doi
+
+:damo
+start "" "http://127.0.0.1:8765"
+echo.
+echo Trang da mo tren trinh duyet.
+echo Neu chua thay, nhin tren thanh tac vu co cua so ten Tao prompt anh.
+echo Cua so do dung de tat tool. Cua so den nay se tu dong.
+timeout /t 5 /nobreak >nul
 exit /b 0
+
+:loimo
+echo.
+echo Chua mo duoc trang. Loi:
+echo.
+if exist "%~dp0loi.txt" type "%~dp0loi.txt"
+echo.
+echo Dang chay lai de hien loi. Dung dong cua so.
+echo.
+"%PY%" "%~dp0mo.py"
+echo.
+echo Chup man hinh ca cua so nay roi gui lai.
+pause
+exit /b 1
+
+:thieufile
+echo Khong thay file mo.py nam cung cho voi Chay.bat.
+echo Hay tai lai file zip, bam Giai nen tat ca, mo thu muc tool, roi bam dup Chay.bat.
+echo Dung bam Chay.bat ngay trong file zip.
+echo.
+pause
+exit /b 1
+
+:thieutk
+echo Python nay khong mo duoc cua so.
+echo Cai lai tu trang https://www.python.org/downloads/
+echo Mo file cai, tick o Add python.exe to PATH, bam Install Now.
+echo Dung cai Python tu Microsoft Store.
+echo.
+pause
+exit /b 1
 
 :chuapython
 echo Chua tim thay Python tren may.
