@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import socket
+import subprocess
+import sys
 import threading
 import time
 import webbrowser
@@ -15,9 +17,14 @@ from app import app
 
 HOST = "127.0.0.1"
 PORT = 8765
-DIA_CHI = f"http://{HOST}:{PORT}"
 THU_MUC = Path(__file__).resolve().parent
 FILE_PID = THU_MUC / "tool.pid"
+FILE_LOI = THU_MUC / "loi.txt"
+
+# DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB
+CO_TACH = 0x00000008 | 0x00000200 | 0x01000000
+# Không thoát được job thì vẫn tách khỏi cửa sổ đen.
+CO_TACH_DU_PHONG = 0x00000008 | 0x00000200
 
 
 def cong_dang_mo(host: str = HOST, port: int = PORT) -> bool:
@@ -47,23 +54,67 @@ def doi_cong(host: str = HOST, port: int = PORT, giay: float = 15) -> bool:
     return False
 
 
-def _mo_trinh_duyet() -> None:
-    webbrowser.open(DIA_CHI)
+def _cong() -> int:
+    raw = os.environ.get("TOOL_PORT", "")
+    if raw.isdigit():
+        return int(raw)
+    return PORT
+
+
+def _mo_trinh_duyet(port: int) -> None:
+    if os.environ.get("TOOL_KHONG_MO_TRINH_DUYET"):
+        return
+    dia_chi = f"http://{HOST}:{port}"
     if os.name == "nt":
-        os.startfile(DIA_CHI)
+        os.startfile(dia_chi)
+        return
+    webbrowser.open(dia_chi)
+
+
+def trinh_chay_nen(exe: Path | None = None) -> str:
+    """pythonw không gắn cửa sổ đen. Không có file đó thì dùng python đang chạy."""
+    goc = Path(exe or sys.executable)
+    pyw = goc.with_name("pythonw.exe")
+    if pyw.is_file():
+        return str(pyw)
+    return str(goc)
+
+
+def bat_dau_tach(argv: list[str], cwd: Path, *, he_windows: bool | None = None) -> subprocess.Popen:
+    """Tách tiến trình khỏi cửa sổ đang mở. Đóng cửa sổ không tắt tiến trình."""
+    windows = os.name == "nt" if he_windows is None else he_windows
+    chung = {
+        "cwd": str(cwd),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "close_fds": True,
+    }
+    if not windows:
+        return subprocess.Popen(argv, start_new_session=True, **chung)
+    try:
+        return subprocess.Popen(argv, creationflags=CO_TACH, **chung)
+    except OSError:
+        return subprocess.Popen(argv, creationflags=CO_TACH_DU_PHONG, **chung)
+
+
+def chay_nen() -> None:
+    argv = [trinh_chay_nen(), str(Path(__file__).resolve())]
+    bat_dau_tach(argv, THU_MUC)
 
 
 def main() -> None:
-    if cong_dang_mo():
-        _mo_trinh_duyet()
+    port = _cong()
+    if cong_dang_mo(HOST, port):
+        _mo_trinh_duyet(port)
         return
     FILE_PID.write_text(str(os.getpid()), encoding="utf-8")
-    server = mo_may_chu()
-    if not doi_cong():
+    server = mo_may_chu(HOST, port)
+    if not doi_cong(HOST, port):
         server.should_exit = True
         FILE_PID.unlink(missing_ok=True)
-        raise RuntimeError("Trang không mở được trên cổng 8765.")
-    _mo_trinh_duyet()
+        raise RuntimeError(f"Trang không mở được trên cổng {port}.")
+    _mo_trinh_duyet(port)
     try:
         while True:
             time.sleep(0.5)
@@ -74,10 +125,12 @@ def main() -> None:
 
 if __name__ == "__main__":
     try:
-        main()
+        if "--nen" in sys.argv[1:]:
+            chay_nen()
+        else:
+            main()
     except Exception:
         import traceback
-        from pathlib import Path
 
-        Path(__file__).resolve().with_name("loi.txt").write_text(traceback.format_exc(), encoding="utf-8")
-        raise
+        FILE_LOI.write_text(traceback.format_exc(), encoding="utf-8")
+        raise SystemExit(1)

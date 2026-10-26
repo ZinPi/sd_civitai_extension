@@ -27,6 +27,8 @@ class AppTests(unittest.TestCase):
         text = page.text
         self.assertIn("Chạy cả bốn bước", text)
         self.assertIn("Bản đã chia dòng", text)
+        self.assertIn("Tat.bat", text)
+        self.assertIn("Chay.bat", text)
         self.assertNotIn("Chọn bộ quy tắc", text)
         self.assertNotIn("USD", text)
         self.assertNotIn("ZIP", text)

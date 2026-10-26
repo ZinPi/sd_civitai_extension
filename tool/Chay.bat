@@ -1,9 +1,9 @@
-﻿@echo off
+@echo off
 cd /d "%~dp0"
 title Tao prompt anh
 
 if not exist "%~dp0mo.py" goto thieufile
-if not exist "%~dp0chay_an.vbs" goto thieufile
+if not exist "%~dp0Tat.bat" goto thieufile
 
 set "PY="
 where py >nul 2>&1 && set "PY=py"
@@ -17,38 +17,38 @@ goto mo
 :caidat
 echo.
 echo Lan dau can cai dat. Giu cua so nay mo, doi vai phut.
-echo Cua so nay se tu tat sau khi trang mo.
+echo Cai xong, cua so nay se tu tat. Trang van chay.
 echo.
 "%PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 goto loicai
 
 :mo
 echo.
-echo Dang mo trang. Doi mot chut. Dung dong cua so nay.
+echo Dang mo trang. Doi mot chut.
+echo Cua so den nay se tu tat. Tat som cung duoc.
+echo Trang van chay sau khi cua so den da tat.
 echo.
-"%PY%" -c "import pathlib,sys; print(pathlib.Path(sys.executable).with_name('pythonw.exe'))" > "%~dp0pyw-path.txt"
-set /p PYW=<"%~dp0pyw-path.txt"
-del "%~dp0pyw-path.txt"
-if not exist "%PYW%" set "PYW=%PY%"
-cscript //nologo "%~dp0chay_an.vbs" "%PYW%"
+if exist "%~dp0loi.txt" del "%~dp0loi.txt"
+"%PY%" "%~dp0mo.py" --nen
+if errorlevel 1 goto loimo
 set /a LAN=0
 
 :doi
 set /a LAN+=1
 "%PY%" -c "import socket,sys; s=socket.socket(); s.settimeout(0.5); sys.exit(0 if s.connect_ex(('127.0.0.1',8765))==0 else 1)"
 if not errorlevel 1 goto damo
+if exist "%~dp0loi.txt" goto loimo
 if %LAN% GEQ 20 goto loimo
 timeout /t 1 /nobreak >nul
 goto doi
 
 :damo
-start "" "http://127.0.0.1:8765"
 echo.
-echo Trang da mo. Cua so den nay se tu tat.
-echo Trang van con khi cua so den da tat.
-echo Muon tat tool thi bam dup file Tat.bat
+echo Trang da mo tren trinh duyet.
+echo Cua so den nay se tu tat. Trang van chay.
+echo Muon tat han: bam dup file Tat.bat, nam cung cho voi Chay.bat.
 timeout /t 6 /nobreak >nul
-exit /b 0
+exit
 
 :loimo
 echo.
@@ -61,8 +61,15 @@ exit /b 1
 
 :thieufile
 echo Ban dang dung ban cu, hoac chua giai nen file zip.
-echo Tai lai file zip, bam Giai nen tat ca, mo thu muc tool.
-echo Trong do phai co file Tat.bat. Roi bam dup Chay.bat.
+echo Lam lan luot:
+echo.
+echo 1. Mo trinh duyet. Bam vao thanh dia chi o tren cung.
+echo 2. Dan dong nay roi bam Enter:
+echo https://github.com/ZinPi/sd_civitai_extension/archive/refs/heads/cursor/quy-tac-tool-48d3.zip
+echo 3. Tai xong, bam phai vao file zip. Chon Extract All hoac Giai nen tat ca.
+echo 4. Mo thu muc vua giai nen. Mo tiep thu muc ten tool.
+echo 5. Trong thu muc tool phai thay ca hai file Chay.bat va Tat.bat.
+echo 6. Bam dup Chay.bat. Dung bam file ngay ben trong file zip.
 echo.
 pause
 exit /b 1

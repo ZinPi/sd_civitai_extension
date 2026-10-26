@@ -63,6 +63,8 @@ h2 {
   color: var(--muted);
 }
 
+.stay { margin-top: 8px; }
+
 .connection {
   margin: 10px 0 0;
   font-size: 14px;
