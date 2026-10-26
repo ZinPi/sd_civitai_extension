@@ -20,6 +20,31 @@ class Completion:
     finish: str
 
 
+def parse_model_ids(data: dict) -> list[str]:
+    """Lấy mã model để chọn. Không lấy tên hiển thị hay tên web."""
+    rows = []
+    if isinstance(data, dict):
+        for key in ("data", "models"):
+            if isinstance(data.get(key), list):
+                rows = data[key]
+                break
+    found: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        if isinstance(row, str):
+            model_id = row.strip()
+        elif isinstance(row, dict):
+            model_id = str(row.get("id") or row.get("name") or "").strip()
+        else:
+            continue
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        found.append(model_id)
+    found.sort(key=str.lower)
+    return found
+
+
 def extract_completion(data: dict) -> tuple[str, str]:
     if isinstance(data.get("error"), dict) and not data.get("choices") and not data.get("output"):
         message = data["error"].get("message") or "API trả lỗi."
@@ -146,18 +171,46 @@ class HttpLlm:
             "stream": False,
         }
 
-    def _post(self, style: str, payload: dict) -> httpx.Response:
-        timeout = float(self.settings.get("request_timeout_seconds") or 180)
+    def list_models(self) -> list[str]:
+        try:
+            response = self._http().get(self._models_endpoint(), headers=self._headers())
+        except httpx.TimeoutException as exc:
+            raise LlmError("Hết giờ chờ. Bấm Kiểm tra lại.", "timeout") from exc
+        except httpx.TransportError as exc:
+            raise LlmError("Không nối được API.", "network") from exc
+        if response.status_code in {401, 403}:
+            raise LlmError("API không dùng được.", "auth")
+        if response.status_code >= 400:
+            raise LlmError("API không dùng được.", "bad")
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise LlmError("API không trả danh sách.", "bad") from exc
+        if not isinstance(data, dict):
+            raise LlmError("API không trả danh sách.", "bad")
+        models = parse_model_ids(data)
+        if not models:
+            raise LlmError("Không thấy model nào.", "empty")
+        return models
+
+    def _http(self) -> httpx.Client:
         if self._client is None:
+            timeout = float(self.settings.get("request_timeout_seconds") or 180)
             self._client = httpx.Client(timeout=httpx.Timeout(connect=30, read=timeout, write=60, pool=30))
-        return self._client.post(
-            self._endpoint(style),
-            headers={
-                "Authorization": f"Bearer {self.settings.get('api_key', '')}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
+        return self._client
+
+    def _headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.settings.get('api_key', '')}",
+            "Content-Type": "application/json",
+        }
+
+    def _post(self, style: str, payload: dict) -> httpx.Response:
+        return self._http().post(self._endpoint(style), headers=self._headers(), json=payload)
+
+    def _models_endpoint(self) -> str:
+        base = str(self.settings.get("base_url") or "").rstrip("/")
+        return base if base.endswith("/models") else base + "/models"
 
     def _endpoint(self, style: str) -> str:
         base = str(self.settings.get("base_url") or "").rstrip("/")

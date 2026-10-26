@@ -2,10 +2,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
 from app import create_app
+from llm import HttpLlm
 from test_runner import write_rules
 
 
@@ -29,6 +31,12 @@ class AppTests(unittest.TestCase):
         self.assertIn("Bản đã chia dòng", text)
         self.assertIn("Tat.bat", text)
         self.assertIn("Chay.bat", text)
+        self.assertIn("Dán API", text)
+        self.assertIn(">Kiểm tra<", text)
+        self.assertIn('id="model-wrap" hidden', text)
+        self.assertNotIn("Địa chỉ API", text)
+        self.assertNotIn("Tên model", text)
+        self.assertNotIn("Kiểu API", text)
         self.assertNotIn("Chọn bộ quy tắc", text)
         self.assertNotIn("USD", text)
         self.assertNotIn("ZIP", text)
@@ -81,7 +89,39 @@ class AppTests(unittest.TestCase):
     def test_run_without_a_key_explains_where_to_fill_it(self):
         response = self.client.post("/api/job", json={"source_text": "Một câu.", "mode": "all"})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Kết nối API", response.json()["detail"])
+        self.assertIn("Dán API", response.json()["detail"])
+
+    def test_check_shows_model_choices_without_a_typed_name(self):
+        def fake_list(self):
+            self.seen_base = self.settings["base_url"]
+            return ["m-b", "m-a"]
+
+        with mock.patch.object(HttpLlm, "list_models", fake_list):
+            response = self.client.post("/api/settings/test", json={"api_key": "secret-key"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertEqual(body["models"], ["m-b", "m-a"])
+        self.assertEqual(body["message"], "Chọn model.")
+        self.assertNotIn("secret-key", response.text)
+        self.assertNotIn("api.openai.com", response.text)
+        stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["api_key"], "secret-key")
+        self.assertEqual(stored["base_url"], "https://api.openai.com/v1")
+        self.assertEqual(stored["model"], "")
+        self.assertNotIn("base_url", self.client.get("/api/settings").json())
+
+    def test_openrouter_key_is_not_shown_as_a_website(self):
+        with mock.patch.object(HttpLlm, "list_models", lambda self: ["vendor/m"]):
+            response = self.client.post("/api/settings/test", json={"api_key": "sk-or-v1-secret"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertNotIn("openrouter", response.text)
+        stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
+        self.assertEqual(stored["base_url"], "https://openrouter.ai/api/v1")
+        picked = self.client.put("/api/settings", json={"api_key": "", "model": "vendor/m"})
+        self.assertEqual(picked.status_code, 200)
+        self.assertEqual(picked.json()["model"], "vendor/m")
+        self.assertNotIn("openrouter", picked.text)
+        self.assertNotIn("sk-or-v1-secret", picked.text)
 
 
 if __name__ == "__main__":

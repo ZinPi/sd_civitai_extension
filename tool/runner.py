@@ -258,14 +258,12 @@ class Job:
         self._qa_omitted_rule = False
 
     def _validate_settings(self, settings: dict) -> None:
-        if not str(settings.get("base_url") or "").strip():
-            raise JobError("Điền địa chỉ, khóa và tên model trong mục Kết nối API.")
-        if not str(settings.get("api_key") or "").strip():
-            raise JobError("Điền địa chỉ, khóa và tên model trong mục Kết nối API.")
+        if not str(settings.get("base_url") or "").strip() or not str(settings.get("api_key") or "").strip():
+            raise JobError("Dán API rồi bấm Kiểm tra.")
         if not str(settings.get("model") or "").strip():
-            raise JobError("Điền địa chỉ, khóa và tên model trong mục Kết nối API.")
+            raise JobError("Bấm Kiểm tra, rồi chọn model.")
         if settings.get("api_style") not in {"chat", "responses"}:
-            raise JobError("Kiểu API không hợp lệ.")
+            raise JobError("API không dùng được.")
 
     def _plan(self) -> list[int]:
         with self._lock:

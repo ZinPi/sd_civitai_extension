@@ -3,10 +3,47 @@ import unittest
 
 import httpx
 
-from llm import HttpLlm, LlmError, extract_completion
+from llm import HttpLlm, LlmError, extract_completion, parse_model_ids
 
 
 class LlmTests(unittest.TestCase):
+    def test_model_choices_use_ids_not_display_names(self):
+        ids = parse_model_ids(
+            {
+                "data": [
+                    {"id": "b-model", "name": "Tên đẹp", "owned_by": "example.com"},
+                    {"id": "a-model", "name": "Tên web"},
+                    {"id": "a-model", "name": "trùng"},
+                ]
+            }
+        )
+        self.assertEqual(ids, ["a-model", "b-model"])
+
+    def test_list_models_reads_ids(self):
+        def handler(request):
+            self.assertTrue(request.url.path.endswith("/models"))
+            self.assertEqual(request.headers["authorization"], "Bearer secret")
+            return httpx.Response(200, json={"data": [{"id": "m", "name": "Tên model"}]})
+
+        llm = HttpLlm(
+            {"base_url": "https://example.test/v1", "api_key": "secret", "model": "", "api_style": "chat"},
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        self.assertEqual(llm.list_models(), ["m"])
+
+    def test_bad_key_does_not_echo_the_secret(self):
+        def handler(request):
+            return httpx.Response(401, json={"error": {"message": "bad secret"}})
+
+        llm = HttpLlm(
+            {"base_url": "https://example.test/v1", "api_key": "secret", "model": "", "api_style": "chat"},
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        with self.assertRaises(LlmError) as caught:
+            llm.list_models()
+        self.assertEqual(caught.exception.kind, "auth")
+        self.assertNotIn("secret", str(caught.exception))
+
     def test_extract_chat_and_responses(self):
         text, finish = extract_completion(
             {"choices": [{"message": {"content": "ok"}, "finish_reason": "length"}]}

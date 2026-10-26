@@ -77,30 +77,46 @@ function showNotice(item) {
 
 function formSettings() {
   return {
-    base_url: document.querySelector("#base-url").value.trim(),
     api_key: document.querySelector("#api-key").value,
     model: document.querySelector("#model").value.trim(),
-    api_style: document.querySelector("#api-style").value,
+    api_style: "chat",
     max_input_tokens: Number(document.querySelector("#max-in").value),
     max_output_tokens: Number(document.querySelector("#max-out").value),
     request_timeout_seconds: Number(document.querySelector("#timeout").value),
   };
 }
 
+function fillModelChoices(models, selected) {
+  const wrap = document.querySelector("#model-wrap");
+  const select = document.querySelector("#model");
+  const list = Array.isArray(models) ? models : [];
+  select.replaceChildren();
+  const blank = document.createElement("option");
+  blank.value = "";
+  blank.textContent = "Chọn model";
+  select.appendChild(blank);
+  for (const id of list) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = id;
+    select.appendChild(option);
+  }
+  select.value = selected && list.includes(selected) ? selected : "";
+  wrap.hidden = list.length === 0;
+}
+
 function fillSettings(settings) {
-  document.querySelector("#base-url").value = settings.base_url || "";
-  document.querySelector("#model").value = settings.model || "";
-  document.querySelector("#api-style").value = settings.api_style || "chat";
   document.querySelector("#max-in").value = settings.max_input_tokens;
   document.querySelector("#max-out").value = settings.max_output_tokens;
   document.querySelector("#timeout").value = settings.request_timeout_seconds;
+  fillModelChoices(settings.models, settings.model || "");
   const key = document.querySelector("#api-key");
   key.value = "";
-  key.placeholder = settings.has_key ? `Đã lưu ${settings.key_hint}` : "Dán khóa API";
-  connection.textContent = settings.model ? `Model: ${settings.model}` : "Chưa kết nối API";
+  key.placeholder = settings.has_key ? `Đã lưu ${settings.key_hint}` : "Dán API";
+  connection.textContent = settings.model ? "Đã kết nối." : "Chưa kết nối.";
   const api = document.querySelector("#api");
-  api.open = !settings.has_key;
-  if (!settings.has_key) api.scrollIntoView({ block: "nearest" });
+  api.open = !settings.model;
+  if (!settings.model) api.scrollIntoView({ block: "nearest" });
 }
 
 async function saveSettings() {
@@ -112,7 +128,7 @@ async function saveSettings() {
   if (!response.ok) {
     const message = await readError(response);
     showNotice({ kind: "error", text: message });
-    if (message.includes("Kết nối API") || message.includes("Địa chỉ")) {
+    if (message.includes("Kiểm tra") || message.includes("Dán API")) {
       const api = document.querySelector("#api");
       api.open = true;
       api.scrollIntoView({ block: "center" });
@@ -253,7 +269,7 @@ async function start(mode) {
   if (!response.ok) {
     const message = await readError(response);
     showNotice({ kind: "error", text: message });
-    if (message.includes("Kết nối API") || message.includes("Địa chỉ")) {
+    if (message.includes("Kiểm tra") || message.includes("Dán API")) {
       const api = document.querySelector("#api");
       api.open = true;
       api.scrollIntoView({ block: "center" });
@@ -345,6 +361,12 @@ clear.addEventListener("click", async () => {
   }
 });
 
+document.querySelector("#model").addEventListener("change", async () => {
+  if (!document.querySelector("#model").value) return;
+  testResult.textContent = "";
+  if (await saveSettings()) document.querySelector("#api").open = false;
+});
+
 document.querySelector("#test").addEventListener("click", async () => {
   testResult.textContent = "Đang kiểm tra…";
   const response = await fetch("/api/settings/test", {
@@ -356,11 +378,10 @@ document.querySelector("#test").addEventListener("click", async () => {
     testResult.textContent = await readError(response);
     return;
   }
-  const data = await response.json();
-  testResult.textContent = data.message;
-  document.querySelector("#api").open = false;
   const saved = await fetch("/api/settings");
   if (saved.ok) fillSettings(await saved.json());
+  document.querySelector("#api").open = true;
+  testResult.textContent = "Chọn model.";
 });
 
 document.addEventListener("keydown", (event) => {
