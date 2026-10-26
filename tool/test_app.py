@@ -1,5 +1,6 @@
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -29,8 +30,13 @@ class AppTests(unittest.TestCase):
         text = page.text
         self.assertIn("Chạy cả bốn bước", text)
         self.assertIn("Bản đã chia dòng", text)
-        self.assertIn("Tat.bat", text)
-        self.assertIn("Chay.bat", text)
+        self.assertIn("Đóng tab này là tool tự tắt", text)
+        self.assertIn("Không cần mở Tat.bat", text)
+        self.assertNotIn("bấm đúp Tat.bat", text)
+        script = (Path(__file__).resolve().parent / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("/api/nhip", script)
+        self.assertIn("/api/roi", script)
+        self.assertIn("pagehide", script)
         self.assertIn("Dán API", text)
         self.assertIn(">Kiểm tra<", text)
         self.assertIn("TeamSocLo", text)
@@ -76,6 +82,18 @@ class AppTests(unittest.TestCase):
         stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
         self.assertEqual(stored["api_key"], "super-secret-key")
         self.assertNotIn("super-secret-key", again.text)
+
+    def test_tab_heartbeat_arms_shutdown(self):
+        started = self.client.post("/api/nhip", params={"tab": "tab-a"})
+        self.assertEqual(started.status_code, 200)
+        khach = self.client.app.state.khach
+        self.assertFalse(khach.nen_tat())
+        left = self.client.post("/api/roi", params={"tab": "tab-a"})
+        self.assertEqual(left.status_code, 200)
+        self.assertFalse(khach.nen_tat())
+        self.assertTrue(khach.nen_tat(bay_gio=time.monotonic() + 60))
+        bad = self.client.post("/api/nhip", params={"tab": "../x"})
+        self.assertEqual(bad.status_code, 400)
 
     def test_rules_endpoint_lists_files(self):
         response = self.client.get("/api/rules")
