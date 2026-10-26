@@ -3,35 +3,34 @@ cd /d "%~dp0"
 title Tao prompt anh
 
 if not exist "%~dp0mo.py" goto thieufile
+if not exist "%~dp0chay_an.vbs" goto thieufile
 
 set "PY="
-set "PYW="
 where py >nul 2>&1 && set "PY=py"
-where pyw >nul 2>&1 && set "PYW=pyw"
 if not defined PY where python >nul 2>&1 && set "PY=python"
-if not defined PYW where pythonw >nul 2>&1 && set "PYW=pythonw"
-if not defined PY if not defined PYW goto chuapython
-if not defined PY set "PY=%PYW%"
-if not defined PYW set "PYW=%PY%"
+if not defined PY goto chuapython
 
-"%PY%" -c "import uvicorn, fastapi, httpx, tkinter" >nul 2>&1
+"%PY%" -c "import uvicorn, fastapi, httpx" >nul 2>&1
 if errorlevel 1 goto caidat
 goto mo
 
 :caidat
 echo.
 echo Lan dau can cai dat. Giu cua so nay mo, doi vai phut.
+echo Cua so nay se tu tat sau khi trang mo.
 echo.
 "%PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 goto loicai
-"%PY%" -c "import tkinter" >nul 2>&1
-if errorlevel 1 goto thieutk
 
 :mo
 echo.
-echo Dang mo trang. Giu cua so nay, doi khoang 10 giay.
+echo Dang mo trang. Doi mot chut. Dung dong cua so nay.
 echo.
-start "Tao prompt anh" /D "%~dp0" "%PYW%" "%~dp0mo.py"
+"%PY%" -c "import pathlib,sys; print(pathlib.Path(sys.executable).with_name('pythonw.exe'))" > "%~dp0pyw-path.txt"
+set /p PYW=<"%~dp0pyw-path.txt"
+del "%~dp0pyw-path.txt"
+if not exist "%PYW%" set "PYW=%PY%"
+cscript //nologo "%~dp0chay_an.vbs" "%PYW%"
 set /a LAN=0
 
 :doi
@@ -45,39 +44,25 @@ goto doi
 :damo
 start "" "http://127.0.0.1:8765"
 echo.
-echo Trang da mo tren trinh duyet.
-echo Neu chua thay, nhin tren thanh tac vu co cua so ten Tao prompt anh.
-echo Cua so do dung de tat tool. Cua so den nay se tu dong.
-timeout /t 5 /nobreak >nul
+echo Trang da mo. Cua so den nay se tu tat.
+echo Trang van con khi cua so den da tat.
+echo Muon tat tool thi bam dup file Tat.bat
+timeout /t 6 /nobreak >nul
 exit /b 0
 
 :loimo
 echo.
-echo Chua mo duoc trang. Loi:
-echo.
+echo Chua mo duoc trang.
 if exist "%~dp0loi.txt" type "%~dp0loi.txt"
-echo.
-echo Dang chay lai de hien loi. Dung dong cua so.
-echo.
-"%PY%" "%~dp0mo.py"
 echo.
 echo Chup man hinh ca cua so nay roi gui lai.
 pause
 exit /b 1
 
 :thieufile
-echo Khong thay file mo.py nam cung cho voi Chay.bat.
-echo Hay tai lai file zip, bam Giai nen tat ca, mo thu muc tool, roi bam dup Chay.bat.
-echo Dung bam Chay.bat ngay trong file zip.
-echo.
-pause
-exit /b 1
-
-:thieutk
-echo Python nay khong mo duoc cua so.
-echo Cai lai tu trang https://www.python.org/downloads/
-echo Mo file cai, tick o Add python.exe to PATH, bam Install Now.
-echo Dung cai Python tu Microsoft Store.
+echo Ban dang dung ban cu, hoac chua giai nen file zip.
+echo Tai lai file zip, bam Giai nen tat ca, mo thu muc tool.
+echo Trong do phai co file Tat.bat. Roi bam dup Chay.bat.
 echo.
 pause
 exit /b 1
@@ -85,11 +70,10 @@ exit /b 1
 :chuapython
 echo Chua tim thay Python tren may.
 echo.
-echo Lam dung 4 viec nay, roi bam dup chuot file Chay.bat lan nua:
 echo 1. Mo trinh duyet, vao https://www.python.org/downloads/
 echo 2. Bam nut vang Download Python
-echo 3. Mo file vua tai. O man hinh dau, tick o Add python.exe to PATH o sat day
-echo 4. Bam Install Now. Cai xong thi dong het cua so den, roi bam dup Chay.bat
+echo 3. Mo file vua tai. Tick o Add python.exe to PATH o sat day
+echo 4. Bam Install Now. Cai xong, bam dup Chay.bat lan nua
 echo.
 pause
 exit /b 1

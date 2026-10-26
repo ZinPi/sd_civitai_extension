@@ -1,4 +1,4 @@
-"""Mở trang trên trình duyệt và giữ tool bằng một cửa sổ thường."""
+"""Giữ trang chạy nền. Đóng cửa sổ đen không tắt trang."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import socket
 import threading
 import time
 import webbrowser
+from pathlib import Path
 
 import uvicorn
 
@@ -15,6 +16,8 @@ from app import app
 HOST = "127.0.0.1"
 PORT = 8765
 DIA_CHI = f"http://{HOST}:{PORT}"
+THU_MUC = Path(__file__).resolve().parent
+FILE_PID = THU_MUC / "tool.pid"
 
 
 def cong_dang_mo(host: str = HOST, port: int = PORT) -> bool:
@@ -44,76 +47,6 @@ def doi_cong(host: str = HOST, port: int = PORT, giay: float = 15) -> bool:
     return False
 
 
-def _hop_thoai(noi_dung: str) -> None:
-    import tkinter as tk
-    from tkinter import messagebox
-
-    goc = tk.Tk()
-    goc.withdraw()
-    messagebox.showinfo("Tạo prompt ảnh", noi_dung)
-    goc.destroy()
-
-
-def _cua_so(server: uvicorn.Server) -> None:
-    import tkinter as tk
-
-    goc = tk.Tk()
-    goc.title("Tạo prompt ảnh")
-    goc.configure(bg="#f3ecdf")
-    goc.resizable(False, False)
-    goc.geometry("440x210")
-    goc.lift()
-    goc.attributes("-topmost", True)
-    goc.after(800, lambda: goc.attributes("-topmost", False))
-
-    chu = tk.Label(
-        goc,
-        text="Trang đã mở trên trình duyệt.\nCửa sổ này giữ tool chạy.\nThu nhỏ cũng được.\nDùng xong thì bấm Tắt.",
-        bg="#f3ecdf",
-        fg="#221c16",
-        font=("Segoe UI", 12),
-        justify="left",
-    )
-    chu.pack(anchor="w", padx=22, pady=(22, 12))
-
-    hang = tk.Frame(goc, bg="#f3ecdf")
-    hang.pack(anchor="w", padx=22)
-
-    def mo_lai() -> None:
-        webbrowser.open(DIA_CHI)
-
-    def tat() -> None:
-        server.should_exit = True
-        goc.destroy()
-
-    tk.Button(
-        hang,
-        text="Mở lại trang",
-        command=mo_lai,
-        font=("Segoe UI", 11),
-        bg="#fffdf8",
-        relief="flat",
-        padx=12,
-        pady=6,
-    ).pack(side="left")
-    tk.Button(
-        hang,
-        text="Tắt",
-        command=tat,
-        font=("Segoe UI", 11, "bold"),
-        bg="#8f3d1b",
-        fg="#fffaf6",
-        activebackground="#8f3d1b",
-        activeforeground="#fffaf6",
-        relief="flat",
-        padx=16,
-        pady=6,
-    ).pack(side="left", padx=(10, 0))
-
-    goc.protocol("WM_DELETE_WINDOW", tat)
-    goc.mainloop()
-
-
 def _mo_trinh_duyet() -> None:
     webbrowser.open(DIA_CHI)
     if os.name == "nt":
@@ -123,15 +56,20 @@ def _mo_trinh_duyet() -> None:
 def main() -> None:
     if cong_dang_mo():
         _mo_trinh_duyet()
-        _hop_thoai("Tool đang chạy sẵn.\nTrình duyệt đã được mở lại.\nCửa sổ Tạo prompt ảnh lúc nãy dùng để tắt.")
         return
+    FILE_PID.write_text(str(os.getpid()), encoding="utf-8")
     server = mo_may_chu()
     if not doi_cong():
-        _hop_thoai("Không mở được trang.\nChụp màn hình này rồi gửi lại.")
         server.should_exit = True
-        return
+        FILE_PID.unlink(missing_ok=True)
+        raise RuntimeError("Trang không mở được trên cổng 8765.")
     _mo_trinh_duyet()
-    _cua_so(server)
+    try:
+        while True:
+            time.sleep(0.5)
+    finally:
+        server.should_exit = True
+        FILE_PID.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

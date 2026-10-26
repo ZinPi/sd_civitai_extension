@@ -9,3 +9,6 @@ __pycache__
 /test/stdout.txt
 /test/stderr.txt
 tool/data/
+tool/tool.pid
+tool/loi.txt
+tool/pyw-path.txt
