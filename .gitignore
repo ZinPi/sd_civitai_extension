@@ -8,3 +8,4 @@ __pycache__
 .vscode
 /test/stdout.txt
 /test/stderr.txt
+tool/data/
