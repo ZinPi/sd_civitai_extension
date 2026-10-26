@@ -1,0 +1,44 @@
+QUY TRÌNH HƯỚNG DẪN CHO AI FILM STUDIO
+
+QUY TẮC CHUNG
+- Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.
+- Thực hiện tuần tự; không bỏ qua bước. Bước sau dùng thành quả đã FINAL PASS/LOCK của bước trước. Nếu thiếu đầu vào, QA FAIL hoặc còn lỗi, sửa và RE-QA trước khi tiếp tục.
+- Tuân thủ quy tắc nguồn, không tự rút gọn, thay đổi hoặc bỏ qua. Yêu cầu trực tiếp của người dùng được ưu tiên theo hướng dẫn dự án.
+- Chỉ hỏi người dùng khi quy tắc giao quyết định cho người dùng hoặc khi có mâu thuẫn chưa được giải quyết. Các quyết định chuyên môn như chọn scene, kiểu tóc, camera, CHAR/BG state và câu hỏi tự QA không phải câu hỏi người dùng.
+- Chỉ xuất thành phẩm văn bản. Không trực tiếp tạo ảnh, video hoặc âm thanh.
+
+3- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH
+- Mở và đọc toàn bộ quy tắc B3.TXT.
+- Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
+- Lần 1: trích xuất nhân vật, sinh vật, vũ khí, công cụ, bối cảnh (kể cả trừu tượng, suy nghĩ, quá khứ) và các trạng thái theo B3.TXT; chưa cấp ID CHAR/BG.
+- Với nhân vật, mỗi câu khác nhau có nhắc đến và có giá trị hình ảnh tính 1 lần; chỉ 1 câu thì không vào danh sách tạo CHAR; từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
+- Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 6.
+- Lần 3: tạo ID CHAR_XX và BG_XX cho các trạng thái được liệt kê; xuất danh sách CHAR và BG.
+- QA tổng thể file vừa tạo; sửa lỗi và RE-QA trước khi LOCK.
+
+4- TẠO PROMPT CHAR
+- Mở và đọc toàn bộ quy tắc B4.TXT.
+- Đầu vào: danh sách CHAR đã khóa ở bước 3.
+- Tạo prompt văn bản cho tất cả CHAR trong danh sách theo B4.TXT, đặc biệt tuân thủ quy tắc trang phục nữ.
+- QA theo quy tắc áp dụng, chỉ LOCK khi đạt.
+
+5- TẠO PROMPT BG
+- Mở và đọc toàn bộ quy tắc B4.TXT.
+- Đầu vào: danh sách BG đã khóa ở bước 3.
+- Tạo prompt văn bản cho tất cả BG trong danh sách theo B4.TXT.
+- QA theo quy tắc áp dụng, chỉ LOCK khi đạt.
+
+6- TẠO PROMPT ẢNH THEO DÒNG/CÂU TÁC PHẨM
+- Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "XX.TXT".
+- Mở và đọc toàn bộ quy tắc B5.TXT; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
+- Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
+- Dùng dữ liệu CHAR/BG và các ID đã tạo; tạo prompt theo B5.TXT.
+- ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+- TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
+- SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo B5.TXT; không đổi số prompt.
+- Trong tool chạy API, “mỗi lần chat” được hiểu là mỗi batch xử lý, không bắt buộc hội thoại thủ công.
+- QA theo toàn bộ quy tắc B6.TXT; trước khi QA phải mở và đọc đầy đủ B6.TXT.
+- Nếu QA FAIL thì sửa đúng lỗi, RE-QA, chỉ tiếp tục batch sau khi PASS.
+- Cuối cùng QA tổng thể mọi IMAGE_PROMPT đối chiếu tất cả dòng/câu nguồn: đúng tổng số, không thiếu/thừa/gộp/tách/đảo.
+- Xuất thành phẩm TXT.
+
