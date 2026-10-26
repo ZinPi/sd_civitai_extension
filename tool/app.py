@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from engine import OUTPUT_FILES, RULE_FILES, RULE_LABELS, JobError, atomic_write
-from llm import HttpLlm, LlmError
+from llm import PROVIDERS, HttpLlm, LlmError
 from runner import AlreadyRunning, Job
 
 ROOT = Path(__file__).resolve().parent
@@ -25,17 +25,16 @@ DEFAULT_RULES = Path(os.environ.get("QUY_TAC_DIR", ROOT.parent / "quy-tac-tool")
 DEFAULT_DATA = Path(os.environ.get("TOOL_DATA_DIR", ROOT / "data"))
 STATIC = ROOT / "static"
 
-OPENAI_BASE = "https://api.openai.com/v1"
-OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 NEED_KEY = "Dán API rồi bấm Kiểm tra."
 NEED_MODEL = "Bấm Kiểm tra, rồi chọn model."
 
 DEFAULT_SETTINGS = {
-    "base_url": "",
+    "provider": "teamsoclo",
+    "base_url": PROVIDERS["teamsoclo"]["base"],
     "api_key": "",
     "model": "",
     "models": [],
-    "api_style": "chat",
+    "api_style": PROVIDERS["teamsoclo"]["style"],
     "max_input_tokens": 120_000,
     "max_output_tokens": 8192,
     "request_timeout_seconds": 180,
@@ -43,10 +42,11 @@ DEFAULT_SETTINGS = {
 
 
 class SettingsBody(BaseModel):
+    provider: str = "teamsoclo"
     base_url: str = ""
     api_key: str = ""
     model: str = ""
-    api_style: str = "chat"
+    api_style: str = "responses"
     max_input_tokens: int = 120_000
     max_output_tokens: int = 8192
     request_timeout_seconds: int = Field(default=180, ge=30, le=600)
@@ -71,6 +71,12 @@ def load_settings(path: Path) -> dict:
                 if key == "models" and not isinstance(saved[key], list):
                     continue
                 settings[key] = saved[key]
+    provider = str(settings.get("provider") or "teamsoclo")
+    if provider not in PROVIDERS:
+        provider = "teamsoclo"
+    settings["provider"] = provider
+    settings["base_url"] = PROVIDERS[provider]["base"]
+    settings["api_style"] = PROVIDERS[provider]["style"]
     return settings
 
 
@@ -84,23 +90,6 @@ def public_settings(settings: dict) -> dict:
     visible["has_key"] = bool(key)
     visible["key_hint"] = ("••••" + key[-4:]) if len(key) >= 4 else ("••••" if key else "")
     return visible
-
-
-def split_pasted_api(text: str) -> tuple[str, str]:
-    url = ""
-    key = ""
-    for part in text.replace("\n", " ").replace(",", " ").split():
-        if part.startswith(("http://", "https://")):
-            url = part.rstrip("/")
-        elif not key:
-            key = part
-    return url, key
-
-
-def host_for_key(key: str) -> str:
-    if key.startswith("sk-or-"):
-        return OPENROUTER_BASE
-    return OPENAI_BASE
 
 
 def valid_base_url(value: str) -> bool:
@@ -127,36 +116,33 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
         except OSError:
             pass
 
-    def merged(body: SettingsBody, *, pasted_key: bool = False) -> dict:
+    def merged(body: SettingsBody) -> dict:
         current = read_saved()
-        pasted_url, pasted = split_pasted_api(body.api_key)
-        if pasted_key and pasted_url:
-            base = pasted_url
-        elif body.base_url.strip():
-            base = body.base_url.strip().rstrip("/")
-        elif pasted_key:
-            base = host_for_key(pasted or str(current.get("api_key") or ""))
-        else:
-            base = str(current.get("base_url") or "").rstrip("/") or host_for_key(str(current.get("api_key") or ""))
-        saved_models = current.get("models") if isinstance(current.get("models"), list) else []
+        provider = body.provider.strip() or str(current.get("provider") or "teamsoclo")
+        if provider not in PROVIDERS:
+            provider = "teamsoclo"
+        spec = PROVIDERS[provider]
+        same = provider == str(current.get("provider") or "teamsoclo")
+        saved_models = current.get("models") if same and isinstance(current.get("models"), list) else []
+        models = [str(item).strip() for item in saved_models if str(item).strip()]
+        model = body.model.strip()
+        if models and model and model not in models:
+            model = ""
         settings = {
-            "base_url": base,
-            "api_key": pasted or str(current.get("api_key") or ""),
-            "model": body.model.strip(),
-            "models": [str(item).strip() for item in saved_models if str(item).strip()],
-            "api_style": body.api_style or "chat",
+            "provider": provider,
+            "base_url": spec["base"],
+            "api_key": body.api_key.strip() or str(current.get("api_key") or ""),
+            "model": model,
+            "models": models,
+            "api_style": spec["style"],
             "max_input_tokens": body.max_input_tokens,
             "max_output_tokens": body.max_output_tokens,
             "request_timeout_seconds": body.request_timeout_seconds,
         }
-        if settings["api_style"] not in {"chat", "responses"}:
-            raise HTTPException(status_code=400, detail="API không dùng được.")
         if not 1024 <= settings["max_input_tokens"] <= 2_000_000:
             raise HTTPException(status_code=400, detail="Token đầu vào cần từ 1024 đến 2000000.")
         if not 256 <= settings["max_output_tokens"] <= 200_000:
             raise HTTPException(status_code=400, detail="Token đầu ra cần từ 256 đến 200000.")
-        if not valid_base_url(settings["base_url"]):
-            raise HTTPException(status_code=400, detail="API không dùng được.")
         return settings
 
     @app.get("/")
@@ -184,14 +170,14 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
 
     @app.put("/api/settings")
     def put_settings(body: SettingsBody):
-        settings = merged(body, pasted_key=bool(body.api_key.strip()))
+        settings = merged(body)
         store(settings)
         return public_settings(settings)
 
     @app.post("/api/settings/test")
     def test_settings(body: SettingsBody):
-        settings = merged(body, pasted_key=bool(body.api_key.strip()))
-        if not settings["api_key"] and not split_pasted_api(body.api_key)[0]:
+        settings = merged(body)
+        if not settings["api_key"]:
             raise HTTPException(status_code=400, detail=NEED_KEY)
         client = HttpLlm(settings)
         try:

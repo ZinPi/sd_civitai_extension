@@ -244,6 +244,7 @@ class Job:
             self._reset_outputs()
             self._log_unlocked("Bản nguồn khác lần trước, chạy lại từ bước 1.")
         self._settings = {
+            "provider": str(settings.get("provider") or "teamsoclo"),
             "base_url": settings["base_url"].strip(),
             "api_key": settings["api_key"],
             "model": settings["model"].strip(),
@@ -262,7 +263,7 @@ class Job:
             raise JobError("Dán API rồi bấm Kiểm tra.")
         if not str(settings.get("model") or "").strip():
             raise JobError("Bấm Kiểm tra, rồi chọn model.")
-        if settings.get("api_style") not in {"chat", "responses"}:
+        if settings.get("api_style") not in {"chat", "responses", "claude"}:
             raise JobError("API không dùng được.")
 
     def _plan(self) -> list[int]:

@@ -33,10 +33,14 @@ class AppTests(unittest.TestCase):
         self.assertIn("Chay.bat", text)
         self.assertIn("Dán API", text)
         self.assertIn(">Kiểm tra<", text)
+        self.assertIn("TeamSocLo", text)
         self.assertIn('id="model-wrap" hidden', text)
         self.assertNotIn("Địa chỉ API", text)
         self.assertNotIn("Tên model", text)
         self.assertNotIn("Kiểu API", text)
+        self.assertNotIn("teamsoclo.site", text)
+        self.assertNotIn("tuansuapi", text)
+        self.assertNotIn("openai.com", text)
         self.assertNotIn("Chọn bộ quy tắc", text)
         self.assertNotIn("USD", text)
         self.assertNotIn("ZIP", text)
@@ -106,21 +110,29 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("api.openai.com", response.text)
         stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
         self.assertEqual(stored["api_key"], "secret-key")
-        self.assertEqual(stored["base_url"], "https://api.openai.com/v1")
+        self.assertEqual(stored["provider"], "teamsoclo")
+        self.assertEqual(stored["base_url"], "https://gpt.teamsoclo.site/v1")
+        self.assertEqual(stored["api_style"], "responses")
         self.assertEqual(stored["model"], "")
         self.assertNotIn("base_url", self.client.get("/api/settings").json())
+        self.assertNotIn("teamsoclo.site", response.text)
 
-    def test_openrouter_key_is_not_shown_as_a_website(self):
+    def test_tuansu_uses_its_chat_endpoint_without_showing_the_address(self):
         with mock.patch.object(HttpLlm, "list_models", lambda self: ["vendor/m"]):
-            response = self.client.post("/api/settings/test", json={"api_key": "sk-or-v1-secret"})
+            response = self.client.post(
+                "/api/settings/test",
+                json={"provider": "tuansu", "api_key": "sk-or-v1-secret"},
+            )
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertNotIn("openrouter", response.text)
+        self.assertNotIn("tuansuapi", response.text)
+        self.assertNotIn("sk-or-v1-secret", response.text)
         stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
-        self.assertEqual(stored["base_url"], "https://openrouter.ai/api/v1")
-        picked = self.client.put("/api/settings", json={"api_key": "", "model": "vendor/m"})
+        self.assertEqual(stored["base_url"], "https://tuansuapi.store/v1")
+        self.assertEqual(stored["api_style"], "chat")
+        picked = self.client.put("/api/settings", json={"provider": "tuansu", "api_key": "", "model": "vendor/m"})
         self.assertEqual(picked.status_code, 200)
         self.assertEqual(picked.json()["model"], "vendor/m")
-        self.assertNotIn("openrouter", picked.text)
+        self.assertNotIn("tuansuapi", picked.text)
         self.assertNotIn("sk-or-v1-secret", picked.text)
 
 

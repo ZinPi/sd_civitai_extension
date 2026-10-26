@@ -35,6 +35,14 @@
     <details class="sheet settings" id="api" open>
       <summary>API</summary>
       <div class="form">
+        <label>
+          <select id="provider" aria-label="Chỗ dùng API">
+            <option value="teamsoclo" selected>TeamSocLo</option>
+            <option value="tuansu">TuanSu</option>
+            <option value="openai">OpenAI</option>
+            <option value="claude">Claude</option>
+          </select>
+        </label>
         <label>API
           <input id="api-key" type="password" autocomplete="off" placeholder="Dán API">
         </label>
@@ -137,6 +145,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=4"></script>
+  <script src="/static/app.js?v=5"></script>
 </body>
 </html>

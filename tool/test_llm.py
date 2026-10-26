@@ -3,10 +3,76 @@ import unittest
 
 import httpx
 
-from llm import HttpLlm, LlmError, extract_completion, parse_model_ids
+from llm import HttpLlm, LlmError, extract_completion, parse_model_ids, text_model_ids
 
 
 class LlmTests(unittest.TestCase):
+    def test_text_models_drop_pictures_and_speech(self):
+        kept = text_model_ids(
+            ["gpt-5", "gpt-image-1", "whisper-1", "claude-sonnet", "tts-1"],
+            "openai",
+        )
+        self.assertEqual(kept, ["gpt-5"])
+        kept = text_model_ids(["claude-sonnet", "gpt-5", "claude-tts"], "claude")
+        self.assertEqual(kept, ["claude-sonnet"])
+
+    def test_teamsoclo_posts_responses_with_instructions(self):
+        seen = {}
+
+        def handler(request):
+            seen["url"] = str(request.url)
+            seen["body"] = json.loads(request.content.decode("utf-8"))
+            seen["auth"] = request.headers["authorization"]
+            return httpx.Response(
+                200,
+                json={
+                    "status": "completed",
+                    "output_text": "ok",
+                },
+            )
+
+        llm = HttpLlm(
+            {
+                "provider": "teamsoclo",
+                "base_url": "https://gpt.teamsoclo.site/v1",
+                "api_key": "secret",
+                "model": "m",
+            },
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        self.assertEqual(llm.complete("quy tac", "dong 1", 32).text, "ok")
+        self.assertEqual(seen["url"], "https://gpt.teamsoclo.site/v1/responses")
+        self.assertEqual(seen["auth"], "Bearer secret")
+        self.assertEqual(seen["body"]["instructions"], "quy tac")
+        self.assertEqual(seen["body"]["input"], "dong 1")
+        self.assertNotIn("temperature", seen["body"])
+        self.assertNotIn("messages", seen["body"])
+
+    def test_claude_posts_messages_with_its_own_header(self):
+        seen = {}
+
+        def handler(request):
+            seen["url"] = str(request.url)
+            seen["key"] = request.headers["x-api-key"]
+            seen["body"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(
+                200,
+                json={
+                    "stop_reason": "end_turn",
+                    "content": [{"type": "text", "text": "ok"}],
+                },
+            )
+
+        llm = HttpLlm(
+            {"provider": "claude", "api_key": "secret", "model": "claude-sonnet"},
+            client=httpx.Client(transport=httpx.MockTransport(handler)),
+        )
+        self.assertEqual(llm.complete("sys", "user", 16).text, "ok")
+        self.assertEqual(seen["url"], "https://api.anthropic.com/v1/messages")
+        self.assertEqual(seen["key"], "secret")
+        self.assertEqual(seen["body"]["system"], "sys")
+        self.assertEqual(seen["body"]["messages"], [{"role": "user", "content": "user"}])
+
     def test_model_choices_use_ids_not_display_names(self):
         ids = parse_model_ids(
             {
@@ -43,6 +109,7 @@ class LlmTests(unittest.TestCase):
             llm.list_models()
         self.assertEqual(caught.exception.kind, "auth")
         self.assertNotIn("secret", str(caught.exception))
+        self.assertIn("từ chối", str(caught.exception))
 
     def test_extract_chat_and_responses(self):
         text, finish = extract_completion(

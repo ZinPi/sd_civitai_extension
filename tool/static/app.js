@@ -77,9 +77,9 @@ function showNotice(item) {
 
 function formSettings() {
   return {
+    provider: document.querySelector("#provider").value,
     api_key: document.querySelector("#api-key").value,
     model: document.querySelector("#model").value.trim(),
-    api_style: "chat",
     max_input_tokens: Number(document.querySelector("#max-in").value),
     max_output_tokens: Number(document.querySelector("#max-out").value),
     request_timeout_seconds: Number(document.querySelector("#timeout").value),
@@ -106,6 +106,10 @@ function fillModelChoices(models, selected) {
 }
 
 function fillSettings(settings) {
+  const provider = document.querySelector("#provider");
+  if (settings.provider && provider.querySelector(`option[value="${settings.provider}"]`)) {
+    provider.value = settings.provider;
+  }
   document.querySelector("#max-in").value = settings.max_input_tokens;
   document.querySelector("#max-out").value = settings.max_output_tokens;
   document.querySelector("#timeout").value = settings.request_timeout_seconds;
@@ -359,6 +363,12 @@ clear.addEventListener("click", async () => {
     shownKey = "";
     render(await response.json());
   }
+});
+
+document.querySelector("#provider").addEventListener("change", () => {
+  fillModelChoices([], "");
+  connection.textContent = "Chưa kết nối.";
+  testResult.textContent = "Bấm Kiểm tra lại.";
 });
 
 document.querySelector("#model").addEventListener("change", async () => {
