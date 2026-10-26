@@ -3,33 +3,30 @@ chcp 65001 >nul
 cd /d "%~dp0"
 title Tao prompt anh
 
-where py >nul 2>&1
-if %errorlevel%==0 (
-  set "PY=py"
-) else (
-  where python >nul 2>&1
-  if errorlevel 1 goto chuapython
-  set "PY=python"
-)
+set "PY="
+set "PYW="
+where py >nul 2>&1 && set "PY=py"
+where pyw >nul 2>&1 && set "PYW=pyw"
+if not defined PY where python >nul 2>&1 && set "PY=python"
+if not defined PYW where pythonw >nul 2>&1 && set "PYW=pythonw"
+if not defined PY if not defined PYW goto chuapython
+if not defined PY set "PY=%PYW%"
+if not defined PYW set "PYW=%PY%"
 
+"%PY%" -c "import uvicorn, fastapi, httpx" >nul 2>&1
+if errorlevel 1 goto caidat
+goto mo
+
+:caidat
 echo.
-echo Dang chuan bi. Lan dau co the mat vai phut.
-echo Cu de cua so nay mo. Dong cua so la trang se tat.
+echo Lan dau can cai dat. Cua so den nay se tu tat khi xong.
+echo Doi vai phut. Dung dong cua so.
 echo.
-%PY% -m pip install -r requirements.txt
+"%PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 goto loicai
 
-echo.
-echo Mo Chrome hoac Edge. Bam vao thanh dia chi o tren cung, dan dong nay roi Enter:
-echo.
-echo     http://127.0.0.1:8765
-echo.
-echo Giu nguyen cua so den nay. Dung xong thi dong cua so nay.
-echo.
-%PY% app.py
-echo.
-echo Trang da tat.
-pause
+:mo
+start "" "%PYW%" "%~dp0mo.py"
 exit /b 0
 
 :chuapython
