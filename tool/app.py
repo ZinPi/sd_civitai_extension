@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from engine import OUTPUT_FILES, RULE_FILES, RULE_LABELS, JobError, atomic_write
+from khach import KhachTrang
 from llm import PROVIDERS, HttpLlm, LlmError
 from runner import AlreadyRunning, Job
 
@@ -104,6 +105,7 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
     settings_path = data / "settings.json"
     job = Job(rules_path, data)
     app = FastAPI(title="Tạo prompt ảnh")
+    app.state.khach = KhachTrang()
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def read_saved() -> dict:
@@ -148,6 +150,17 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/nhip")
+    def nhip_tab(tab: str = ""):
+        if not app.state.khach.nhip(tab):
+            raise HTTPException(status_code=400, detail="Thiếu mã tab.")
+        return {"ok": True}
+
+    @app.post("/api/roi")
+    def roi_tab(tab: str = ""):
+        app.state.khach.roi(tab)
+        return {"ok": True}
 
     @app.get("/api/rules")
     def list_rules():

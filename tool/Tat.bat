@@ -8,6 +8,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8765" ^| findstr "LISTENING
 if exist "%~dp0tool.pid" del "%~dp0tool.pid"
 echo.
 echo Da tat tool. Trang web se khong mo duoc nua.
+echo Lan sau chi can dong tab. Cua so den tu tat, khong can file nay.
 echo Muon mo lai: bam dup file Chay.bat.
 echo Cua so nay se tu tat.
 timeout /t 4 /nobreak >nul

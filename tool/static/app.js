@@ -401,8 +401,34 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+function tabToken() {
+  const rand = Math.random().toString(36).slice(2);
+  const stamp = Date.now().toString(36);
+  return `t${rand}${stamp}`.replace(/[^a-z0-9]/g, "").slice(0, 64);
+}
+
+const tabId = tabToken();
+
+function postTab(path) {
+  const url = `${path}?tab=${encodeURIComponent(tabId)}`;
+  if (path === "/api/roi" && navigator.sendBeacon && navigator.sendBeacon(url)) return;
+  fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+}
+
+function watchTab() {
+  const beat = () => postTab("/api/nhip");
+  beat();
+  window.setInterval(beat, 15000);
+  window.addEventListener("pageshow", beat);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") beat();
+  });
+  window.addEventListener("pagehide", () => postTab("/api/roi"));
+}
+
 updateCount();
 loadRules();
+watchTab();
 fetch("/api/settings").then(async (response) => {
   if (response.ok) fillSettings(await response.json());
 }).finally(() => refresh(true));

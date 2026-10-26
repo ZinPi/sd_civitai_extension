@@ -1,4 +1,7 @@
-"""Giữ trang chạy nền. Đóng cửa sổ đen không tắt trang."""
+"""Giữ trang chạy nền. Đóng cửa sổ đen không tắt trang.
+
+Đóng tab trên trình duyệt thì tiến trình tự thoát. Cửa sổ đen đang chờ cũng tắt.
+"""
 
 from __future__ import annotations
 
@@ -116,11 +119,15 @@ def main() -> None:
         raise RuntimeError(f"Trang không mở được trên cổng {port}.")
     _mo_trinh_duyet(port)
     try:
-        while True:
-            time.sleep(0.5)
+        while not app.state.khach.nen_tat():
+            time.sleep(0.4)
     finally:
         server.should_exit = True
         FILE_PID.unlink(missing_ok=True)
+        for _ in range(40):
+            if not cong_dang_mo(HOST, port):
+                break
+            time.sleep(0.1)
 
 
 if __name__ == "__main__":

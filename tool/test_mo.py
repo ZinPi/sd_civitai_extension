@@ -116,11 +116,66 @@ class MoTests(unittest.TestCase):
         damo = noi.split(":damo", 1)[1].split(":loimo", 1)[0]
         self.assertIn("\nexit\r\n", damo)
         self.assertNotIn("exit /b", damo)
+        self.assertIn("Dong tab trang la tool tu tat", damo)
+        self.assertIn(":cho", damo)
+        self.assertNotIn("Tat.bat", damo)
+        self.assertNotIn("timeout /t 6", damo)
         tat = Path(mo.__file__).with_name("Tat.bat").read_text(encoding="ascii")
         self.assertIn("tool.pid", tat)
         self.assertIn("8765", tat)
         self.assertIn("taskkill", tat)
         self.assertNotIn("chay_an.vbs", tat)
+
+    def test_dong_tab_thi_tien_trinh_tu_thoat(self):
+        import urllib.request
+
+        port = 18781
+        self.assertFalse(mo.cong_dang_mo("127.0.0.1", port))
+        env = os.environ.copy()
+        env["TOOL_PORT"] = str(port)
+        env["TOOL_KHONG_MO_TRINH_DUYET"] = "1"
+        env["TOOL_CHO_ROI_GIAY"] = "0.4"
+        env["TOOL_HET_NHIP_GIAY"] = "30"
+        mo.FILE_LOI.unlink(missing_ok=True)
+        mo.FILE_PID.unlink(missing_ok=True)
+        err = tempfile.TemporaryFile()
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        proc = subprocess.Popen(
+            [sys.executable, str(Path(mo.__file__).resolve())],
+            env=env,
+            cwd=str(mo.THU_MUC),
+            stdout=subprocess.DEVNULL,
+            stderr=err,
+        )
+
+        def bao_loi(mac_dinh: str) -> str:
+            err.seek(0)
+            chu = err.read().decode(errors="replace")
+            if mo.FILE_LOI.is_file():
+                chu = mo.FILE_LOI.read_text(encoding="utf-8") + "\n" + chu
+            return chu or mac_dinh
+
+        try:
+            if not mo.doi_cong("127.0.0.1", port, giay=15):
+                self.fail(bao_loi("trang khong mo"))
+            time.sleep(0.7)
+            self.assertIsNone(proc.poll(), bao_loi("tat khi chua co tab"))
+            opener.open(f"http://127.0.0.1:{port}/api/nhip?tab=tabmot", data=b"", timeout=5).read()
+            time.sleep(0.7)
+            self.assertIsNone(proc.poll(), bao_loi("tat khi tab con mo"))
+            opener.open(f"http://127.0.0.1:{port}/api/roi?tab=tabmot", data=b"", timeout=5).read()
+            het = time.time() + 12
+            while time.time() < het and proc.poll() is None:
+                time.sleep(0.1)
+            self.assertIsNotNone(proc.poll(), bao_loi("khong tu tat sau khi dong tab"))
+            self.assertFalse(mo.cong_dang_mo("127.0.0.1", port))
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+            err.close()
+            mo.FILE_PID.unlink(missing_ok=True)
+            mo.FILE_LOI.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

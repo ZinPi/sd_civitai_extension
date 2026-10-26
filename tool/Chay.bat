@@ -17,7 +17,6 @@ goto mo
 :caidat
 echo.
 echo Lan dau can cai dat. Giu cua so nay mo, doi vai phut.
-echo Cai xong, cua so nay se tu tat. Trang van chay.
 echo.
 "%PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 goto loicai
@@ -25,8 +24,8 @@ if errorlevel 1 goto loicai
 :mo
 echo.
 echo Dang mo trang. Doi mot chut.
-echo Cua so den nay se tu tat. Tat som cung duoc.
-echo Trang van chay sau khi cua so den da tat.
+echo Khi trang mo, cua so den nay giu mo.
+echo Dong tab la cua so den tu tat. Tat som cua so cung duoc.
 echo.
 if exist "%~dp0loi.txt" del "%~dp0loi.txt"
 "%PY%" "%~dp0mo.py" --nen
@@ -45,9 +44,25 @@ goto doi
 :damo
 echo.
 echo Trang da mo tren trinh duyet.
-echo Cua so den nay se tu tat. Trang van chay.
-echo Muon tat han: bam dup file Tat.bat, nam cung cho voi Chay.bat.
-timeout /t 6 /nobreak >nul
+echo Dong tab trang la tool tu tat, cua so den nay cung tat.
+echo Neu tat som cua so den, trang van chay den khi dong tab.
+echo.
+set /a MAT=0
+
+:cho
+"%PY%" -c "import socket,sys; s=socket.socket(); s.settimeout(0.5); sys.exit(0 if s.connect_ex(('127.0.0.1',8765))==0 else 1)"
+if errorlevel 1 goto mat
+set /a MAT=0
+timeout /t 1 /nobreak >nul
+goto cho
+
+:mat
+set /a MAT+=1
+if %MAT% GEQ 2 goto xong
+timeout /t 1 /nobreak >nul
+goto cho
+
+:xong
 exit
 
 :loimo
