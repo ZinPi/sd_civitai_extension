@@ -37,6 +37,11 @@ QUY TẮC CHUNG
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
 - SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo B5.TXT; không đổi số prompt.
 - Trong tool chạy API, “mỗi lần chat” được hiểu là mỗi batch xử lý, không bắt buộc hội thoại thủ công.
+- 20 prompt một lượt chỉ là mức trần tham khảo, không phải số bắt buộc.
+- Trước khi gọi API, nếu 20 dòng cùng quy tắc B5 và file tham chiếu đã khóa vượt giới hạn token đầu vào hoặc đầu ra của model, giảm số dòng của lượt đó cho đến khi vừa giới hạn.
+- Mỗi lượt vẫn xuất đủ một prompt hoàn chỉnh cho đúng các dòng đã gửi. Không cắt cụt prompt, không gộp dòng, không bỏ dòng để nhét đủ 20.
+- Nếu phản hồi bị cắt vì hết token, không nhận phần bị cắt. Dòng chưa có prompt hoàn chỉnh đưa sang lượt sau với số dòng ít hơn. Dòng đã có prompt hoàn chỉnh và đã đếm đúng thì giữ.
+- Nếu chỉ một dòng cùng quy tắc và file tham chiếu vẫn vượt giới hạn token, dừng lượt đó và báo, không tự cắt quy tắc hoặc file tham chiếu.
 - QA theo toàn bộ quy tắc B6.TXT; trước khi QA phải mở và đọc đầy đủ B6.TXT.
 - Nếu QA FAIL thì sửa đúng lỗi, RE-QA, chỉ tiếp tục batch sau khi PASS.
 - Cuối cùng QA tổng thể mọi IMAGE_PROMPT đối chiếu tất cả dòng/câu nguồn: đúng tổng số, không thiếu/thừa/gộp/tách/đảo.
