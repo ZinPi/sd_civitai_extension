@@ -9,11 +9,11 @@ KHÓA THEO QUY TRÌNH HƯỚNG DẪN:
 - Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 4.
 - Lần 3: cấp `CHAR_XX` và `BG_XX` cho các trạng thái được liệt kê, rồi xuất danh sách CHAR và BG.
 - Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo đã khóa. Nguồn có số thì dùng đúng số đó. Nguồn không có số thì phân tích tác phẩm và chính đối tượng đó, sáng tạo một kích thước hợp lý và khóa lại. Số đo sáng tạo hợp lý là hợp lệ, không phải lỗi thiếu.
-- BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một nơi thì một BG, không tách thêm BG.
+- BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một bối cảnh có thể có nhiều trạng thái BG. Phân tích từng trường hợp rồi áp dụng: cùng một nơi ở đoạn này là buổi sáng, qua đoạn khác là ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Mỗi trạng thái là một BG_XX riêng. Cùng nơi và cùng trạng thái thì dùng lại một BG.
 - Bước này không viết prompt ảnh theo dòng và không cấp mã BG trong prompt dòng.
 - Việc chọn resource, reference và state là việc của bước này từ nguồn và các khóa, không phải câu hỏi bắt buộc người dùng điền.
 - Quy tắc đếm nhân vật theo câu nguồn ở mục 2A có hiệu lực. Rule cũ dùng số IMAGE_PROMPT cho nhân vật chỉ là lịch sử, không được kích hoạt trở lại.
-- Nếu một đoạn phía dưới còn gọi bước này là B3, còn gọi pipeline B1–B7, còn nhận SRT, MASTER hoặc TTS làm nguồn hiện hành, hoặc còn tách thêm BG cho cùng một nơi, đoạn đó không được thực thi. Khóa đầu file này và quy trình hướng dẫn được ưu tiên.
+- Nếu một đoạn phía dưới còn gọi bước này là B3, còn gọi pipeline B1–B7, còn nhận SRT, MASTER hoặc TTS làm nguồn hiện hành, hoặc còn cấm tách trạng thái BG khi cùng một nơi đổi buổi, thời tiết hay trạng thái môi trường, đoạn đó không được thực thi. Khóa đầu file này được ưu tiên.
 
 ======================================================================
 0. MỤC ĐÍCH
@@ -470,8 +470,10 @@ Bao gồm:
 - các location khác.
 
 Đọc tác phẩm rồi lập BG cho nơi hoặc khung cảnh cần vẽ.
-Cùng một nơi thì một BG. Không tách thêm BG cho cùng một nơi vì ngày, đêm, thời tiết, mùa, cảm xúc, góc máy hay vị trí đứng.
-Nơi khác với nơi hiện tại, kể cả nơi trong quá khứ, suy nghĩ hoặc không gian trừu tượng, chỉ được lập thành BG khi tác phẩm cần vẽ nơi đó và nơi đó không trùng một BG đã có.
+Cùng một bối cảnh có thể có nhiều trạng thái BG. Phân tích từng trường hợp rồi áp dụng.
+Cùng một nơi ở đoạn này là buổi sáng, qua đoạn khác là ban đêm, mưa, tuyết, bão hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG. Mỗi trạng thái là một BG riêng.
+Cùng nơi và cùng trạng thái thì một BG.
+Nơi khác với nơi hiện tại, kể cả nơi trong quá khứ, suy nghĩ hoặc không gian trừu tượng, chỉ được lập thành BG khi tác phẩm cần vẽ nơi đó và trạng thái đó chưa có.
 Nhớ hoặc nhận ra một nơi khác không đổi nơi nhân vật đang đứng. Việc chọn BG cho từng dòng thuộc bước 4. Bước này chỉ lập danh sách nơi cần vẽ.
 Nguồn không gọi tên loại phòng vẫn lập BG từ những gì tác phẩm cho thấy, kèm phần hoàn thiện hợp lý.
 Không bỏ BG chỉ vì thiếu tên phòng.
@@ -481,7 +483,7 @@ Chưa cấp BG_XX ở lần trích này. ID được cấp ở lần 3.
 10. TRẠNG THÁI BỐI CẢNH
 ======================================================================
 
-Cùng một nơi chỉ có một BG. Ngày, đêm, thời tiết, mùa và thay đổi môi trường ghi vào state của đúng BG đó, không thành BG thứ hai.
+Cùng một nơi có thể có nhiều trạng thái BG khi hình ảnh môi trường khác rõ giữa các đoạn.
 
 Phải xem xét các thay đổi hình ảnh quan trọng như:
 
@@ -538,9 +540,14 @@ SPECIAL:
 Đặc biệt:
 
 CÙNG MỘT NƠI BAN NGÀY VÀ BAN ĐÊM
-→ vẫn là một BG.
-→ ghi TIME_STATE của BG đó.
-→ không cấp BG_XX thứ hai.
+→ hai trạng thái BG khi tác phẩm thật sự dùng cả hai.
+→ mỗi trạng thái một BG_XX, cấp ở lần 3.
+→ ghi TIME_STATE của đúng trạng thái đó.
+→ prompt sau gọi đúng BG của buổi đang diễn, không lấy BG buổi sáng rồi sửa thành đêm bằng câu chữ.
+
+CÙNG MỘT NƠI TRỜI QUANG VÀ MƯA, TUYẾT, BÃO HOẶC TRẠNG THÁI MÔI TRƯỜNG KHÁC RÕ
+→ chia trạng thái BG theo cùng cách.
+→ cùng nơi và cùng trạng thái thì dùng lại BG đã có.
 
 Không tạo BG mới chỉ vì:
 - camera khác;
@@ -658,11 +665,12 @@ RESOURCE_ROLE có thể gồm khi áp dụng:
 
 Không tạo một BG mới cho từng câu chỉ vì wording cảm xúc khác nhau.
 
-Cùng một nơi
-→ một BG.
-→ ngày, đêm, thời tiết, cảm xúc và lớp đồ họa ghi vào state và BACKGROUND_VISUAL_MODE của BG đó.
+Cùng một nơi, khác buổi, khác thời tiết hoặc khác trạng thái môi trường rõ
+→ nhiều trạng thái BG.
+→ mỗi trạng thái một BG_XX.
+→ cảm xúc của nhân vật không tự thành trạng thái BG mới.
 
-Nơi khác, hoặc một field trừu tượng không phải nơi đó, chỉ được lập BG riêng khi tác phẩm cần vẽ và BG đó chưa có.
+Nơi khác, hoặc một field trừu tượng không phải nơi đó, chỉ được lập BG riêng khi tác phẩm cần vẽ và trạng thái đó chưa có.
 
 REFERENCE_REQUIRED vẫn theo mục 12:
 - một BG có thể có BG_ID ở lần 3 nhưng không bắt buộc ảnh reference riêng nếu chỉ dùng một lần và không phức tạp;
@@ -1010,8 +1018,9 @@ Q04 ITEM COVERAGE
 
 Q05 LOCATION / BG COVERAGE
 - có bỏ location/BG cần dùng không?
-- ngày, đêm và trạng thái môi trường đã ghi vào đúng BG của nơi đó chưa?
-- cùng một nơi có bị tách thành hai BG không? Nếu có → FAIL.
+- cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ đã được chia thành nhiều trạng thái BG chưa?
+- cùng nơi và cùng trạng thái có bị tách thành hai BG không? Nếu có → FAIL.
+- có BG nào bị tách chỉ vì camera, vị trí đứng, pose hoặc biểu cảm không? Nếu có → FAIL.
 - có nhận diện đúng emotional / abstract / dynamic / thought / memory / flashback / dream / hypothetical background function khi nội dung cần trực quan hóa không?
 - có route đúng PHYSICAL_BG / PHYSICAL_BG_PLUS_DYNAMIC / DYNAMIC_BG không?
 - có dùng exact numbered BG_XX theo sequence hiện hành và không quay lại quy ước BG_00 cảm xúc không?
@@ -1047,8 +1056,8 @@ Bước 1 PASS khi:
 - state ngoại hình và trang phục quan trọng được trích đủ;
 - sinh vật được trích đủ;
 - item quan trọng được trích đủ;
-- nơi cần vẽ đã có đúng một BG; ngày, đêm và môi trường nằm trong state của BG đó;
-- emotional / abstract / dynamic / thought / memory / flashback / dream / hypothetical background function cần thiết được nhận diện và route đúng mode, không tách thành BG mới khi vẫn là cùng một nơi;
+- nơi cần vẽ đã có BG; buổi, mưa và trạng thái môi trường khác rõ đã thành các trạng thái BG riêng;
+- emotional / abstract / dynamic / thought / memory / flashback / dream / hypothetical background function cần thiết được nhận diện và route đúng mode;
 - không dùng BG_00 làm nền cảm xúc chung; ID BG chỉ được cấp ở lần 3 và là exact numbered BG_XX theo sequence hiện hành;
 - đối tượng 1 lần không bị ép tạo reference;
 - resource lặp lại có reference khi cần;
@@ -1078,12 +1087,12 @@ Trích xuất:
 - weapon, tool, item;
 - bối cảnh, kể cả trừu tượng, suy nghĩ và quá khứ khi tác phẩm cần vẽ.
 Với mỗi resource, xác định visual state quan trọng và EFFECTIVE_FROM_SOURCE_SENTENCE_ID.
-Với mỗi nơi, xác định một BG và BACKGROUND_VISUAL_MODE. Chưa ghi CHAR_XX hoặc BG_XX.
+Với mỗi nơi, xác định các trạng thái BG cần vẽ và BACKGROUND_VISUAL_MODE. Chưa ghi CHAR_XX hoặc BG_XX.
 Đếm nhân vật theo mục 2A. Sinh vật, vật phẩm và BG dùng ngưỡng của chính loại đó, không dùng ngưỡng câu của nhân vật.
 
 LẦN 2 — QA DANH SÁCH
 QA danh sách vừa trích theo mục 21, trước khi cấp ID.
-Sửa thiếu CHAR, thiếu BG, BG bị tách đôi cho cùng một nơi, số đo bị ghi GAP dù đã khóa hợp lý, và sinh vật bị đếm bằng ngưỡng nhân vật.
+Sửa thiếu CHAR, thiếu BG, thiếu trạng thái BG khi cùng một nơi đổi buổi hoặc thời tiết, BG tách chỉ vì camera hoặc cảm xúc, số đo bị ghi GAP dù đã khóa hợp lý, và sinh vật bị đếm bằng ngưỡng nhân vật.
 RE-QA cho đến khi danh sách đủ.
 
 LẦN 3 — CẤP ID VÀ XUẤT
@@ -1117,9 +1126,11 @@ VŨ KHÍ / VẬT PHẨM / CÔNG CỤ:
 TRÍCH NẾU CÓ GIÁ TRỊ HÌNH ẢNH HOẶC CONTINUITY.
 
 BỐI CẢNH:
-CÙNG MỘT NƠI THÌ MỘT BG.
-NGÀY, ĐÊM, THỜI TIẾT VÀ CẢM XÚC GHI VÀO STATE CỦA BG ĐÓ.
-NƠI KHÁC, KỂ CẢ TRỪU TƯỢNG, SUY NGHĨ VÀ QUÁ KHỨ, CHỈ LẬP BG KHI TÁC PHẨM CẦN VẼ VÀ NƠI ĐÓ CHƯA CÓ BG.
+CÙNG MỘT NƠI CÓ THỂ CÓ NHIỀU TRẠNG THÁI BG.
+PHÂN TÍCH TỪNG TRƯỜNG HỢP RỒI ÁP DỤNG.
+BUỔI SÁNG RỒI BAN ĐÊM, MƯA HOẶC TRẠNG THÁI MÔI TRƯỜNG KHÁC RÕ THÌ MỖI TRẠNG THÁI MỘT BG_XX.
+CÙNG NƠI VÀ CÙNG TRẠNG THÁI THÌ DÙNG LẠI MỘT BG.
+NƠI KHÁC, KỂ CẢ TRỪU TƯỢNG, SUY NGHĨ VÀ QUÁ KHỨ, CHỈ LẬP BG KHI TÁC PHẨM CẦN VẼ VÀ TRẠNG THÁI ĐÓ CHƯA CÓ.
 ROUTE THEO PHYSICAL_BG / PHYSICAL_BG_PLUS_DYNAMIC / DYNAMIC_BG.
 KHÔNG DÙNG BG_00 LÀ NỀN CẢM XÚC CHUNG.
 ID BG_XX CHỈ CẤP Ở LẦN 3, THEO SEQUENCE HIỆN HÀNH.
@@ -1155,7 +1166,7 @@ REVISION_LOG
 - Bước này đi theo file `01_TRICH_NHAN_VAT_VA_BOI_CANH.txt` và tên `1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH`.
 - Nguồn hiện hành là `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE`.
 - Ba lần: trích chưa cấp ID, QA danh sách, rồi cấp CHAR_XX / BG_XX.
-- Cùng một nơi thì một BG. Ngày, đêm và cảm xúc không tách thêm BG.
+- Cùng một nơi có thể có nhiều trạng thái BG khi buổi, mưa hoặc trạng thái môi trường khác rõ. Cùng nơi và cùng trạng thái thì một BG.
 - Số đo sáng tạo hợp lý là khóa hợp lệ.
 - Ngưỡng 2 câu chỉ áp dụng cho nhân vật.
 - Rule cũ dùng số IMAGE_PROMPT cho nhân vật vẫn là LEGACY / INACTIVE.
