@@ -242,13 +242,14 @@ class RunnerTests(unittest.TestCase):
         job.begin("Hermes recuerda la academia.\n", self.settings, "all")
         job._thread.join(10)
         snapshot = job.snapshot()
-        self.assertIn("Không sang lượt sau", snapshot["notice"]["text"])
-        self.assertIn("WRONG_LOCATION", snapshot["notice"]["text"])
-        self.assertIn("without depicting", snapshot["notice"]["text"])
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("academy approach", prompts)
         journal = "\n".join(snapshot["log"])
-        self.assertIn("BÁO CÁO QA", journal)
+        self.assertIn("còn lỗi sau khi sửa", journal)
+        self.assertIn("chạy tiếp", journal)
         self.assertIn("WRONG_LOCATION", journal)
-        self.assertIn("PROMPT ĐANG BỊ CHẤM", journal)
+        self.assertIn("BÁO CÁO QA", journal)
         stored = (self.data / "NHAT_KY.txt").read_text(encoding="utf-8")
         self.assertIn("BÁO CÁO QA", stored)
 
@@ -342,6 +343,9 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("LỖI CẦN SỬA", repair_users[0])
         self.assertIn("MISSING_REQUIRED_REFERENCE", repair_users[0])
         self.assertIn("Chỉ đổi đúng chi tiết đó", repair_users[0])
+        qa_users = [user for step, user in script.calls if step == "qa"]
+        self.assertGreaterEqual(len(qa_users), 2)
+        self.assertNotIn("002. Cô bé nhìn cánh cửa sân.", qa_users[1])
         journal = "\n".join(snapshot["log"])
         self.assertIn("Chỉ sửa dòng 001", journal)
         self.assertIn("Giữ các dòng QA không nêu lỗi", journal)
@@ -444,12 +448,13 @@ class RunnerTests(unittest.TestCase):
         job.begin("Người trẻ đứng nhìn phố.\nCô bé nhìn cửa.\n", self.settings, "all")
         job._thread.join(10)
         snapshot = job.snapshot()
-        self.assertEqual(snapshot["state"], "error")
-        self.assertIn("Bản sửa thiếu dòng 001", snapshot["notice"]["text"])
-        self.assertIn("Không khóa lượt này", snapshot["notice"]["text"])
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("A young man watches the street", prompts)
+        self.assertIn("KEEP-LINE-TWO stays put", prompts)
         journal = "\n".join(snapshot["log"])
         self.assertIn("Bản sửa thiếu dòng 001", journal)
-        self.assertIn("không có prompt", journal)
+        self.assertIn("chạy tiếp", journal)
 
 
 class MissingBackgroundTests(unittest.TestCase):
@@ -610,16 +615,15 @@ class MissingBackgroundTests(unittest.TestCase):
         self.assertEqual(snapshot["state"], "done", snapshot["notice"])
         prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
         self.assertIn("not yet recovered", prompts)
-        self.assertIn("beginning to reach", prompts)
+        self.assertIn("already complete", prompts)
         repair_users = [user for step, user in script.calls if step == "repair"]
-        self.assertEqual(len(repair_users), 2)
+        self.assertEqual(len(repair_users), 1)
         self.assertIn("001. Hermes chưa hồi phục.", repair_users[0])
         self.assertNotIn("002. Mẹ muốn ôm Hermes.", repair_users[0])
-        self.assertIn("002. Mẹ muốn ôm Hermes.", repair_users[1])
-        self.assertNotIn("001. Hermes chưa hồi phục.", repair_users[1])
-        self.assertNotIn("add-bg", [step for step, _user in script.calls])
-        journal = "\n".join(snapshot["log"])
-        self.assertIn("Chỉ sửa các dòng còn lỗi: 002", journal)
+        qa_users = [user for step, user in script.calls if step == "qa"]
+        self.assertGreaterEqual(len(qa_users), 2)
+        self.assertNotIn("002. Mẹ muốn ôm Hermes.", qa_users[1])
+        self.assertIn("001. Hermes chưa hồi phục.", qa_users[1])
 
     def test_fault_brief_names_the_line_the_error_and_the_fix(self):
         report = (

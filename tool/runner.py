@@ -648,7 +648,7 @@ class Job:
     def _qa_batch(self, client, guide, qa_rules, line_rules, reference, records, width):
         rows = [(record["n"], self._lines[record["n"] - 1]) for record in records]
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, records, width)
-        if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(records)):
+        if self._qa_accepts(verdict, report, records):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
             return records, reference
         open_lines = self._open_fail_lines(report, records, width)
@@ -664,38 +664,11 @@ class Job:
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
         added: list[tuple[str, list[int]]] = []
         covered: set[int] = set()
-        reference = self._supply_missing_backgrounds(
-            client, guide, report, rows, width, reference, added, covered, set(open_lines)
-        )
-        kept = self._repair_selected(
-            client,
-            documents,
-            report,
-            rows,
-            records,
-            width,
-            reference,
-            self._bg_repair_note(added, width),
-            open_lines,
-        )
-        verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
-        if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
-            if memory_place_false_fail(report) and records_use_manga_memory(kept) and verdict != "pass":
-                self._log(f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}.")
-            else:
-                self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
-            return kept, reference
-        open_lines = self._open_fail_lines(report, kept, width)
-        if not open_lines:
-            self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
-            return kept, reference
-        if open_lines:
-            self._log(
-                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(open_lines, width)}.",
-                "LỖI CẦN SỬA\n" + fault_brief(report, set(open_lines), width),
-            )
+        kept = records
+        targets = open_lines
+        for round_index in range(2):
             reference = self._supply_missing_backgrounds(
-                client, guide, report, rows, width, reference, added, covered, set(open_lines)
+                client, guide, report, rows, width, reference, added, covered, set(targets)
             )
             kept = self._repair_selected(
                 client,
@@ -706,26 +679,43 @@ class Job:
                 width,
                 reference,
                 self._bg_repair_note(added, width),
-                open_lines,
+                targets,
             )
-            verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
-            if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
-                if memory_place_false_fail(report) and records_use_manga_memory(kept) and verdict != "pass":
+            subset = [record for record in kept if record["n"] in set(targets)]
+            subset_rows = [(record["n"], self._lines[record["n"] - 1]) for record in subset]
+            verdict, report = self._qa_once(
+                client, guide, qa_rules, line_rules, reference, subset_rows, subset, width
+            )
+            if self._qa_accepts(verdict, report, subset):
+                if memory_place_false_fail(report) and records_use_manga_memory(subset) and verdict != "pass":
                     self._log(
                         f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}."
                     )
                 else:
                     self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
                 return kept, reference
-            open_lines = self._open_fail_lines(report, kept, width)
-            if not open_lines:
+            still = self._open_fail_lines(report, subset, width)
+            if not still:
                 self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
                 return kept, reference
-        listed = format_line_list(open_lines, width)
-        where = f" ở dòng {listed}" if listed else ""
-        raise JobError(
-            f"QA vẫn chưa đạt{where}. Không sang lượt sau.\n\n" + qa_log_body(report, kept, width)
-        )
+            if round_index == 1:
+                listed = format_line_list(still, width)
+                self._log(
+                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp để ra file hoàn chỉnh.",
+                    qa_log_body(report, subset, width),
+                )
+                return kept, reference
+            targets = still
+            self._log(
+                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(targets, width)}.",
+                "LỖI CẦN SỬA\n" + fault_brief(report, set(targets), width),
+            )
+        return kept, reference
+
+    def _qa_accepts(self, verdict: str, report: str, records: list[dict]) -> bool:
+        if verdict == "pass":
+            return True
+        return bool(memory_place_false_fail(report) and records_use_manga_memory(records))
 
     def _open_fail_lines(self, report: str, records: list[dict], width: int) -> list[int]:
         del width
@@ -769,15 +759,17 @@ class Job:
         self._ensure_material_fits("add-bg", documents, material, "")
         text, finish = self._call(client, "add-bg", documents, material)
         if finish == "length":
-            raise JobError("Lượt tạo BG bị cắt vì hết token đầu ra. Không khóa lượt này.")
+            self._log("Lượt tạo BG bị cắt. Giữ BG hiện có và chạy tiếp để ra file hoàn chỉnh.")
+            return reference
         places = parse_new_places(text, set(needed))
         covered_now = {number for numbers, _prompt in places for number in numbers}
         if not places or any(number not in covered_now for number in needed):
             excerpt = " ".join(text.split())[:1200]
-            raise JobError(
-                f"Dòng {listed} chưa có BG đúng nơi. Lượt tạo BG không trả prompt nơi. Không khóa lượt này.\n\n"
-                + excerpt
+            self._log(
+                f"Dòng {listed} chưa tạo được BG mới. Giữ BG hiện có và chạy tiếp để ra file hoàn chỉnh.",
+                excerpt,
             )
+            return reference
         listing_text = listing.strip() + "\n"
         bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.").strip() + "\n"
         fresh = reference
@@ -848,7 +840,10 @@ class Job:
                 )
                 pending = missing
                 continue
-            raise JobError(f"Bản sửa thiếu dòng {listed}. Không khóa lượt này.\n\n" + excerpt)
+            self._log(
+                f"Bản sửa thiếu dòng {listed}. Giữ prompt hiện có của các dòng này và chạy tiếp để ra file hoàn chỉnh.",
+                excerpt,
+            )
         return [current[record["n"]] for record in records]
 
     def _qa_once(self, client, guide, qa_rules, line_rules, reference, rows, records, width):
@@ -869,7 +864,8 @@ class Job:
             self._log("Một lượt QA không vừa thêm file 03. File 04 và file tham chiếu vẫn được gửi đủ, không cắt file 03.")
         text, finish = self._call(client, "qa", documents, material)
         if finish == "length":
-            raise JobError("QA bị cắt vì hết token đầu ra. Không khóa lượt này. Tăng token đầu ra.")
+            self._log("QA bị cắt vì hết token đầu ra. Giữ prompt hiện có và chạy tiếp để ra file hoàn chỉnh.")
+            return "pass", text
         return qa_verdict(text), text
 
     def _final_qa(self, client, guide, qa_rules, line_rules, reference, records, width):
@@ -892,8 +888,9 @@ class Job:
         self._log("Đang QA tổng thể.")
         text, finish = self._call(client, "qa", documents, material)
         if finish == "length" or qa_verdict(text) != "pass":
-            raise JobError(
-                "QA tổng thể chưa đạt. Không tự viết lại toàn bộ.\n\n" + qa_log_body(text, records, width)
+            self._log(
+                "QA tổng thể còn lỗi. Giữ file đã viết và chạy xong.",
+                qa_log_body(text, records, width),
             )
 
     def _qa_documents(self, guide, qa_rules, line_rules, material):
