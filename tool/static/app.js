@@ -18,6 +18,7 @@ const count = document.querySelector("#count");
 const notice = document.querySelector("#notice");
 const detail = document.querySelector("#detail");
 const log = document.querySelector("#log");
+const logFile = document.querySelector("#log-file");
 const preview = document.querySelector("#preview");
 const previewNote = document.querySelector("#preview-note");
 const download = document.querySelector("#download");
@@ -174,12 +175,12 @@ function render(nextJob) {
   }
 
   log.replaceChildren();
-  const history = (job.log || []).slice(0, -1).slice(-6);
-  for (const line of history) {
+  for (const line of (job.log || []).slice(-40)) {
     const item = document.createElement("li");
     item.textContent = line;
     log.appendChild(item);
   }
+  logFile.hidden = !job.files?.["nhat-ky"]?.ready;
 
   updateCount();
   stop.hidden = !job.running;

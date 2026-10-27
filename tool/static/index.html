@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tạo prompt ảnh</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%238f3d1b'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css?v=6">
+  <link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
   <main>
@@ -106,6 +106,7 @@
           <button id="clear" class="quiet" type="button" hidden>Xóa kết quả</button>
         </div>
         <ul id="log" class="log"></ul>
+        <a id="log-file" class="quiet-link" href="/api/file/nhat-ky" hidden>Tải nhật ký</a>
       </section>
 
       <section class="sheet results">
@@ -132,6 +133,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=6"></script>
+  <script src="/static/app.js?v=7"></script>
 </body>
 </html>

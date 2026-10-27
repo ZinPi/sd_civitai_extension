@@ -28,6 +28,7 @@ OUTPUT_FILES = {
     "bg": "PROMPT_BG.txt",
     "dong": "PROMPT_THEO_DONG.txt",
     "tham-chieu": "TBN6A.txt",
+    "nhat-ky": "NHAT_KY.txt",
 }
 
 MSG_RULES_ONLY = (

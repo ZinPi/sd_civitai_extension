@@ -241,7 +241,16 @@ class RunnerTests(unittest.TestCase):
         job = Job(self.rules, self.data, client_factory=lambda _settings: StillThere())
         job.begin("Hermes recuerda la academia.\n", self.settings, "all")
         job._thread.join(10)
-        self.assertIn("Không sang lượt sau", job.snapshot()["notice"]["text"])
+        snapshot = job.snapshot()
+        self.assertIn("Không sang lượt sau", snapshot["notice"]["text"])
+        self.assertIn("WRONG_LOCATION", snapshot["notice"]["text"])
+        self.assertIn("without depicting", snapshot["notice"]["text"])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("BÁO CÁO QA", journal)
+        self.assertIn("WRONG_LOCATION", journal)
+        self.assertIn("PROMPT ĐANG BỊ CHẤM", journal)
+        stored = (self.data / "NHAT_KY.txt").read_text(encoding="utf-8")
+        self.assertIn("BÁO CÁO QA", stored)
 
 
 if __name__ == "__main__":

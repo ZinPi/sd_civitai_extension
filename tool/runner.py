@@ -117,6 +117,18 @@ def records_use_manga_memory(records: list[dict]) -> bool:
     text = " ".join(str(record.get("body", "")) for record in records)
     return bool(_MANGA_STAGING.search(text))
 
+
+def qa_log_body(report: str, records: list[dict], width: int) -> str:
+    """Keep the QA report readable. The page log used to drop everything after one sentence."""
+    findings = (report or "").strip() or "(QA không trả nội dung.)"
+    prompts = format_records(records, width).strip()
+    body = "BÁO CÁO QA\n" + findings
+    if prompts:
+        body += "\n\nPROMPT ĐANG BỊ CHẤM\n" + prompts
+    if len(body) > 20000:
+        body = body[:20000] + "\n…(nhật ký đã cắt bớt)"
+    return body
+
 STEP_TITLES = {
     1: "Danh sách nhân vật và bối cảnh",
     2: "Prompt ảnh nhân vật",
@@ -431,7 +443,10 @@ class Job:
         if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(records)):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
             return records
-        self._log(f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.")
+        self._log(
+            f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.",
+            qa_log_body(report, records, width),
+        )
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
         repair = (
             REPAIR_TASK
@@ -454,8 +469,10 @@ class Job:
             if memory_place_false_fail(report) and records_use_manga_memory(kept):
                 self._log(f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}.")
                 return kept
-            excerpt = " ".join(report.split())[:1500]
-            raise JobError("QA vẫn chưa đạt sau một lần sửa. Không sang lượt sau.\n\n" + excerpt)
+            raise JobError(
+                "QA vẫn chưa đạt sau một lần sửa. Không sang lượt sau.\n\n"
+                + qa_log_body(report, kept, width)
+            )
         self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
         return kept
 
@@ -500,8 +517,9 @@ class Job:
         self._log("Đang QA tổng thể.")
         text, finish = self._call(client, "qa", documents, material)
         if finish == "length" or qa_verdict(text) != "pass":
-            excerpt = " ".join(text.split())[:1500]
-            raise JobError("QA tổng thể chưa đạt. Không tự viết lại toàn bộ.\n\n" + excerpt)
+            raise JobError(
+                "QA tổng thể chưa đạt. Không tự viết lại toàn bộ.\n\n" + qa_log_body(text, records, width)
+            )
 
     def _qa_documents(self, guide, qa_rules, line_rules, material):
         full = [("HUONG_DAN", guide), ("QUY_TAC_QA", qa_rules), ("QUY_TAC_TAO_PROMPT", line_rules)]
@@ -626,9 +644,8 @@ class Job:
             self._notice = {"kind": kind, "text": message}
             if self._current and self._steps.get(self._current) == "running":
                 self._steps[self._current] = "error" if state == "error" else "stopped"
-            self._detail = message.split("\n", 1)[0][:240]
-            self._logs.append(self._detail)
-            del self._logs[:-80]
+            first, _, rest = message.partition("\n")
+            self._log_unlocked(first, rest)
             self._save()
 
     def _mark(self, step: int, status: str) -> None:
@@ -637,18 +654,23 @@ class Job:
             self._current = step if status == "running" else self._current
             self._save()
 
-    def _log(self, message: str) -> None:
+    def _log(self, message: str, body: str = "") -> None:
         with self._lock:
-            self._log_unlocked(message)
+            self._log_unlocked(message, body)
             self._save()
 
-    def _log_unlocked(self, message: str) -> None:
-        clean = " ".join(message.split())
-        if len(clean) > 240:
-            clean = clean[:237] + "…"
-        self._detail = clean
-        self._logs.append(clean)
+    def _log_unlocked(self, message: str, body: str = "") -> None:
+        summary = " ".join(message.split())
+        if len(summary) > 240:
+            summary = summary[:237] + "…"
+        entry = summary
+        detail = (body or "").strip()
+        if detail:
+            entry = summary + "\n" + detail
+        self._detail = summary
+        self._logs.append(entry)
         del self._logs[:-80]
+        atomic_write(self.data_dir / "NHAT_KY.txt", "\n\n".join(self._logs) + "\n")
 
     def _pair(self, guide_name: str, rule_name: str) -> tuple[str, str]:
         return self._rule(guide_name), self._rule(rule_name)
