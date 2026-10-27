@@ -28,6 +28,7 @@ from engine import (
     numbered_width,
     parse_prompt_records,
     qa_verdict,
+    record_ok,
     read_text,
     source_digest,
     split_source,
@@ -68,6 +69,8 @@ Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
 Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã BG mới.
+Nhân vật đã khóa mà có mặt trong hình thì header phải có CHAR_XX của nhân vật đó, và phần chữ ghi đúng số đo đã khóa.
+Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
 Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
 Giữ đúng số đo đã khóa.
 """
@@ -77,6 +80,8 @@ Không viết lại quy tắc.
 FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Không yêu cầu tạo mã BG mới. Nếu BG không thích hợp, chỉ định BG đã tạo nào đúng với dòng.
+FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR_XX hoặc phần chữ không ghi số đo đã khóa.
+FAIL khi dòng diễn ra trong một nơi vật lý mà prompt dùng BG chuyển cảnh trừu tượng thay cho BG vật lý đã tạo.
 Suy nghĩ, hồi tưởng hoặc việc sắp tới được vẽ bằng BG của nơi đó, hoặc ghép với BG nơi đang đứng. Không FAIL vì ảnh có nơi được nhớ. Không bắt sửa thành chỉ phản ứng trong phòng hiện tại.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
 Nếu không đạt, dòng cuối là TOOL_QA: FAIL
@@ -84,8 +89,10 @@ Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 
 REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy tắc tạo prompt.
 Giữ nguyên số dòng và số thứ tự đã cho.
-Chỉ xuất các dòng prompt, đúng định dạng trong quy tắc.
+Chỉ xuất các dòng được yêu cầu sửa, đúng định dạng trong quy tắc. Không viết lại dòng không được gửi.
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
+Nhân vật có mặt trong hình thì header có CHAR_XX và phần chữ ghi số đo đã khóa.
+Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
 Giữ đúng số đo đã khóa.
 """
 
@@ -116,6 +123,42 @@ def memory_place_false_fail(report: str) -> bool:
 def records_use_manga_memory(records: list[dict]) -> bool:
     text = " ".join(str(record.get("body", "")) for record in records)
     return bool(_MANGA_STAGING.search(text))
+
+
+def failed_line_numbers(report: str, allowed: set[int]) -> list[int]:
+    """Line numbers a QA report actually marks FAIL, such as '001 | FAIL_H' or RECHECK_SCOPE."""
+    found: set[int] = set()
+    text = report or ""
+    for match in re.finditer(
+        r"(?im)^\s*(\d{1,6})\s*[|:]\s*(?:RESULT:\s*)?FAIL(?:_[A-Z0-9]+)?\b",
+        text,
+    ):
+        number = int(match.group(1))
+        if number in allowed:
+            found.add(number)
+    for match in re.finditer(r"(?i)RECHECK_SCOPE\s*[:=]\s*(\d{1,6})", text):
+        number = int(match.group(1))
+        if number in allowed:
+            found.add(number)
+    return sorted(found)
+
+
+def format_line_list(numbers: list[int], width: int) -> str:
+    return ", ".join(f"{number:0{width}d}" for number in numbers)
+
+
+def valid_repair_map(text: str, expected: list[int], finish: str) -> dict[int, dict]:
+    wanted = set(expected)
+    found: dict[int, dict] = {}
+    order: list[int] = []
+    for record in parse_prompt_records(text):
+        number = record["n"]
+        if number in wanted and record_ok(record) and number not in found:
+            found[number] = record
+            order.append(number)
+    if finish == "length" and order:
+        found.pop(order[-1], None)
+    return found
 
 
 def qa_log_body(report: str, records: list[dict], width: int) -> str:
@@ -448,22 +491,7 @@ class Job:
             qa_log_body(report, records, width),
         )
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
-        repair = (
-            REPAIR_TASK
-            + ("\n" + MANGA_REPAIR if memory_place_false_fail(report) else "")
-            + "\nBAO_CAO_QA\n"
-            + report
-            + "\nDONG_NGUON\n"
-            + format_source_rows(rows, width)
-            + "\nPROMPT_CU\n"
-            + format_records(records, width)
-        )
-        self._ensure_material_fits("repair", documents, repair, reference)
-        text, finish = self._call(client, "repair", documents, repair)
-        expected = [number for number, _text in rows]
-        kept, status = classify_records(parse_prompt_records(text), expected, finish)
-        if status != "ok":
-            raise JobError("Bản sửa sau QA không đủ prompt đúng số dòng. Không khóa lượt này.")
+        kept = self._repair_selected(client, documents, report, rows, records, width, reference)
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
         if verdict != "pass":
             if memory_place_false_fail(report) and records_use_manga_memory(kept):
@@ -475,6 +503,54 @@ class Job:
             )
         self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
         return kept
+
+    def _repair_selected(self, client, documents, report, rows, records, width, reference):
+        """Rewrite only the lines QA marked FAIL. Keep every other line in this window."""
+        source = {number: text for number, text in rows}
+        current = {record["n"]: record for record in records}
+        cited = failed_line_numbers(report, set(current))
+        if cited and len(cited) < len(records):
+            self._log(
+                f"Chỉ sửa dòng {format_line_list(cited, width)}. Giữ các dòng QA không nêu lỗi."
+            )
+            pending = cited
+        else:
+            pending = cited or [record["n"] for record in records]
+        manga = memory_place_false_fail(report)
+        for attempt in range(2):
+            selected_rows = [(number, source[number]) for number in pending]
+            selected_records = [current[number] for number in pending]
+            repair = (
+                REPAIR_TASK
+                + ("\n" + MANGA_REPAIR if manga else "")
+                + "\nBAO_CAO_QA\n"
+                + report
+                + "\nDONG_CAN_SUA\n"
+                + format_source_rows(selected_rows, width)
+                + "PROMPT_CU\n"
+                + format_records(selected_records, width)
+                + "CHỈ TRẢ ĐÚNG CÁC DÒNG: "
+                + format_line_list(pending, width)
+                + "\n"
+            )
+            self._ensure_material_fits("repair", documents, repair, reference)
+            text, finish = self._call(client, "repair", documents, repair)
+            found = valid_repair_map(text, pending, finish)
+            current.update(found)
+            missing = [number for number in pending if number not in found]
+            if not missing:
+                break
+            excerpt = " ".join(text.split())[:1200]
+            listed = format_line_list(missing, width)
+            if attempt == 0:
+                self._log(
+                    f"Bản sửa thiếu dòng {listed}. Chỉ gửi lại các dòng này.",
+                    excerpt,
+                )
+                pending = missing
+                continue
+            raise JobError(f"Bản sửa thiếu dòng {listed}. Không khóa lượt này.\n\n" + excerpt)
+        return [current[record["n"]] for record in records]
 
     def _qa_once(self, client, guide, qa_rules, line_rules, reference, rows, records, width):
         material = (

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from engine import parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import Job
+from runner import Job, failed_line_numbers, valid_repair_map
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -251,6 +251,202 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("PROMPT ĐANG BỊ CHẤM", journal)
         stored = (self.data / "NHAT_KY.txt").read_text(encoding="utf-8")
         self.assertIn("BÁO CÁO QA", stored)
+
+    def test_failed_line_numbers_keep_only_cited_rows(self):
+        report = (
+            "001 | FAIL_H  \n"
+            "ISSUE_TYPE: MISSING_REQUIRED_REFERENCE\n"
+            "008 | FAIL_H  \n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "RECHECK_SCOPE: 008\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(failed_line_numbers(report, set(range(1, 17))), [1, 8])
+        colon = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION\n"
+            "RECHECK_SCOPE: 002\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(failed_line_numbers(colon, {1, 2}), [1, 2])
+        self.assertEqual(failed_line_numbers("đối chiếu xong\nTOOL_QA: FAIL\n", {1, 2}), [])
+
+    def test_length_cut_drops_the_last_repaired_line(self):
+        text = (
+            "001 | CHAR_01.BG_01 | IMAGE_PROMPT: CHAR_01 stands in the street, 174 cm.\n"
+            "002 | CHAR_01.BG_03 | IMAGE_PROMPT: CHAR_01 wakes in the room, 168 cm.\n"
+        )
+        cut = valid_repair_map(text, [1, 2], "length")
+        self.assertEqual(list(cut), [1])
+        whole = valid_repair_map(text, [1, 2], "stop")
+        self.assertEqual(list(whole), [1, 2])
+
+    def test_qa_repair_rewrites_only_the_failed_line(self):
+        fail = (
+            "001 | FAIL_H\n"
+            "ISSUE_TYPE: MISSING_REQUIRED_REFERENCE\n"
+            "REQUIRED_FIX: Add CHAR_01 and the locked size.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        kept = "KEEP-LINE-TWO the patio curtain stays untouched."
+
+        class OneFail(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\nBG_03 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front, close, back.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\nBG_03 room.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "repair":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: "
+                        "CHAR_01 the young man, 174 cm, watches the street.\n",
+                        "stop",
+                    )
+                return Completion(
+                    "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                    f"002 | CHAR_01.BG_01 | IMAGE_PROMPT: {kept}\n",
+                    "stop",
+                )
+
+        script = OneFail()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        source = "Người trẻ đứng nhìn phố.\nCô bé nhìn cánh cửa sân.\n"
+        job.begin(source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("174 cm", prompts)
+        self.assertIn(kept, prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("DONG_CAN_SUA", repair_users[0])
+        self.assertIn("001. Người trẻ đứng nhìn phố.", repair_users[0])
+        self.assertNotIn("002. Cô bé nhìn cánh cửa sân.", repair_users[0])
+        self.assertIn("CHỈ TRẢ ĐÚNG CÁC DÒNG: 001", repair_users[0])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Chỉ sửa dòng 001", journal)
+        self.assertIn("Giữ các dòng QA không nêu lỗi", journal)
+
+    def test_short_repair_retries_only_the_missing_line(self):
+        fail = (
+            "001 | FAIL_H\nISSUE_TYPE: MISSING_REQUIRED_REFERENCE\nTOOL_QA: FAIL\n"
+            "002 | FAIL_H\nISSUE_TYPE: WRONG_LOCATION\nTOOL_QA: FAIL\n"
+        )
+
+        class ShortThenRest(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+                self.repairs = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\nBG_03 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\nBG_03 room.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                        "002 | BG_06 | IMAGE_PROMPT: An abstract awakening transition.\n",
+                        "stop",
+                    )
+                self.repairs += 1
+                if self.repairs == 1:
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: CHAR_01, 174 cm, watches the street.\n"
+                        "không đủ dòng còn lại",
+                        "stop",
+                    )
+                return Completion(
+                    "002 | CHAR_01.BG_03 | IMAGE_PROMPT: CHAR_01, 168 cm, wakes in the physical room.\n",
+                    "stop",
+                )
+
+        script = ShortThenRest()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Người trẻ đứng nhìn phố.\nAnh tỉnh dậy trong phòng.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("174 cm", prompts)
+        self.assertIn("168 cm", prompts)
+        self.assertNotIn("abstract awakening", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 2)
+        self.assertIn("001. Người trẻ đứng nhìn phố.", repair_users[0])
+        self.assertIn("002. Anh tỉnh dậy trong phòng.", repair_users[0])
+        self.assertIn("002. Anh tỉnh dậy trong phòng.", repair_users[1])
+        self.assertNotIn("001. Người trẻ đứng nhìn phố.", repair_users[1])
+        self.assertIn("CHỈ TRẢ ĐÚNG CÁC DÒNG: 002", repair_users[1])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bản sửa thiếu dòng 002", journal)
+        self.assertIn("Chỉ gửi lại các dòng này", journal)
+
+    def test_second_short_repair_names_the_missing_line_and_stops(self):
+        fail = "001 | FAIL_H\nISSUE_TYPE: MISSING_REQUIRED_REFERENCE\nTOOL_QA: FAIL\n"
+
+        class AlwaysShort(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\n", "stop")
+                if step == "qa":
+                    return Completion(fail, "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                        "002 | CHAR_01.BG_01 | IMAGE_PROMPT: KEEP-LINE-TWO stays put.\n",
+                        "stop",
+                    )
+                return Completion("không có prompt", "stop")
+
+        job = Job(self.rules, self.data, client_factory=lambda _settings: AlwaysShort())
+        job.begin("Người trẻ đứng nhìn phố.\nCô bé nhìn cửa.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "error")
+        self.assertIn("Bản sửa thiếu dòng 001", snapshot["notice"]["text"])
+        self.assertIn("Không khóa lượt này", snapshot["notice"]["text"])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bản sửa thiếu dòng 001", journal)
+        self.assertIn("không có prompt", journal)
 
 
 if __name__ == "__main__":
