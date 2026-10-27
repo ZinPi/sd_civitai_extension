@@ -37,7 +37,8 @@ from llm import HttpLlm, LlmError
 PROMPT_CHARS = 4000
 OUTPUT_FILE_CHARS = 2_000_000
 OUTPUT_PER_LINE = estimate_tokens("x" * PROMPT_CHARS)
-CEILING = 20
+LINE_BATCH = 10
+CEILING = LINE_BATCH
 
 EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.
 Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số thứ tự giữ nguyên.
@@ -186,7 +187,7 @@ class Job:
             }
 
     def output_path(self, filename: str) -> Path:
-        if filename not in OUTPUT_FILES.values() and filename != "XX.TXT":
+        if filename not in OUTPUT_FILES.values():
             raise JobError("Không có file này.")
         return self.data_dir / filename
 
@@ -489,7 +490,9 @@ class Job:
         rules_only = message_tokens("lines", documents, LINE_TASK + "\nCAC_DONG\n")
         costs = [estimate_tokens(f"{number:0{width}d}. {text}\n") for number, text in rows]
         wanted = min(self._ceiling, len(rows))
-        count = largest_prefix(costs, fixed, OUTPUT_PER_LINE, self._max_input(), self._max_output(), wanted)
+        count = largest_prefix(
+            costs, fixed, OUTPUT_PER_LINE, self._max_input(), self._output_limit("lines"), wanted
+        )
         if count > 0:
             return count, wanted
         if OUTPUT_PER_LINE > self._max_output():
@@ -536,9 +539,12 @@ class Job:
         char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
         bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.")
         text = compile_reference(listing, char_text, bg_text)
-        self._write("TBN6A.txt", text)
-        self._write("XX.TXT", text)
-        self._log("Đã tổng hợp file tham chiếu TBN6A.txt.")
+        self._write(OUTPUT_FILES["tham-chieu"], text)
+        for old_name in ("TBN6A.txt", "XX.TXT"):
+            old_path = self.data_dir / old_name
+            if old_path.exists():
+                old_path.unlink()
+        self._log("Đã tổng hợp file tổng hợp.")
         return text
 
     def _complete_whole(self, client, step: str, documents, material: str) -> str:
@@ -563,9 +569,15 @@ class Job:
             raise JobError(MSG_RULES_AND_REFERENCE)
         raise JobError(MSG_RULES_ONLY)
 
+    def _output_limit(self, step: str) -> int:
+        limit = self._max_output()
+        if step in {"lines", "repair"}:
+            return max(limit, LINE_BATCH * OUTPUT_PER_LINE)
+        return limit
+
     def _call(self, client, step: str, documents, material: str):
         system, user = build_call(step, documents, material)
-        completion = client.complete(system, user, self._max_output())
+        completion = client.complete(system, user, self._output_limit(step))
         return completion.text, completion.finish
 
     def _with_range(self, exc: LlmError, batch) -> str:
@@ -661,7 +673,7 @@ class Job:
         return int(self._settings["max_output_tokens"])
 
     def _reset_outputs(self) -> None:
-        for name in list(OUTPUT_FILES.values()) + ["XX.TXT"]:
+        for name in list(OUTPUT_FILES.values()) + ["XX.TXT", "TBN6A.txt"]:
             path = self.data_dir / name
             if path.exists():
                 path.unlink()
