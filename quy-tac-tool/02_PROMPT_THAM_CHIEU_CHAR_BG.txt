@@ -1,7 +1,17 @@
 truyện isekai nam
 # MASTER CHARACTER DESIGN GUIDE
 
-KHÓA ĐẦU RA B4 TRONG AI FILM STUDIO (VĂN BẢN → VĂN BẢN):
+FILE: 02_PROMPT_THAM_CHIEU_CHAR_BG.txt
+Bước 2 tạo prompt CHAR. Bước 3 tạo prompt BG. Danh sách lấy từ bước 1 đã khóa.
+
+KHÓA BG:
+- Cùng một nơi và cùng trạng thái thì dùng lại BG đã có.
+- Cùng một nơi lúc buổi sáng, qua đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Mỗi trạng thái một BG.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ những gì tác phẩm cho thấy. Không dừng bằng LOCATION_GAP hay BG_GAP để né việc tạo BG.
+- Prompt ảnh theo dòng không tự đặt mã BG mới. Mỗi prompt dòng có ít nhất một BG đã tạo.
+- Nếu câu phía dưới bảo cùng một nơi luôn chỉ một BG kể cả khi đổi buổi hoặc thời tiết, câu đó không áp dụng.
+
+KHÓA ĐẦU RA TRONG AI FILM STUDIO (VĂN BẢN → VĂN BẢN):
 - B4 dùng tài nguyên CHAR/BG và các khóa đã PASS/LOCK từ B3 để VIẾT PROMPT TXT cho CHAR/BG, không tự render/tạo ảnh.
 - Mỗi câu có từ “tạo ảnh”, “dùng prompt để sinh ảnh” trong tài liệu này chỉ mô tả mục đích sử dụng prompt ở công cụ tạo ảnh riêng về sau; nó KHÔNG mở thêm công đoạn thực thi ảnh trong AI FILM STUDIO.
 - Bộ ba ảnh reference CHAR ở phần dưới là BA PROMPT VĂN BẢN cho ba ảnh chức năng riêng (khi áp dụng), không phải yêu cầu xuất ảnh từ tool này.
@@ -2423,9 +2433,11 @@ B7. TẠO BG THAM CHIẾU
 
 Tham khảo tác phẩm rồi tạo BG.
 Đọc đoạn đang viết, câu quanh đó và nơi đã xuất hiện trong tác phẩm.
-Cùng một nơi thì dùng lại BG đã có.
-Nơi hoặc khung cảnh tác phẩm cần vẽ mà chưa có BG thì tạo BG từ những gì tác phẩm cho thấy, kèm phần hoàn thiện hợp lý.
+Cùng một nơi và cùng trạng thái thì dùng lại BG đã có.
+Cùng một nơi nhưng buổi sáng, ban đêm, mưa hoặc trạng thái môi trường khác rõ thì là các trạng thái BG khác nhau. Mỗi trạng thái một BG.
+Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ những gì tác phẩm cho thấy, kèm phần hoàn thiện hợp lý.
 Không dừng bằng LOCATION_GAP hay BG_GAP để né việc tạo BG.
+Prompt ảnh theo dòng gọi BG đã tạo và không tự đặt mã mới.
 
 B8. DYNAMIC BG / ACTION / FORCE CONSISTENCY
 

@@ -2,8 +2,8 @@ QUY TRÌNH HƯỚNG DẪN CHO AI FILM STUDIO
 
 KHÓA SỬA — SỐ ĐO VÀ BG
 - Mọi nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn có số thì dùng đúng số đó. Nguồn không có số thì phân tích tác phẩm và phân tích chính đối tượng đó, rồi sáng tạo một kích thước hợp lý và khóa lại. Số đo sáng tạo hợp lý là hợp lệ, không phải lỗi thiếu.
-- Tạo bối cảnh tham chiếu bằng cách tham khảo tác phẩm rồi viết BG. Cùng một nơi trong tác phẩm thì một BG.
-- Prompt ảnh theo dòng phải có BG. BG đó phải thích hợp với đúng dòng đang viết, và phải là một BG đã tạo từ tác phẩm. Không tự đặt mã BG mới trong prompt dòng.
+- Tạo bối cảnh tham chiếu bằng cách tham khảo tác phẩm rồi viết BG. Cùng một bối cảnh có thể có nhiều trạng thái BG. Phân tích từng trường hợp rồi áp dụng: cùng một nơi lúc buổi sáng, qua đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Cùng nơi và cùng trạng thái thì một BG.
+- Prompt ảnh theo dòng phải có ít nhất một BG. BG đó phải thích hợp với đúng dòng đang viết, đúng trạng thái đã tạo từ tác phẩm. Một prompt được có nhiều BG. Không tự đặt mã BG mới trong prompt dòng.
 
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.
@@ -15,12 +15,13 @@ QUY TẮC CHUNG
 1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH
 - Mở và đọc toàn bộ quy tắc 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt.
 - Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
-- Lần 1: trích xuất nhân vật, sinh vật, vũ khí, công cụ, bối cảnh (kể cả trừu tượng, suy nghĩ, quá khứ) và các trạng thái theo 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt; chưa cấp ID CHAR/BG.
-- Với nhân vật, mỗi câu khác nhau có nhắc đến và có giá trị hình ảnh tính 1 lần; chỉ 1 câu thì không vào danh sách tạo CHAR; từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
-- Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 4.
-- Lần 3: tạo ID CHAR_XX và BG_XX cho các trạng thái được liệt kê; xuất danh sách CHAR và BG.
+- Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
+- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ và vũ khí nhân vật cầm được ghi cùng CHAR đó. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
+- Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn. Dòng nào bước 4 sẽ vẽ thì bảng đã có BG đúng trạng thái, và đã có CHAR khi nhân vật đủ điều kiện tạo CHAR. Thiếu mục nào thì bổ sung ở lần này.
+- Lần 3: liệt kê trạng thái chính xác, rồi gán CHAR_XX và BG_XX phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
+- Chỉ LOCK khi bảng đã đồng bộ. Bước 4 dùng đúng bảng này để không còn GAP vì thiếu CHAR hoặc BG.
 - Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo đã khóa. Thiếu số trong nguồn thì phân tích rồi đặt kích thước hợp lý.
-- BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một nơi thì không tách thêm BG.
+- BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
 - QA tổng thể file vừa tạo; sửa lỗi và RE-QA trước khi LOCK.
 
 2- TẠO PROMPT CHAR
@@ -39,8 +40,11 @@ QUY TẮC CHUNG
 - Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "XX.TXT".
 - Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
-- Dùng dữ liệu CHAR/BG và các ID đã tạo; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
-- Mỗi prompt dòng phải có BG. Chọn BG đã tạo nào thích hợp với dòng đó. Không tự đặt mã BG mới. Giữ đúng số đo đã khóa.
+- Dùng dữ liệu CHAR/BG và các ID đã tạo ở bước 1; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
+- Prompt dòng dùng CHAR_XX và BG_XX đã tạo. Mỗi prompt có ít nhất một BG, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã mới trong prompt dòng. Không ghi GAP thay cho prompt. Giữ đúng số đo đã khóa.
+- Suy nghĩ, hồi tưởng hoặc việc sắp tới có thể là một BG riêng. Có thể dùng BG đó thay cho BG hiện tại, hoặc kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga.
+- Nhân vật đang ở một nơi mà nhớ, nghĩ hoặc nhận ra một nơi khác: vẽ BG của nơi được nhớ, hoặc ghép BG nơi đang đứng với BG nơi được nhớ. QA không được bắt xóa nơi được nhớ để chỉ còn phản ứng trong phòng hiện tại.
+- CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu.
 - ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
 - SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo 03_PROMPT_ANH_THEO_DONG.txt; không đổi số prompt.

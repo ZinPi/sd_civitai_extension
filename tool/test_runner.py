@@ -1,3 +1,4 @@
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -138,6 +139,109 @@ class RunnerTests(unittest.TestCase):
         job.begin(self.source, self.settings, "next")
         job._thread.join(10)
         self.assertIn("Không tự gửi lại", job.snapshot()["notice"]["text"])
+
+    def test_remembered_place_qa_does_not_stop_the_next_turn(self):
+        fail = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION; FUTURE_LEAK "
+            "EVIDENCE: The source describes Hermes remembering that he will soon enter the academy "
+            "while still in the mansion room. "
+            "REQUIRED_FIX: Use the already-created BG_03 and keep Hermes in the mansion room "
+            "without depicting the future academy approach.\n"
+            "TOOL_QA: FAIL"
+        )
+
+        class MemoryQa(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_03 mansion\nBG_04 academy\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front, close, back.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_03 mansion room.\nBG_04 academy.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count <= 2:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                rows = source_rows(user) or [
+                    (int(match.group(1)), match.group(2))
+                    for match in re.finditer(r"(?m)^(\d+)\. (.+)$", user)
+                ]
+                if step == "repair":
+                    text = "\n".join(
+                        f"{number:03d} | CHAR_01.BG_03.BG_04 | IMAGE_PROMPT: "
+                        "Hermes in the mansion, manga inset memory of the academy."
+                        for number, _text in rows
+                    )
+                    return Completion(text, "stop")
+                text = "\n".join(
+                    f"{number:03d} | CHAR_01.BG_04 | IMAGE_PROMPT: Hermes standing on the academy approach."
+                    for number, _text in rows
+                )
+                return Completion(text, "stop")
+
+        script = MemoryQa()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        source = (
+            "Hermes recuerda que pronto entrará a la academia.\n"
+            "El nombre de la institución es inconfundible.\n"
+        )
+        job.begin(source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("manga inset memory", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("KHÓA SỬA MANGA", repair_users[0])
+
+    def test_physical_future_staging_still_stops_the_turn(self):
+        fail = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION; FUTURE_LEAK "
+            "EVIDENCE: Hermes remembering the academy. "
+            "REQUIRED_FIX: keep him in the present mansion room without depicting the academy.\n"
+            "TOOL_QA: FAIL"
+        )
+
+        class StillThere(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_03 mansion\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_03 room.\n", "stop")
+                if step == "qa":
+                    return Completion(fail, "stop")
+                rows = source_rows(user) or [
+                    (int(match.group(1)), match.group(2))
+                    for match in re.finditer(r"(?m)^(\d+)\. (.+)$", user)
+                ]
+                text = "\n".join(
+                    f"{number:03d} | CHAR_01.BG_04 | IMAGE_PROMPT: Hermes standing on the academy approach."
+                    for number, _text in rows
+                )
+                return Completion(text, "stop")
+
+        job = Job(self.rules, self.data, client_factory=lambda _settings: StillThere())
+        job.begin("Hermes recuerda la academia.\n", self.settings, "all")
+        job._thread.join(10)
+        self.assertIn("Không sang lượt sau", job.snapshot()["notice"]["text"])
 
 
 if __name__ == "__main__":

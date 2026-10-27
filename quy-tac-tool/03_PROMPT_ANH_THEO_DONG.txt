@@ -321,13 +321,12 @@ Do not copy the reference-sheet pose, action, facial expression, gaze, camera, f
 
 CHAR đơn và CHAR_GROUP đều là CHAR và tuân theo cùng các quy tắc CHAR hiện hành.
 
-CHAR đơn/CHAR_ID đã được xác định ở B3 theo VISUAL_USE_COUNT của CÂU NGUỒN; B5 chỉ DÙNG các ID đã khóa, không được xét lại điều kiện tạo CHAR theo số IMAGE_PROMPT. CHAR_GROUP chỉ là tối ưu tham chiếu trong một IMAGE_PROMPT khi đạt ngưỡng 10 tổng CHAR + BG ở các dòng dưới, không phải tiêu chí cấp CHAR_ID mới.
+CHAR_ID lấy từ bước trích xuất. Prompt dòng không xét lại điều kiện tạo CHAR bằng số IMAGE_PROMPT. CHAR_GROUP chỉ để giữ prompt không quá 10 ảnh tham chiếu, không phải tiêu chí cấp CHAR_ID mới.
 
-CHAR_GROUP chỉ được xét khi tổng số ID tham chiếu CHAR + BG cần cho MỘT IMAGE_PROMPT đạt 10 ID trở lên trước khi tối ưu, ví dụ:
-- 9 CHAR + 1 BG;
-- 8 CHAR + 2 BG;
-- 7 CHAR + 3 BG;
-- hoặc trường hợp tương tự.
+CHAR và BG đều là ảnh tham chiếu.
+Một prompt không viết trên 10 ảnh tham chiếu. Tổng CHAR + BG trong prompt tối đa là 10.
+Khi liệt kê đủ sẽ vượt 10, gom các nhân vật phụ vào CHAR_GROUP để prompt còn không quá 10 ảnh tham chiếu.
+Tổng đã trong mức 10 thì không gom.
 
 Khi đó có thể gom các nhân vật phụ phù hợp vào CHAR_GROUP để giảm số ID CHAR tham chiếu phải liệt kê trong IMAGE_PROMPT.
 
@@ -335,7 +334,7 @@ Không ghép vào CHAR_GROUP bất kỳ nhân vật nào đang diễn chính tro
 
 Nhân vật diễn chính phải tiếp tục dùng CHAR reference riêng.
 
-Nếu tổng số reference CHAR + BG chưa đạt ngưỡng cần dùng CHAR_GROUP thì dùng CHAR đơn bình thường.
+Nếu tổng CHAR + BG không vượt 10 thì dùng CHAR đơn, không gom.
 
 ========================================================================================================================
 6. NHÂN VẬT KHÔNG CÓ CHAR_ID
@@ -397,7 +396,7 @@ Không:
 - healthy state khi severe injury vẫn còn;
 - physical form thay spirit/transformed state;
 - wet/dirty/burnt persistent state bị reset;
-- reference state tương lai xuất hiện trước thời điểm hợp lệ.
+- reference state tương lai của chính nhân vật xuất hiện trước thời điểm hợp lệ. BG hồi tưởng của dòng hiện tại không thuộc mục này.
 
 Emotion/pose/action/camera KHÔNG tạo CHAR state mới.
 
@@ -602,10 +601,14 @@ Với current OUTPUT_SLOT thuộc hồi tưởng / memory / thought / inner imag
 - current physical location + mental/emotional treatment dùng PHYSICAL_BG_PLUS_DYNAMIC khi B3 khóa;
 - abstract/mental/emotional field chủ đạo dùng DYNAMIC_BG khi B3 khóa exact BG_XX.
 
-13.3. Mỗi IMAGE_PROMPT phải có BG thích hợp với dòng đó.
-- Chọn một BG đã tạo từ tác phẩm, đúng nơi hoặc khung cảnh của dòng.
+13.3. Mỗi IMAGE_PROMPT phải có ít nhất một BG_XX thích hợp với dòng đó.
+- Chọn BG đã tạo từ tác phẩm, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG khi dòng cần nhiều nơi hoặc nhiều trạng thái.
+- Cùng một nơi nhưng khác buổi, khác thời tiết hoặc khác trạng thái môi trường thì dùng đúng BG_XX của trạng thái đó. Không lấy BG buổi sáng rồi sửa thành đêm hoặc mưa bằng câu chữ.
 - Không tự đặt mã BG mới trong prompt dòng.
-- Không trả báo lỗi thay cho prompt.
+- CHAR_XX và BG_XX trong prompt chỉ lấy từ bảng đã thống kê đồng bộ và đã LOCK ở bước trích xuất.
+- Không ghi CHAR_GAP hoặc BG_GAP thay cho prompt.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG đó từ tác phẩm ở bước trích xuất và bước prompt BG, theo 02_PROMPT_THAM_CHIEU_CHAR_BG.txt. Không dừng bằng GAP để né việc tạo BG.
+- Prompt dòng gọi BG đã tạo. Không tự đặt mã mới trong prompt dòng.
 
 ========================================================================================================================
 14. PHYSICAL BG RECONSTRUCTION
@@ -1088,6 +1091,22 @@ Có thể bỏ hoàn toàn hình nhân vật/cảnh vật lý hiện tại và c
 - không làm sai source;
 - không làm người xem hiểu nhầm reality/timeline.
 
+KHÓA MANGA — SUY NGHĨ, HỒI TƯỞNG, VIỆC SẮP TỚI:
+Suy nghĩ, hồi tưởng hoặc việc sắp tới là một BG khác.
+Được dùng BG hồi tưởng thay cho BG hiện tại.
+Được kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga.
+Cả hai cách đều hợp lệ.
+CHAR và BG trong prompt đó cộng lại không quá 10 ảnh tham chiếu.
+Vẽ BG hồi tưởng hoặc kết hợp hai BG không phải FUTURE_LEAK.
+FUTURE_LEAK chỉ khi prompt biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+
+Nhân vật đang đứng ở một nơi, dòng nói nhân vật nhớ, nghĩ hoặc nhận ra một nơi khác:
+- dùng BG của nơi được nhớ hoặc được nhận ra;
+- hoặc ghép BG nơi đang đứng với BG nơi đó theo hiệu ứng manga.
+QA không được FAIL_H với WRONG_LOCATION hoặc FUTURE_LEAK chỉ vì ảnh có nơi được nhớ.
+QA không được bắt sửa thành chỉ phản ứng trong phòng hiện tại và cấm vẽ nơi được nhớ.
+Nếu prompt đang dựng nhân vật như đã đứng sẵn tại nơi tương lai, sửa thành một trong hai cách manga ở trên.
+
 Không bắt buộc nhân vật đang nghĩ/nói/nghe/đọc phải xuất hiện trong ảnh.
 
 ========================================================================================================================
@@ -1113,13 +1132,13 @@ Khi trực quan hóa nội dung không thuộc physical present, phải xác đ�
 - OTHER CONFIRMED LAYER.
 
 Không được:
-- biến MEMORY thành current physical reality;
+- biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+- Dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp hai BG theo hiệu ứng manga, là cách vẽ hợp lệ. Việc dòng đang nhớ, nghĩ hoặc nhận ra một nơi sắp tới được vẽ bằng BG của nơi đó.
 - biến FEAR thành sự kiện đã xảy ra;
 - biến HOPE thành kết quả đã đạt được;
 - biến PLAN thành hành động đã thực hiện;
 - biến PREDICTION thành canon fact;
-- biến HYPOTHETICAL thành event thật;
-- kéo knowledge/reveal từ tương lai về current OUTPUT_SLOT.
+- biến HYPOTHETICAL thành event thật.
 
 Nếu visual layer có nguy cơ gây hiểu nhầm:
 → prompt phải nói rõ bản chất memory / imagined / feared / planned / hypothetical / reported của hình ảnh.
@@ -1347,7 +1366,7 @@ Trước khi PASS current IMAGE_PROMPT, kiểm tra khi áp dụng:
 [ ] Không mặc định nhân vật đang nghĩ/nói/nghe/đọc phải luôn xuất hiện.
 [ ] Memory/past/report/thought/fear/hope/plan/hypothetical được phân biệt đúng reality/time.
 [ ] Không biến khả năng hoặc suy nghĩ thành canon fact.
-[ ] Không future leak.
+[ ] Không future leak. Future leak chỉ là biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại. BG hồi tưởng hoặc BG kết hợp theo hiệu ứng manga không phải future leak.
 [ ] Không invent event/action/prop/character/BG/state để chống lặp.
 [ ] Không dùng camera-only variation khi SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT có content khác rõ ràng có thể minh họa.
 [ ] Nếu source thật sự không có visual alternative, variation chỉ ở mức hợp lý và không bịa.
@@ -1360,8 +1379,8 @@ FAIL khi:
 - CAMERA_ONLY_ANTI_REPETITION khi source có content khác đủ để trực quan hóa;
 - INVENTED_VARIATION_CONTENT;
 - WRONG_VISUALIZED_REALITY_LAYER;
-- BORROWED_ADJACENT_EVENT_FOR_VARIETY;
-- FUTURE_CONTENT_USED_FOR_VARIETY.
+- BORROWED_ADJACENT_EVENT_FOR_VARIETY.
+- FUTURE_CONTENT_USED_FOR_VARIETY chỉ khi mượn sự kiện của dòng sau, việc dòng hiện tại không nói tới, để đổi hình. Dòng đang nhớ, nghĩ hoặc nhận ra một nơi thì vẽ BG của nơi đó, không thuộc mã này.
 
 ========================================================================================================================
 17A.10. CÂU KHÓA CUỐI
@@ -1376,7 +1395,7 @@ SEMANTIC_ANALYSIS_WINDOW ĐÃ KHÓA CHO CURRENT OUTPUT_SLOT
 → phân tích TOÀN BỘ nội dung có thể trực quan hóa
 → chọn hình ảnh truyền đạt đúng ý nhất
 → ưu tiên tránh lặp hình không cần thiết với các OUTPUT_SLOT liền kề
-→ nhưng không bịa, không future leak, không phá reality layer, không phá continuity.
+→ nhưng không bịa, không biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại, không phá reality layer, không phá continuity. BG hồi tưởng và BG kết hợp theo hiệu ứng manga vẫn được dùng.
 
 HÀNH ĐỘNG VẬT LÝ HIỆN TẠI
 KHÔNG PHẢI
@@ -1805,12 +1824,13 @@ Nếu source có joke/awkward beat:
 27. REFERENCE BUDGET
 ========================================================================================================================
 
-Tổng token reference trong header:
-CHAR + BG <= 9.
+Tổng ảnh tham chiếu trong header:
+CHAR + BG tối đa 10.
+Không viết trên 10 ảnh tham chiếu.
 
 Visual-source CHAR cũng tính vào giới hạn.
 
-Nếu số ID tham chiếu CHAR + BG cần cho MỘT IMAGE_PROMPT đạt 10 ID trở lên trước khi tối ưu:
+Nếu số ID tham chiếu CHAR + BG của một IMAGE_PROMPT vượt 10:
 - được phép dùng CHAR_GROUP theo mục 5.7 để gom các nhân vật phụ phù hợp;
 - không ghép nhân vật đang diễn chính trong IMAGE_PROMPT/cảnh hiện tại vào CHAR_GROUP;
 - nhân vật diễn chính vẫn dùng CHAR_ID tham chiếu riêng;
@@ -1947,7 +1967,7 @@ G. INVENTION
 [ ] không invent plot/prop/landmark/lore/state.
 
 H. TECHNICAL
-[ ] total CHAR+BG <= 9;
+[ ] total CHAR+BG không quá 10 ảnh tham chiếu;
 [ ] English technical prompt;
 [ ] không chép nguyên văn source/thoại;
 [ ] không render reference metadata;
@@ -2056,10 +2076,10 @@ TERMINOLOGY BRIDGE CHỈ DÙNG ĐỂ ÁP DỤNG CÁC BLOCK BUOC_11 NGUYÊN VĂN 
 - Trong các khối BUOC_11 chép nguyên văn, từ “reference image”, “ảnh đã gắn”, “ảnh đã xác nhận” trong quy trình B5 viết TXT được áp dụng như dữ liệu PROMPT CHAR/BG gắn ID CHAR_XX/BG_XX đã khóa; không bắt buộc có ảnh thật, ảnh tải lên hay bước duyệt ảnh để tạo IMAGE_PROMPT. Các điều khoản về metadata trên ảnh chỉ phát huy tác dụng khi có ảnh thật ở hệ thống tạo ảnh ngoài tool.
 
 KNOWN CONFLICTS KHÔNG ĐƯỢC IMPORT VÀO B5:
-- mọi rule BUOC_11 bắt buộc TẤT CẢ IMAGE_PROMPT phải có BG; B5 hiện hành giữ BG conditional theo exact resource need/B3.
+- câu cũ cho phép IMAGE_PROMPT không có BG, hoặc giữ BG là tùy trường hợp. Quy tắc hiện hành: mỗi IMAGE_PROMPT phải có ít nhất một exact numbered BG_XX đã tạo, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG.
 - quota/workflow `1 SMALL_SCENE = 1 IMAGE_PROMPT` và director-chain SMALL_SCENE; B5 hiện hành giữ chế độ theo dòng/câu.
-- rule CHAR_GROUP cũ trigger `>5 reference`; B5 hiện hành giữ `CHAR + BG <= 9` và chỉ xét CHAR_GROUP từ 10 reference trước tối ưu, đồng thời áp latest override cuối BUOC_11.
-- reference budget 10 của BUOC_11 cũ; B5 hiện hành giữ hard budget `CHAR + BG <= 9`.
+- rule CHAR_GROUP cũ trigger `>5 reference`, ngưỡng trên 9 CHAR, và hard budget `CHAR + BG <= 9`. Quy tắc hiện hành: CHAR và BG đều là ảnh tham chiếu; một prompt không viết trên 10 ảnh tham chiếu.
+- reference budget cũ mâu thuẫn với trần 10 ảnh. Quy tắc hiện hành giữ trần 10.
 
 Các block sau đây là NGUYÊN VĂN BUOC_11 và được áp dụng cùng terminology bridge ở trên.
 
@@ -2320,7 +2340,7 @@ CÁCH ĐÚNG:
 2. Xác định CURRENT MOMENT / KEY / TRƯỚC / HIỆN TẠI / SAU.
 3. Chuyển ý nghĩa thị giác cần thiết thành chỉ dẫn tiếng Anh.
 4. Chỉ mô tả thứ thực sự được phép xuất hiện trong ảnh.
-5. Không future leak.
+5. Không future leak. Future leak chỉ là biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại. Vẽ BG hồi tưởng hoặc kết hợp BG hiện tại với BG hồi tưởng theo hiệu ứng manga không phải future leak.
 6. Không đổi nghĩa chỉ vì bỏ source quote.
 
 Ví dụ KHÔNG ĐƯỢC:
@@ -3241,7 +3261,7 @@ Cấm dùng template này để chèn narrative explanation thừa. Mỗi câu p
 
 
 --- BEGIN VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE | SOURCE_LINES 3459-3459 | SHA256 675e822693f711b667f9cf54faa1bd73d7b425305f782b9c33e9cc97c1050f8f ---
-*********CHÚ Ý TUYỆT ĐỐI KHÔNG DÙNG SÁNG TẠO CHAR NHÓM CHO CÁC CHAR ĐÃ CÓ TRỪ KHI 1 CẢNH NHỎ CÓ TRÊN 9 CHAR.(KO NHÓM CHAR_XX,CHAR_YY,CHAR_ZZ THÀNH CHAR NHÓM NẾU CẢNH ĐÓ HAY PROMPT ĐÓ KO QUÁ 9 CHAR VÀ BG)
+CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu. Chỉ gom CHAR phụ khi tổng sẽ vượt 10. Tổng đã trong mức 10 thì không gom. Nhân vật diễn chính giữ CHAR riêng.
 --- END VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE ---
 
 
@@ -3292,17 +3312,20 @@ Header KHÔNG hợp lệ:
 - Close-up, medium shot, full shot, action, dialogue visualization, emotional beat, thought, memory, flashback, dream, vision, hypothetical, montage, abstract treatment, dynamic treatment, symbolic treatment... đều vẫn phải gọi exact numbered `BG_XX` đã được upstream/B3 khóa.
 - Không được dùng lý do “không nhìn thấy nhiều background”, “neutral field”, “no identifiable background”, “no new BG resource”, “plain field”, “white field”, “abstract field” hoặc cách diễn đạt tương tự để bỏ token BG khỏi header.
 
-3. MỖI PROMPT DÒNG PHẢI CÓ BG THÍCH HỢP VỚI DÒNG ĐÓ.
-- Header có ít nhất một `BG_XX` đã tạo từ tác phẩm.
-- BG đó phải đúng nơi hoặc khung cảnh của dòng đang viết.
+3. MỖI PROMPT DÒNG PHẢI CÓ ÍT NHẤT MỘT BG THÍCH HỢP VỚI DÒNG ĐÓ.
+- Header có ít nhất một `BG_XX` đã tạo từ tác phẩm. Một prompt được có nhiều `BG_XX`.
+- BG đó phải đúng nơi và đúng trạng thái của dòng đang viết.
+- Cùng một nơi có nhiều trạng thái BG khi tác phẩm dùng nơi đó lúc buổi sáng, rồi ở đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác. Prompt gọi đúng BG_XX của trạng thái đó.
+- Không lấy BG buổi sáng rồi sửa thành đêm hoặc mưa bằng câu chữ.
 - Không tự đặt mã BG mới.
 - Không chọn một BG khác chỉ để lấp chỗ trống khi BG đó không thích hợp với dòng.
 - Không dùng `BG_00` nếu BG đó không phải nơi của dòng.
 
-4. KHÔNG DỪNG ĐỂ ĐÒI MÃ BG MỚI.
-- Vẫn viết prompt.
-- Gắn BG đã tạo nào thích hợp với dòng.
-- Không xuất `BG_GAP` thay cho prompt.
+4. ID LẤY TỪ BẢNG ĐÃ TẠO.
+- Prompt gọi CHAR_XX và BG_XX đã tạo.
+- Khi đã có BG thích hợp, viết prompt và gắn BG đó. Không xuất `BG_GAP` hoặc `CHAR_GAP` thay cho prompt.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG. Cùng nơi và cùng trạng thái thì dùng lại BG đã có. Buổi sáng, ban đêm, mưa hoặc trạng thái môi trường khác rõ là các BG khác nhau.
+- Không tự đặt mã mới trong prompt dòng.
 
 5. HARD GATE TRƯỚC KHI PASS PROMPT:
 Mỗi prompt bắt buộc thỏa đồng thời:
@@ -3338,11 +3361,12 @@ Nếu:
 
 8. THỨ TỰ REPAIR KHI THIẾU BG HOẶC BG KHÔNG THÍCH HỢP:
 A. Đọc dòng nguồn.
-B. Chọn BG đã tạo nào thích hợp với dòng đó.
-C. Gắn mã BG đó vào header.
-D. Viết body theo đúng nơi của BG đó.
-E. Giữ nguyên số đo đã khóa.
-F. Không tạo mã BG mới và không thay prompt bằng báo lỗi.
+B. Chọn BG đã tạo, đúng nơi và đúng trạng thái của dòng. Suy nghĩ hoặc hồi tưởng có thể dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp cả hai theo hiệu ứng manga.
+C. Nếu trạng thái đó chưa có BG, tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG, rồi gắn mã đã tạo.
+D. Gắn mã BG đó vào header.
+E. Viết body theo đúng nơi và đúng trạng thái của BG đó.
+F. Giữ nguyên số đo đã khóa.
+G. Không tạo mã BG mới trong prompt dòng và không thay prompt bằng BG_GAP.
 
 9. OVERRIDE:
 Khóa này ghi đè mọi rule, ví dụ, template hoặc cách hiểu trước đó cho phép IMAGE_PROMPT không có BG, cho phép BG presence là optional/conditional/N/A, hoặc cho phép dùng prose thay cho exact `BG_XX` trong header.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 
@@ -40,7 +41,7 @@ EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.
 Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số thứ tự giữ nguyên.
 Làm đủ các lần của bước trích trong quy tắc và xuất danh sách CHAR, BG.
 Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn không có số thì phân tích tác phẩm và đối tượng, rồi sáng tạo kích thước hợp lý.
-Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi thì một BG.
+Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
 """
 
 MERGE_TASK = """CHỈ GỘP BƯỚC 1.
@@ -66,7 +67,8 @@ LINE_TASK = """CHỈ LÀM BƯỚC 4 cho đúng các dòng trong CAC_DONG.
 Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
-Mỗi prompt phải có một BG đã tạo, và BG đó phải thích hợp với dòng. Không tự đặt mã BG mới.
+Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã BG mới.
+Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
 Giữ đúng số đo đã khóa.
 """
 
@@ -75,6 +77,7 @@ Không viết lại quy tắc.
 FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Không yêu cầu tạo mã BG mới. Nếu BG không thích hợp, chỉ định BG đã tạo nào đúng với dòng.
+Suy nghĩ, hồi tưởng hoặc việc sắp tới được vẽ bằng BG của nơi đó, hoặc ghép với BG nơi đang đứng. Không FAIL vì ảnh có nơi được nhớ. Không bắt sửa thành chỉ phản ứng trong phòng hiện tại.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
 Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 """
@@ -82,9 +85,37 @@ Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy tắc tạo prompt.
 Giữ nguyên số dòng và số thứ tự đã cho.
 Chỉ xuất các dòng prompt, đúng định dạng trong quy tắc.
-Mỗi dòng vẫn có một BG đã tạo và BG đó thích hợp với dòng. Không tự đặt mã BG mới.
+Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
 Giữ đúng số đo đã khóa.
 """
+
+MANGA_REPAIR = """KHÓA SỬA MANGA, ưu tiên hơn REQUIRED_FIX nếu QA bắt xóa nơi được nhớ.
+Viết lại prompt bằng BG của nơi được nhớ, hoặc ghép BG nơi đang đứng với BG nơi đó theo hiệu ứng manga.
+Prompt sửa phải có memory, manga inset hoặc split background.
+Không dựng nhân vật đang đứng sẵn tại nơi tương lai như sự kiện đã xảy ra.
+Không sửa thành chỉ phản ứng trong phòng và cấm vẽ nơi được nhớ.
+"""
+
+_MEMORY_CUE = re.compile(r"(?i)(remember|will soon|recognition|recogniz|nhớ|hồi tưởng|nhận ra|sắp tới|sắp vào)")
+_HIDE_REMEMBERED = re.compile(
+    r"(?i)(without depicting|do not depict|present mansion|phòng hiện tại|"
+    r"already-created BG_|chỉ còn phản ứng|cấm vẽ|visualizing his reaction|visible reaction)"
+)
+_MANGA_STAGING = re.compile(r"(?i)\b(memory|recollection|flashback|manga|inset|split[- ]background|hồi tưởng)\b")
+
+
+def memory_place_false_fail(report: str) -> bool:
+    text = report or ""
+    if not re.search(r"(?i)WRONG_LOCATION|FUTURE_LEAK", text):
+        return False
+    if not _MEMORY_CUE.search(text):
+        return False
+    return bool(_HIDE_REMEMBERED.search(text))
+
+
+def records_use_manga_memory(records: list[dict]) -> bool:
+    text = " ".join(str(record.get("body", "")) for record in records)
+    return bool(_MANGA_STAGING.search(text))
 
 STEP_TITLES = {
     1: "Danh sách nhân vật và bối cảnh",
@@ -397,13 +428,14 @@ class Job:
     def _qa_batch(self, client, guide, qa_rules, line_rules, reference, records, width):
         rows = [(record["n"], self._lines[record["n"] - 1]) for record in records]
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, records, width)
-        if verdict == "pass":
+        if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(records)):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
             return records
         self._log(f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.")
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
         repair = (
             REPAIR_TASK
+            + ("\n" + MANGA_REPAIR if memory_place_false_fail(report) else "")
             + "\nBAO_CAO_QA\n"
             + report
             + "\nDONG_NGUON\n"
@@ -419,6 +451,9 @@ class Job:
             raise JobError("Bản sửa sau QA không đủ prompt đúng số dòng. Không khóa lượt này.")
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
         if verdict != "pass":
+            if memory_place_false_fail(report) and records_use_manga_memory(kept):
+                self._log(f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}.")
+                return kept
             excerpt = " ".join(report.split())[:1500]
             raise JobError("QA vẫn chưa đạt sau một lần sửa. Không sang lượt sau.\n\n" + excerpt)
         self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
