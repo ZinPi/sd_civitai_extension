@@ -15,10 +15,11 @@ QUY TẮC CHUNG
 1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH
 - Mở và đọc toàn bộ quy tắc 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt.
 - Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
-- Lần 1: trích xuất nhân vật, sinh vật, vũ khí, công cụ, bối cảnh (kể cả trừu tượng, suy nghĩ, quá khứ) và các trạng thái theo 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt; chưa cấp ID CHAR/BG.
+- Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
 - Với nhân vật, mỗi câu khác nhau có nhắc đến và có giá trị hình ảnh tính 1 lần; chỉ 1 câu thì không vào danh sách tạo CHAR; từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
-- Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 4.
-- Lần 3: tạo ID CHAR_XX và BG_XX cho các trạng thái được liệt kê; xuất danh sách CHAR và BG.
+- Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn. Dòng nào bước 4 sẽ vẽ thì bảng đã có BG đúng trạng thái, và đã có CHAR khi nhân vật đủ điều kiện tạo CHAR. Thiếu mục nào thì bổ sung ở lần này.
+- Lần 3: liệt kê trạng thái chính xác, rồi gán CHAR_XX và BG_XX phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
+- Chỉ LOCK khi bảng đã đồng bộ. Bước 4 dùng đúng bảng này để không còn GAP vì thiếu CHAR hoặc BG.
 - Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo đã khóa. Thiếu số trong nguồn thì phân tích rồi đặt kích thước hợp lý.
 - BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
 - QA tổng thể file vừa tạo; sửa lỗi và RE-QA trước khi LOCK.
@@ -39,7 +40,8 @@ QUY TẮC CHUNG
 - Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "XX.TXT".
 - Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
-- Dùng dữ liệu CHAR/BG và các ID đã tạo; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
+- Dùng dữ liệu CHAR/BG và các ID đã tạo ở bước 1; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
+- Prompt dòng chỉ gọi CHAR_XX và BG_XX có trong bảng đã thống kê đồng bộ. Không ghi GAP thay cho prompt. Không tự đặt mã mới. Nếu dòng cần một trạng thái chưa có trong bảng, quay lại bước 1, bổ sung, đồng bộ, gán ID, rồi mới viết prompt.
 - Mỗi prompt dòng phải có ít nhất một BG. Chọn BG đã tạo nào thích hợp với dòng đó và đúng trạng thái. Một prompt được có nhiều BG. Không tự đặt mã BG mới. Giữ đúng số đo đã khóa.
 - ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.

@@ -4,10 +4,11 @@ FILE: 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt
 KHÓA THEO QUY TRÌNH HƯỚNG DẪN:
 - Đây là bước 1. Tên bước là `1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH`. File quy tắc là `01_TRICH_NHAN_VAT_VA_BOI_CANH.txt`.
 - Đầu vào đã khóa: `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE`. Không dùng bản TTS. Không dùng SRT làm nguồn hiện hành.
-- Lần 1: trích xuất nhân vật, sinh vật, vũ khí, công cụ, bối cảnh, kể cả trừu tượng, suy nghĩ, quá khứ, và các trạng thái. Chưa cấp ID CHAR/BG.
+- Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
 - Với nhân vật, mỗi câu nguồn khác nhau có nhắc đến và có giá trị hình ảnh tính 1. Chỉ 1 câu thì không vào danh sách tạo CHAR. Từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
-- Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 4.
-- Lần 3: cấp `CHAR_XX` và `BG_XX` cho các trạng thái được liệt kê, rồi xuất danh sách CHAR và BG.
+- Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn để bảng đủ cho bước 4. Thiếu thì bổ sung ở lần này.
+- Lần 3: liệt kê trạng thái chính xác, rồi gán `CHAR_XX` và `BG_XX` phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
+- Bảng này là nguồn ID duy nhất của prompt theo dòng. Prompt dòng không được rơi vào GAP vì một CHAR hoặc BG đã phải có từ bước này.
 - Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo đã khóa. Nguồn có số thì dùng đúng số đó. Nguồn không có số thì phân tích tác phẩm và chính đối tượng đó, sáng tạo một kích thước hợp lý và khóa lại. Số đo sáng tạo hợp lý là hợp lệ, không phải lỗi thiếu.
 - BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một bối cảnh có thể có nhiều trạng thái BG. Phân tích từng trường hợp rồi áp dụng: cùng một nơi ở đoạn này là buổi sáng, qua đoạn khác là ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Mỗi trạng thái là một BG_XX riêng. Cùng nơi và cùng trạng thái thì dùng lại một BG.
 - Bước này không viết prompt ảnh theo dòng và không cấp mã BG trong prompt dòng.
@@ -21,12 +22,16 @@ KHÓA THEO QUY TRÌNH HƯỚNG DẪN:
 
 Bước 1 dùng file này để trích xuất các tài nguyên hình ảnh cần thiết cho các bước tạo ảnh tiếp theo.
 
-Bước này chỉ tập trung vào 4 nhóm chính:
+Bước này liệt kê đủ các nhóm có trong tác phẩm:
 
 1. NHÂN VẬT.
-2. SINH VẬT / QUÁI VẬT / THỰC THỂ PHI NHÂN.
-3. VŨ KHÍ / VẬT PHẨM / CÔNG CỤ / ĐẠO CỤ QUAN TRỌNG.
-4. BỐI CẢNH / LOCATION / BG.
+2. SINH VẬT.
+3. QUÁI VẬT.
+4. ĐỘNG VẬT.
+5. CÔNG CỤ.
+6. VŨ KHÍ.
+7. VẬT PHẨM / ĐẠO CỤ QUAN TRỌNG.
+8. BỐI CẢNH / LOCATION / BG, gồm từng trạng thái BG.
 
 Mục tiêu:
 - xác định cái gì cần dùng lại;
@@ -1079,26 +1084,47 @@ Nếu quy tắc hoặc output xa rời mục tiêu tạo ảnh:
 23. QUY TRÌNH BƯỚC 1
 ======================================================================
 
-LẦN 1 — TRÍCH, CHƯA CẤP ID
+LẦN 1 — TRÍCH THẬT KỸ, CHƯA CẤP ID
 Đọc toàn bộ `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE` đã khóa. Đối chiếu SOURCE_ORIGINAL khi cần để giữ canon. Không dùng TTS, MASTER hoặc SRT.
-Trích xuất:
-- character;
-- creature;
-- weapon, tool, item;
-- bối cảnh, kể cả trừu tượng, suy nghĩ và quá khứ khi tác phẩm cần vẽ.
-Với mỗi resource, xác định visual state quan trọng và EFFECTIVE_FROM_SOURCE_SENTENCE_ID.
-Với mỗi nơi, xác định các trạng thái BG cần vẽ và BACKGROUND_VISUAL_MODE. Chưa ghi CHAR_XX hoặc BG_XX.
-Đếm nhân vật theo mục 2A. Sinh vật, vật phẩm và BG dùng ngưỡng của chính loại đó, không dùng ngưỡng câu của nhân vật.
+Đi hết nguồn. Không dừng ở vài tên dễ thấy.
+Liệt kê khi tác phẩm có:
+- nhân vật;
+- bối cảnh, kể cả trừu tượng, suy nghĩ và quá khứ khi tác phẩm cần vẽ;
+- sinh vật;
+- quái vật;
+- động vật;
+- công cụ;
+- vũ khí;
+- vật phẩm và đạo cụ quan trọng.
+Với mỗi mục, ghi các trạng thái hình ảnh nhìn thấy được và EFFECTIVE_FROM_SOURCE_SENTENCE_ID.
+Với mỗi nơi, ghi các trạng thái BG cần vẽ và BACKGROUND_VISUAL_MODE.
+Chưa ghi CHAR_XX hoặc BG_XX.
+Đếm nhân vật theo mục 2A. Sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm và BG dùng ngưỡng của chính loại đó, không dùng ngưỡng câu của nhân vật.
 
-LẦN 2 — QA DANH SÁCH
-QA danh sách vừa trích theo mục 21, trước khi cấp ID.
-Sửa thiếu CHAR, thiếu BG, thiếu trạng thái BG khi cùng một nơi đổi buổi hoặc thời tiết, BG tách chỉ vì camera hoặc cảm xúc, số đo bị ghi GAP dù đã khóa hợp lý, và sinh vật bị đếm bằng ngưỡng nhân vật.
-RE-QA cho đến khi danh sách đủ.
+LẦN 2 — THỐNG KÊ ĐỒNG BỘ
+Đối chiếu bảng lần 1 với toàn bộ nguồn trước khi cấp ID.
+Đồng bộ như sau:
+- cùng một nhân vật, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm hoặc nơi, dù nguồn gọi bằng tên khác, gộp về một identity;
+- trạng thái khác rõ thì tách thành dòng trạng thái riêng;
+- cùng nơi và cùng trạng thái thì một dòng BG;
+- buổi sáng rồi ban đêm, mưa hoặc trạng thái môi trường khác rõ thì nhiều dòng trạng thái BG.
+Rà từng dòng nguồn có giá trị hình ảnh:
+- nơi dòng đó cần vẽ đã có trạng thái BG trong bảng;
+- nhân vật đủ ngưỡng tạo CHAR đã có trong bảng;
+- sinh vật, quái vật, động vật, công cụ, vũ khí cần tham chiếu đã có trong bảng.
+Thiếu mục nào thì bổ sung vào bảng ở lần này.
+QA bảng theo mục 21.
+Sửa thiếu CHAR, thiếu BG, thiếu trạng thái BG, BG tách chỉ vì camera hoặc cảm xúc, số đo bị ghi GAP dù đã khóa hợp lý, và sinh vật bị đếm bằng ngưỡng nhân vật.
+RE-QA cho đến khi bảng khớp nguồn.
 
-LẦN 3 — CẤP ID VÀ XUẤT
-Cấp CHAR_XX và BG_XX cho các trạng thái đã liệt kê.
+LẦN 3 — LIỆT KÊ TRẠNG THÁI RỒI GÁN ID
+Với từng identity đã giữ, liệt kê trạng thái chính xác: trang phục, hình thái, thương tích, buổi, thời tiết, hư hại, kích hoạt.
+Gán CHAR_XX cho trạng thái nhân vật, sinh vật, quái vật, động vật, công cụ hoặc vũ khí khi mục đó cần tham chiếu.
+Gán BG_XX cho từng trạng thái bối cảnh.
+Cùng identity và cùng trạng thái thì một ID. Cùng nơi nhưng khác trạng thái môi trường thì BG_XX khác.
 Xuất CHARACTER_MASTER, CREATURE_MASTER, ITEM_MASTER, LOCATION_MASTER, BG_MASTER, REFERENCE_QUEUE.
-QA tổng thể file vừa tạo. Sửa lỗi và RE-QA. Chỉ LOCK khi PASS.
+QA tổng thể file vừa tạo. Sửa lỗi và RE-QA. Chỉ LOCK khi bảng đã đồng bộ và mỗi trạng thái đã có ID phù hợp.
+Bước 4 chỉ được gọi các ID trong bảng đã LOCK.
 
 ======================================================================
 24. CÂU KHÓA CUỐI
@@ -1165,7 +1191,8 @@ REVISION_LOG
 
 - Bước này đi theo file `01_TRICH_NHAN_VAT_VA_BOI_CANH.txt` và tên `1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH`.
 - Nguồn hiện hành là `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE`.
-- Ba lần: trích chưa cấp ID, QA danh sách, rồi cấp CHAR_XX / BG_XX.
+- Ba lần: trích thật kỹ, thống kê đồng bộ, rồi liệt kê trạng thái và gán CHAR_XX / BG_XX.
+- Bảng đã khóa là nguồn ID của prompt theo dòng, để bước 4 không còn GAP vì thiếu CHAR hoặc BG.
 - Cùng một nơi có thể có nhiều trạng thái BG khi buổi, mưa hoặc trạng thái môi trường khác rõ. Cùng nơi và cùng trạng thái thì một BG.
 - Số đo sáng tạo hợp lý là khóa hợp lệ.
 - Ngưỡng 2 câu chỉ áp dụng cho nhân vật.

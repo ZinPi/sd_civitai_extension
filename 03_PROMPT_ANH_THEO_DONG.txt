@@ -606,7 +606,10 @@ Với current OUTPUT_SLOT thuộc hồi tưởng / memory / thought / inner imag
 - Chọn BG đã tạo từ tác phẩm, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG khi dòng cần nhiều nơi hoặc nhiều trạng thái.
 - Cùng một nơi nhưng khác buổi, khác thời tiết hoặc khác trạng thái môi trường thì dùng đúng BG_XX của trạng thái đó. Không lấy BG buổi sáng rồi sửa thành đêm hoặc mưa bằng câu chữ.
 - Không tự đặt mã BG mới trong prompt dòng.
-- Không trả báo lỗi thay cho prompt.
+- CHAR_XX và BG_XX trong prompt chỉ lấy từ bảng đã thống kê đồng bộ và đã LOCK ở bước trích xuất.
+- Không ghi CHAR_GAP hoặc BG_GAP thay cho prompt.
+- Nếu dòng cần một nhân vật, sinh vật, quái vật, động vật, công cụ, vũ khí hoặc trạng thái BG chưa có trong bảng, quay lại bước trích xuất, bổ sung, đồng bộ, gán ID, rồi mới viết prompt.
+- Không trả báo lỗi thay cho prompt khi bảng đã có ID phù hợp.
 
 ========================================================================================================================
 14. PHYSICAL BG RECONSTRUCTION
@@ -3302,10 +3305,12 @@ Header KHÔNG hợp lệ:
 - Không chọn một BG khác chỉ để lấp chỗ trống khi BG đó không thích hợp với dòng.
 - Không dùng `BG_00` nếu BG đó không phải nơi của dòng.
 
-4. KHÔNG DỪNG ĐỂ ĐÒI MÃ BG MỚI.
-- Vẫn viết prompt.
-- Gắn BG đã tạo nào thích hợp với dòng.
-- Không xuất `BG_GAP` thay cho prompt.
+4. ID LẤY TỪ BẢNG ĐÃ THỐNG KÊ ĐỒNG BỘ.
+- Bảng bước trích xuất đã liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí và từng trạng thái, rồi đã gán CHAR_XX / BG_XX.
+- Prompt gọi đúng ID đó.
+- Khi bảng đã có BG thích hợp, viết prompt và gắn BG đó. Không xuất `BG_GAP` hoặc `CHAR_GAP` thay cho prompt.
+- Khi dòng cần một trạng thái chưa có trong bảng, chưa viết prompt của dòng đó. Quay lại bước trích xuất, bổ sung mục thiếu, thống kê đồng bộ, gán ID, rồi viết prompt.
+- Không tự đặt mã mới trong prompt dòng.
 
 5. HARD GATE TRƯỚC KHI PASS PROMPT:
 Mỗi prompt bắt buộc thỏa đồng thời:
@@ -3341,11 +3346,12 @@ Nếu:
 
 8. THỨ TỰ REPAIR KHI THIẾU BG HOẶC BG KHÔNG THÍCH HỢP:
 A. Đọc dòng nguồn.
-B. Chọn BG đã tạo nào thích hợp với dòng đó.
-C. Gắn mã BG đó vào header.
-D. Viết body theo đúng nơi của BG đó.
-E. Giữ nguyên số đo đã khóa.
-F. Không tạo mã BG mới và không thay prompt bằng báo lỗi.
+B. Chọn BG đã có trong bảng thống kê đồng bộ, đúng nơi và đúng trạng thái của dòng.
+C. Nếu trạng thái đó chưa có trong bảng, quay lại bước trích xuất, bổ sung, đồng bộ, gán BG_XX, rồi mới sửa prompt.
+D. Gắn mã BG đó vào header.
+E. Viết body theo đúng nơi và đúng trạng thái của BG đó.
+F. Giữ nguyên số đo đã khóa.
+G. Không tạo mã BG mới trong prompt dòng và không thay prompt bằng BG_GAP.
 
 9. OVERRIDE:
 Khóa này ghi đè mọi rule, ví dụ, template hoặc cách hiểu trước đó cho phép IMAGE_PROMPT không có BG, cho phép BG presence là optional/conditional/N/A, hoặc cho phép dùng prose thay cho exact `BG_XX` trong header.
