@@ -22,6 +22,7 @@ const logFile = document.querySelector("#log-file");
 const preview = document.querySelector("#preview");
 const previewNote = document.querySelector("#preview-note");
 const download = document.querySelector("#download");
+const downloadAll = document.querySelector("#download-all");
 const reference = document.querySelector("#reference");
 const run = document.querySelector("#run");
 const next = document.querySelector("#next");
@@ -55,6 +56,7 @@ function updateCount() {
   next.hidden = running || allDone || job?.state === "error" || job?.state === "stopped" || total === 0;
   repair.hidden = running || !(job?.repair_lines || []).length;
   repair.disabled = running;
+  downloadAll.hidden = !job || running || done !== 4;
 }
 
 async function readError(response) {

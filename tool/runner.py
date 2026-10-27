@@ -454,7 +454,7 @@ class Job:
             }
 
     def output_path(self, filename: str) -> Path:
-        if filename not in OUTPUT_FILES.values() and filename != "XX.TXT":
+        if filename not in OUTPUT_FILES.values():
             raise JobError("Không có file này.")
         return self.data_dir / filename
 
@@ -895,8 +895,7 @@ class Job:
         self._write("PROMPT_BG.txt", bg_text)
         char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
         reference = compile_reference(listing_text, char_text, bg_text)
-        self._write("TBN6A.txt", reference)
-        self._write("XX.TXT", reference)
+        self._write_reference(reference)
         return reference
 
     def _repair_selected(
@@ -1061,10 +1060,17 @@ class Job:
         char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
         bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.")
         text = compile_reference(listing, char_text, bg_text)
-        self._write("TBN6A.txt", text)
-        self._write("XX.TXT", text)
-        self._log("Đã tổng hợp file tham chiếu TBN6A.txt.")
+        self._write_reference(text)
+        self._log("Đã tổng hợp file tham chiếu.")
         return text
+
+    def _write_reference(self, text: str) -> None:
+        body = text if text.endswith("\n") else text + "\n"
+        self._write("FILE_TONG_HOP.txt", body)
+        for old_name in ("TBN6A.txt", "XX.TXT"):
+            old_path = self.data_dir / old_name
+            if old_path.exists():
+                old_path.unlink()
 
     def _complete_whole(self, client, step: str, documents, material: str) -> str:
         text, finish = self._call(client, step, documents, material)
@@ -1206,7 +1212,7 @@ class Job:
         return int(self._settings["max_output_tokens"])
 
     def _reset_outputs(self) -> None:
-        for name in list(OUTPUT_FILES.values()) + ["XX.TXT"]:
+        for name in list(OUTPUT_FILES.values()) + ["XX.TXT", "TBN6A.txt"]:
             path = self.data_dir / name
             if path.exists():
                 path.unlink()

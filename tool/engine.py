@@ -27,7 +27,7 @@ OUTPUT_FILES = {
     "char": "PROMPT_CHAR.txt",
     "bg": "PROMPT_BG.txt",
     "dong": "PROMPT_THEO_DONG.txt",
-    "tham-chieu": "TBN6A.txt",
+    "tham-chieu": "FILE_TONG_HOP.txt",
     "nhat-ky": "NHAT_KY.txt",
 }
 

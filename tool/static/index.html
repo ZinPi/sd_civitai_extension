@@ -113,6 +113,7 @@
       <section class="sheet results">
         <div class="sheet-head">
           <h2>Kết quả</h2>
+          <a id="download-all" class="download" hidden href="/api/file/tat-ca" download="TAT_CA_FILE.zip">Tải tất cả</a>
         </div>
         <div class="tabs" role="tablist">
           <button type="button" role="tab" data-file="danh-sach" aria-selected="true">Danh sách</button>
@@ -123,7 +124,7 @@
         <pre id="preview">Kết quả hiện ở đây sau khi chạy.</pre>
         <p id="preview-note" class="hint" hidden></p>
         <a id="download" class="download" hidden>Tải file này</a>
-        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" hidden>Tải file tham chiếu đã tổng hợp</a>
+        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" download="FILE_TONG_HOP.txt" hidden>Tải file tổng hợp</a>
       </section>
     </section>
 
@@ -134,6 +135,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=8"></script>
+  <script src="/static/app.js?v=9"></script>
 </body>
 </html>

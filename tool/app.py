@@ -6,8 +6,10 @@ Mở: http://127.0.0.1:8765
 
 from __future__ import annotations
 
+import io
 import json
 import os
+import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -278,6 +280,30 @@ def create_app(
         except AlreadyRunning as exc:
             raise HTTPException(status_code=409, detail="Đang chạy một lượt.") from exc
         return job.snapshot(include_source=True)
+
+    @app.get("/api/file/tat-ca")
+    def download_all():
+        names = [
+            "DANH_SACH_CHAR_BG.txt",
+            "PROMPT_CHAR.txt",
+            "PROMPT_BG.txt",
+            "PROMPT_THEO_DONG.txt",
+            "FILE_TONG_HOP.txt",
+            "NHAT_KY.txt",
+        ]
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name in names:
+                path = data / name
+                if path.is_file() and path.stat().st_size > 0:
+                    archive.write(path, name)
+            if not archive.namelist():
+                raise HTTPException(status_code=404, detail="Chưa có file để tải.")
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="TAT_CA_FILE.zip"'},
+        )
 
     @app.get("/api/file/{key}")
     def download(key: str, preview: int = 0):

@@ -53,8 +53,8 @@ QUY TẮC CHUNG
 - QA theo quy tắc áp dụng, chỉ LOCK khi đạt.
 
 4- TẠO PROMPT ẢNH THEO DÒNG/CÂU TÁC PHẨM
-- Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "XX.TXT".
-- Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
+- Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. Xuất file tổng hợp FILE_TONG_HOP.txt.
+- Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file tổng hợp FILE_TONG_HOP.txt làm dữ liệu hỗ trợ.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
 - Dùng dữ liệu CHAR/BG và các ID đã tạo ở bước 1; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
 - Prompt dòng dùng CHAR_XX và BG_XX đã tạo. Mỗi prompt có ít nhất một BG, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã mới trong prompt dòng. Không ghi GAP thay cho prompt. Giữ đúng số đo đã khóa.
