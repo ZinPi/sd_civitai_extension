@@ -109,7 +109,7 @@ class MoTests(unittest.TestCase):
         self.assertNotIn("chay_an.vbs", noi)
         self.assertNotIn("app.py", noi)
         self.assertIn(
-            "https://github.com/ZinPi/sd_civitai_extension/archive/refs/heads/cursor/quy-tac-tool-48d3.zip",
+            "https://github.com/ZinPi/sd_civitai_extension/archive/refs/heads/cursor/sua-quy-tac-kich-thuoc-bg-4928.zip",
             noi,
         )
         self.assertIn("Tat.bat", noi)
