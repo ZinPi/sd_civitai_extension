@@ -51,6 +51,8 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("Quy tắc đang dùng", text)
         self.assertNotIn("/api/rules", script)
         self.assertNotIn("USD", text)
+        self.assertIn("4000 ký tự", text)
+        self.assertIn("2 triệu ký tự", text)
         self.assertNotIn("ZIP", text)
 
     def test_settings_do_not_echo_the_key(self):

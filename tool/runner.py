@@ -33,7 +33,10 @@ from engine import (
 )
 from llm import HttpLlm, LlmError
 
-OUTPUT_PER_LINE = 500
+# Bước 4: một prompt có thể dài 4000 ký tự. Cả file kết quả có thể gần 2 triệu ký tự.
+PROMPT_CHARS = 4000
+OUTPUT_FILE_CHARS = 2_000_000
+OUTPUT_PER_LINE = estimate_tokens("x" * PROMPT_CHARS)
 CEILING = 20
 
 EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.

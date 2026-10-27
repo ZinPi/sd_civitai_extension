@@ -2,9 +2,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from engine import parse_prompt_records, source_rows
+from engine import estimate_tokens, format_records, parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import Job
+from runner import OUTPUT_FILE_CHARS, OUTPUT_PER_LINE, PROMPT_CHARS, Job
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -128,6 +128,26 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(snapshot["state"], "error")
         self.assertIn("không cắt quy tắc", snapshot["notice"]["text"])
         self.assertEqual(self.script.calls, [])
+
+    def test_step4_reserves_4000_characters_per_prompt(self):
+        self.assertEqual(PROMPT_CHARS, 4000)
+        self.assertEqual(OUTPUT_FILE_CHARS, 2_000_000)
+        self.assertEqual(OUTPUT_PER_LINE, estimate_tokens("x" * PROMPT_CHARS))
+        self.job._settings = {**self.settings, "max_input_tokens": 200_000, "max_output_tokens": 8192}
+        rows = [(number, f"Câu {number}.") for number in range(1, 17)]
+        count, wanted = self.job._fit_line_batch([("QUY_TAC", "ngan")], "BG_01", rows, 3)
+        self.assertEqual(wanted, 16)
+        self.assertEqual(count, 8)
+
+    def test_prompt_file_near_two_million_characters_is_kept(self):
+        records = [{"n": number, "ids": "BG_01", "body": "x" * 3900} for number in range(1, 501)]
+        text = format_records(records, 3)
+        self.assertGreaterEqual(len(text), 1_900_000)
+        self.assertLess(len(text), OUTPUT_FILE_CHARS)
+        self.job._write("PROMPT_THEO_DONG.txt", text)
+        saved = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertEqual(saved, text)
+        self.assertEqual(parse_prompt_records(saved)[-1]["n"], 500)
 
     def test_timeout_does_not_raise_a_generic_error(self):
         class Slow(Script):
