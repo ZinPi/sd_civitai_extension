@@ -305,26 +305,25 @@ SIZE_EVIDENCE
 SIZE_LOCK
 SIZE_ORIGIN
 
-Nếu source có exact height:
-→ dùng canon.
+Mọi nhân vật cần tham chiếu phải có số đo cụ thể trong SIZE_LOCK.
+Prompt tham chiếu và prompt theo dòng phía sau phải dùng đúng số này.
 
-Nếu source chỉ có relative scale:
-→ dùng relative source.
+Nếu source có số đo:
+→ dùng đúng số đó.
+SIZE_ORIGIN = CANON.
 
-Nếu source không có:
-→ được khóa một production size hợp lý,
-nhưng phải ghi:
+Nếu source chỉ có tương quan:
+→ giữ tương quan và khóa một số đo production hợp lý.
 SIZE_ORIGIN = INFERRED_DESIGN.
 
-QUY TẮC QUAN TRỌNG:
+Nếu source không có số đo:
+→ phân tích tác phẩm và phân tích nhân vật, rồi sáng tạo một kích thước hợp lý.
+SIZE_ORIGIN = INFERRED_DESIGN.
+Số này là khóa hợp lệ. Không ghi vào GAP và không coi là lỗi.
 
-KÍCH THƯỚC / CHIỀU CAO PHẢI CÓ TRONG CHAR MASTER.
-
-Nhưng:
-
-PROMPT ẢNH KHÔNG BẮT BUỘC PHẢI GHI KÍCH THƯỚC / CHIỀU CAO.
-
-Không ép chiều cao vào mọi prompt ảnh.
+Người thì khóa chiều cao bằng cm.
+Cùng quy tắc này cho sinh vật, công cụ và vũ khí cần tham chiếu:
+phân tích đối tượng trong tác phẩm, đặt số đo hợp lý với hình thái của nó, rồi khóa.
 
 ======================================================================
 7. SINH VẬT / QUÁI VẬT / THỰC THỂ PHI NHÂN
@@ -406,7 +405,7 @@ Với mỗi item cần ghi:
 - loại;
 - chủ sở hữu nếu có;
 - hình dạng;
-- kích thước nếu source có;
+- kích thước: lấy số đo trong nguồn nếu có; nguồn không có thì phân tích vật và sáng tạo số đo hợp lý;
 - màu;
 - chất liệu;
 - hoa văn;
@@ -459,7 +458,10 @@ Bao gồm:
 - divine space;
 - các location khác.
 
-Không được tự tạo exact room nếu source không nói rõ.
+Đọc tác phẩm rồi tạo BG cho nơi hoặc khung cảnh cần vẽ.
+Cùng một nơi thì một BG.
+Nguồn không gọi tên loại phòng vẫn tạo BG từ những gì tác phẩm cho thấy, kèm phần hoàn thiện hợp lý.
+Không bỏ BG chỉ vì thiếu tên phòng.
 
 ======================================================================
 10. TRẠNG THÁI BỐI CẢNH
@@ -825,6 +827,7 @@ ITEM_NAME
 ITEM_TYPE
 OWNER
 SIZE_IF_KNOWN
+(bắt buộc có số: số nguồn, hoặc số sáng tạo hợp lý khi nguồn không có)
 SHAPE
 COLOR
 MATERIAL

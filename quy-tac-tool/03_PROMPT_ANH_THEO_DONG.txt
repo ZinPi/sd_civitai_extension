@@ -602,9 +602,10 @@ Với current OUTPUT_SLOT thuộc hồi tưởng / memory / thought / inner imag
 - current physical location + mental/emotional treatment dùng PHYSICAL_BG_PLUS_DYNAMIC khi B3 khóa;
 - abstract/mental/emotional field chủ đạo dùng DYNAMIC_BG khi B3 khóa exact BG_XX.
 
-13.3. Nếu current OUTPUT_SLOT cần location/background function nhưng mapping/B3 không có BG cần thiết:
-- không invent BG_ID;
-- báo BG_GAP / cập nhật B3 trước khi khóa prompt.
+13.3. Mỗi IMAGE_PROMPT phải có BG thích hợp với dòng đó.
+- Chọn một BG đã tạo từ tác phẩm, đúng nơi hoặc khung cảnh của dòng.
+- Không tự đặt mã BG mới trong prompt dòng.
+- Không trả báo lỗi thay cho prompt.
 
 ========================================================================================================================
 14. PHYSICAL BG RECONSTRUCTION
@@ -2089,7 +2090,7 @@ ACTIVE RESOURCE-STATE MODEL — CHAR/BG ID / REFERENCE STATE
 
 9. VERSION KHÔNG PHẢI VISUAL-STATE TOKEN. Visual state luôn được biểu diễn bằng exact CHAR_XX/BG_XX riêng. Revision/version của file/resource-data nếu cần quản lý chỉ là metadata nội bộ; không xuất hiện trong resource token/header và không dùng để thay thế CHAR/BG state ID.
 
-10. SIZE: IMAGE_PROMPT không tự phát minh cm/m mới. Nếu upstream resource đã khóa số đo, dùng đúng số đó; nếu upstream khóa relative scale, dùng đúng relative scale; nếu upstream thiếu scale bắt buộc, báo GAP/sửa upstream.
+10. SIZE: Dùng đúng số đo đã khóa ở bước trước. Số đo sáng tạo hợp lý đã khóa là hợp lệ, phải ghi lại đúng số đó. Không đổi sang số khác. Không báo GAP vì số đo là số sáng tạo.
 
 11. CHAR_XX là reference namespace cho subject/entity cần khóa hình ảnh; có thể là human, humanoid, creature, spirit, construct hoặc object/weapon/tool/item khi upstream đã cấp CHAR reference độc lập. IMAGE_PROMPT phải nói rõ entity/object type và scale theo resource.
 --- END VERBATIM BUOC_11 BLOCK: ACTIVE_RESOURCE_STATE_MODEL ---
@@ -3291,17 +3292,17 @@ Header KHÔNG hợp lệ:
 - Close-up, medium shot, full shot, action, dialogue visualization, emotional beat, thought, memory, flashback, dream, vision, hypothetical, montage, abstract treatment, dynamic treatment, symbolic treatment... đều vẫn phải gọi exact numbered `BG_XX` đã được upstream/B3 khóa.
 - Không được dùng lý do “không nhìn thấy nhiều background”, “neutral field”, “no identifiable background”, “no new BG resource”, “plain field”, “white field”, “abstract field” hoặc cách diễn đạt tương tự để bỏ token BG khỏi header.
 
-3. CHỈ DÙNG BG ĐÃ ĐƯỢC UPSTREAM/B3 KHÓA.
-- Không tự invent BG_ID.
-- Không tự dùng BG khác chỉ để lấp header.
-- Không dùng `BG_00` làm fallback nếu B3 hiện hành không khóa `BG_00` cho đúng current OUTPUT_SLOT.
-- Mọi background resource phải là exact numbered `BG_XX` đúng state/reality layer/location/function hiện hành.
+3. MỖI PROMPT DÒNG PHẢI CÓ BG THÍCH HỢP VỚI DÒNG ĐÓ.
+- Header có ít nhất một `BG_XX` đã tạo từ tác phẩm.
+- BG đó phải đúng nơi hoặc khung cảnh của dòng đang viết.
+- Không tự đặt mã BG mới.
+- Không chọn một BG khác chỉ để lấp chỗ trống khi BG đó không thích hợp với dòng.
+- Không dùng `BG_00` nếu BG đó không phải nơi của dòng.
 
-4. NẾU CURRENT OUTPUT_SLOT CHƯA CÓ BG PHÙ HỢP:
-- KHÔNG ĐƯỢC VIẾT/CHỐT/EXPORT IMAGE_PROMPT THIẾU BG.
-- Gắn lỗi `BG_GAP` / `MISSING_REQUIRED_BG_REFERENCE`.
-- Sửa/cập nhật B3 hoặc upstream mapping trước.
-- Chỉ sau khi exact `BG_XX` đã được khóa hợp lệ mới được tạo hoặc repair IMAGE_PROMPT.
+4. KHÔNG DỪNG ĐỂ ĐÒI MÃ BG MỚI.
+- Vẫn viết prompt.
+- Gắn BG đã tạo nào thích hợp với dòng.
+- Không xuất `BG_GAP` thay cho prompt.
 
 5. HARD GATE TRƯỚC KHI PASS PROMPT:
 Mỗi prompt bắt buộc thỏa đồng thời:
@@ -3335,14 +3336,13 @@ Nếu:
 - Prompt đẹp, đúng CHAR, đúng action, đúng panel nhưng thiếu BG = FAIL_H.
 - Một prompt duy nhất thiếu BG cũng đủ làm FULL FINAL không được PASS.
 
-8. THỨ TỰ REPAIR KHI THIẾU BG:
-A. Xác định current OUTPUT_SLOT/source window.
-B. Đối chiếu B3/upstream để lấy exact BG state.
-C. Nếu chưa có exact BG -> sửa upstream/B3 trước.
-D. Thêm đúng `BG_XX` vào header.
-E. Đồng bộ body với exact BG đó.
-F. Re-QA prompt + dependency/continuity liên quan.
-G. Chạy lại full `BG_MISSING_COUNT` scan trên toàn batch/project trước khi PASS.
+8. THỨ TỰ REPAIR KHI THIẾU BG HOẶC BG KHÔNG THÍCH HỢP:
+A. Đọc dòng nguồn.
+B. Chọn BG đã tạo nào thích hợp với dòng đó.
+C. Gắn mã BG đó vào header.
+D. Viết body theo đúng nơi của BG đó.
+E. Giữ nguyên số đo đã khóa.
+F. Không tạo mã BG mới và không thay prompt bằng báo lỗi.
 
 9. OVERRIDE:
 Khóa này ghi đè mọi rule, ví dụ, template hoặc cách hiểu trước đó cho phép IMAGE_PROMPT không có BG, cho phép BG presence là optional/conditional/N/A, hoặc cho phép dùng prose thay cho exact `BG_XX` trong header.

@@ -39,6 +39,8 @@ CEILING = 20
 EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.
 Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số thứ tự giữ nguyên.
 Làm đủ các lần của bước trích trong quy tắc và xuất danh sách CHAR, BG.
+Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn không có số thì phân tích tác phẩm và đối tượng, rồi sáng tạo kích thước hợp lý.
+Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi thì một BG.
 """
 
 MERGE_TASK = """CHỈ GỘP BƯỚC 1.
@@ -50,22 +52,29 @@ CHAR_TASK = """CHỈ LÀM BƯỚC 2.
 Danh sách đã khóa nằm trong DU_LIEU.
 Viết prompt tham chiếu cho mọi CHAR trong danh sách.
 Không viết prompt BG ở bước này.
+Ghi đúng số đo đã khóa. Số đo sáng tạo hợp lý đã khóa là hợp lệ, không được bỏ.
 """
 
 BG_TASK = """CHỈ LÀM BƯỚC 3.
 Danh sách đã khóa nằm trong DU_LIEU.
 Viết prompt tham chiếu cho mọi BG trong danh sách.
 Không viết lại prompt CHAR ở bước này.
+Tham khảo tác phẩm rồi viết BG. Không bỏ BG đã có trong danh sách.
 """
 
 LINE_TASK = """CHỈ LÀM BƯỚC 4 cho đúng các dòng trong CAC_DONG.
 Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
+Mỗi prompt phải có một BG đã tạo, và BG đó phải thích hợp với dòng. Không tự đặt mã BG mới.
+Giữ đúng số đo đã khóa.
 """
 
 QA_TASK = """CHỈ QA các prompt trong DU_LIEU theo file quy tắc QA.
 Không viết lại quy tắc.
+FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
+Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
+Không yêu cầu tạo mã BG mới. Nếu BG không thích hợp, chỉ định BG đã tạo nào đúng với dòng.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
 Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 """
@@ -73,6 +82,8 @@ Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy tắc tạo prompt.
 Giữ nguyên số dòng và số thứ tự đã cho.
 Chỉ xuất các dòng prompt, đúng định dạng trong quy tắc.
+Mỗi dòng vẫn có một BG đã tạo và BG đó thích hợp với dòng. Không tự đặt mã BG mới.
+Giữ đúng số đo đã khóa.
 """
 
 STEP_TITLES = {

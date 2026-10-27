@@ -1,5 +1,10 @@
 QUY TRÌNH HƯỚNG DẪN CHO AI FILM STUDIO
 
+KHÓA SỬA — SỐ ĐO VÀ BG
+- Mọi nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn có số thì dùng đúng số đó. Nguồn không có số thì phân tích tác phẩm và phân tích chính đối tượng đó, rồi sáng tạo một kích thước hợp lý và khóa lại. Số đo sáng tạo hợp lý là hợp lệ, không phải lỗi thiếu.
+- Tạo bối cảnh tham chiếu bằng cách tham khảo tác phẩm rồi viết BG. Cùng một nơi trong tác phẩm thì một BG.
+- Prompt ảnh theo dòng phải có BG. BG đó phải thích hợp với đúng dòng đang viết, và phải là một BG đã tạo từ tác phẩm. Không tự đặt mã BG mới trong prompt dòng.
+
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.
 - Thực hiện tuần tự; không bỏ qua bước. Bước sau dùng thành quả đã FINAL PASS/LOCK của bước trước. Nếu thiếu đầu vào, QA FAIL hoặc còn lỗi, sửa và RE-QA trước khi tiếp tục.
@@ -14,6 +19,8 @@ QUY TẮC CHUNG
 - Với nhân vật, mỗi câu khác nhau có nhắc đến và có giá trị hình ảnh tính 1 lần; chỉ 1 câu thì không vào danh sách tạo CHAR; từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
 - Lần 2: QA danh sách đã trích xuất cho đúng và đủ, tránh thiếu CHAR/BG khi làm bước 4.
 - Lần 3: tạo ID CHAR_XX và BG_XX cho các trạng thái được liệt kê; xuất danh sách CHAR và BG.
+- Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo đã khóa. Thiếu số trong nguồn thì phân tích rồi đặt kích thước hợp lý.
+- BG lấy từ chính tác phẩm. Nơi nào tác phẩm cần vẽ thì có BG. Cùng một nơi thì không tách thêm BG.
 - QA tổng thể file vừa tạo; sửa lỗi và RE-QA trước khi LOCK.
 
 2- TẠO PROMPT CHAR
@@ -25,7 +32,7 @@ QUY TẮC CHUNG
 3- TẠO PROMPT BG
 - Mở và đọc toàn bộ quy tắc 02_PROMPT_THAM_CHIEU_CHAR_BG.txt.
 - Đầu vào: danh sách BG đã khóa ở bước 1.
-- Tạo prompt văn bản cho tất cả BG trong danh sách theo 02_PROMPT_THAM_CHIEU_CHAR_BG.txt.
+- Tạo prompt văn bản cho tất cả BG trong danh sách: tham khảo tác phẩm rồi viết BG. Không bỏ BG đã có trong danh sách.
 - QA theo quy tắc áp dụng, chỉ LOCK khi đạt.
 
 4- TẠO PROMPT ẢNH THEO DÒNG/CÂU TÁC PHẨM
@@ -33,6 +40,7 @@ QUY TẮC CHUNG
 - Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
 - Dùng dữ liệu CHAR/BG và các ID đã tạo; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
+- Mỗi prompt dòng phải có BG. Chọn BG đã tạo nào thích hợp với dòng đó. Không tự đặt mã BG mới. Giữ đúng số đo đã khóa.
 - ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
 - SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo 03_PROMPT_ANH_THEO_DONG.txt; không đổi số prompt.

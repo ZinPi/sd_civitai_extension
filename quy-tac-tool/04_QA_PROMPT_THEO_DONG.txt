@@ -473,9 +473,11 @@ Kiểm:
 - reference measurement không bị render thành text.
 
 FAIL_H:
-- WRONG_SCALE;
-- SCALE_CONTINUITY_BREAK;
-- INVENTED_MEASUREMENT.
+- WRONG_SCALE: prompt dùng số đo khác số đã khóa.
+- SCALE_CONTINUITY_BREAK.
+
+Số đo sáng tạo hợp lý, đã khóa ở bước trước và được prompt dùng đúng số đó, là PASS.
+Không FAIL chỉ vì nguồn gốc không viết sẵn số đo.
 
 
 QA-14 — OBJECT / WEAPON / TOOL / GEAR CURRENT STATE
@@ -1137,8 +1139,8 @@ Khi FAIL_H:
    - prompt wording/staging;
    - continuity.
 3. Sửa đúng layer.
-4. Nếu lỗi B3/resource/mapping/state:
-   sửa upstream trước.
+4. Nếu BG không thích hợp với dòng: đổi sang BG đã tạo nào đúng với dòng. Không tạo mã BG mới.
+   Nếu số đo lệch: đổi về đúng số đã khóa. Không biến số đo sáng tạo hợp lý thành lỗi.
 5. Re-QA đúng lỗi + dependency có thể bị ảnh hưởng.
 6. Chỉ chạy lại Level 2 toàn prompt nếu prompt thay đổi rộng.
 7. Chỉ chạy lại Level 3 nếu continuity có thể bị ảnh hưởng.
@@ -1312,17 +1314,21 @@ Quét TOÀN BỘ prompt trong scope QA:
 Nếu bất kỳ prompt nào không có `BG_XX`:
 - `RESULT = FAIL_H`
 - `ISSUE_TYPE = MISSING_REQUIRED_BG_REFERENCE`
-- nếu upstream chưa có BG phù hợp: thêm `BG_GAP`
 - prompt đó KHÔNG được PASS_H.
+
+Nếu prompt có BG nhưng BG không thích hợp với dòng:
+- `RESULT = FAIL_H`
+- `ISSUE_TYPE = WRONG_LOCATION`
+- sửa bằng cách đổi sang BG đã tạo nào thích hợp với dòng.
+- Không yêu cầu tạo mã BG mới.
 
 C. LEVEL 1 — INPUT / AUTHORITY / RESOURCE LOCK
 Bắt buộc xác nhận:
-- mọi OUTPUT_SLOT có BG mapping;
-- mọi BG mapping resolve sang exact numbered `BG_XX`;
-- BG state/location/reality layer/background function đúng authority hiện hành.
-Nếu thiếu:
-`QA_STATUS = STOP` hoặc `FAIL_H` theo loại gap;
-không được tự invent BG để tiếp tục.
+- mọi OUTPUT_SLOT có một BG đã tạo;
+- BG đó thích hợp với dòng;
+- không có mã BG tự đặt ngoài danh sách đã tạo.
+Prompt thiếu BG thì FAIL.
+Không STOP để đòi thêm BG ở bước trước. Chọn BG đã tạo nào đúng với dòng.
 
 D. LEVEL 2 — PROMPT-BY-PROMPT
 Khóa này bổ sung/ghi đè cách hiểu lỏng của QA-01 / QA-08 / QA-17 / QA-36:
@@ -1371,16 +1377,14 @@ Nếu bất kỳ giá trị nào > 0:
 Không được dùng evidence PASS cũ để bỏ qua gate này.
 
 H. REPAIR ORDER
-Khi phát hiện prompt thiếu BG:
-1. Xác định exact OUTPUT_SLOT/source window.
-2. Kiểm B3/upstream mapping.
-3. Nếu upstream thiếu exact BG -> sửa upstream trước.
-4. Gắn exact BG vào header.
-5. Đồng bộ body/staging với BG.
-6. Re-QA Level 2 prompt bị sửa.
-7. Re-QA Level 3 dependency nếu BG/location/reality-layer continuity bị ảnh hưởng.
-8. Chạy lại full BG machine scan cho batch/project.
-9. Chỉ khi các BG count = 0 mới được xét PASS tiếp.
+Khi phát hiện prompt thiếu BG hoặc BG không thích hợp với dòng:
+1. Đọc dòng nguồn.
+2. Chọn BG đã tạo nào thích hợp với dòng đó.
+3. Gắn mã BG đó vào header.
+4. Sửa body cho khớp nơi của BG đó.
+5. Giữ đúng số đo đã khóa.
+6. Không tạo mã BG mới.
+7. Kiểm lại prompt vừa sửa.
 
 I. FALSE PASS PREVENTION — BG
 Các kết luận sau đều CẤM:
