@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 
@@ -78,6 +79,17 @@ Giữ nguyên số dòng và số thứ tự đã cho.
 Chỉ xuất các dòng prompt, đúng định dạng trong quy tắc.
 """
 
+BG_FILL_TASK = """CHỈ BỔ SUNG BG còn thiếu cho các dòng trong CAC_DONG.
+DANH_SACH_DA_KHOA là bản đã khóa. Không chép lại toàn bộ danh sách.
+Với mỗi dòng: nếu một BG_ đã khóa đúng cảnh thì ghi dòng đó dùng BG_ đó.
+Nếu chưa có BG đúng, tạo BG_XX mới, số lớn hơn mọi BG_ đã có, đúng quy tắc trích xuất.
+Không viết prompt ảnh. Không tự bỏ qua dòng nào được đưa.
+"""
+
+BG_ADD_TASK = """CHỈ VIẾT PROMPT THAM CHIẾU cho các BG mới được nêu trong DU_LIEU.
+Không viết lại prompt BG cũ. Không viết prompt CHAR. Không viết prompt theo dòng.
+"""
+
 STEP_TITLES = {
     1: "Danh sách nhân vật và bối cảnh",
     2: "Prompt ảnh nhân vật",
@@ -88,6 +100,12 @@ STEP_TITLES = {
 
 class AlreadyRunning(Exception):
     pass
+
+
+class NeedBg(Exception):
+    def __init__(self, report: str):
+        self.report = report
+        super().__init__(report)
 
 
 class Stopped(Exception):
@@ -344,7 +362,19 @@ class Job:
             batch = remaining_rows[:count]
             self._log(f"Đang viết dòng {batch[0][0]}–{batch[-1][0]}.")
             try:
-                kept, status = self._generate_batch(client, documents, reference, batch, width)
+                try:
+                    kept, status = self._generate_batch(client, documents, reference, batch, width)
+                except NeedBg as gap:
+                    self._fill_missing_bg(client, batch, width, gap.report)
+                    reference = self._compile()
+                    try:
+                        kept, status = self._generate_batch(client, documents, reference, batch, width)
+                    except NeedBg as again:
+                        excerpt = " ".join(again.report.split())[:1200]
+                        raise JobError(
+                            "Đã bổ sung BG mà lượt này vẫn thiếu bối cảnh khóa. Không nhận bản thiếu.\n\n"
+                            + excerpt
+                        ) from again
             except LlmError as exc:
                 if exc.kind == "context" and count > 1:
                     self._ceiling = max(1, count // 2)
@@ -377,14 +407,49 @@ class Job:
         kept, status = classify_records(parse_prompt_records(text), expected, finish)
         if status != "invalid":
             return kept, status
+        if _thieu_bg(text):
+            raise NeedBg(text)
         self._log("Lượt này chưa đủ prompt đúng số dòng. Sửa một lần.")
         repair = REPAIR_TASK + "\nDONG_NGUON\n" + format_source_rows(batch, width) + "\nPROMPT_DA_TRA\n" + text
         repaired, finish = self._call(client, "repair", documents, repair)
         kept, status = classify_records(parse_prompt_records(repaired), expected, finish)
-        if status == "invalid":
-            excerpt = " ".join(repaired.split())[:1200]
-            raise JobError("Lượt này vẫn không đủ một prompt cho mỗi dòng. Không nhận bản thiếu.\n\n" + excerpt)
-        return kept, status
+        if status != "invalid":
+            return kept, status
+        if _thieu_bg(repaired):
+            raise NeedBg(repaired)
+        excerpt = " ".join(repaired.split())[:1200]
+        raise JobError("Lượt này vẫn không đủ một prompt cho mỗi dòng. Không nhận bản thiếu.\n\n" + excerpt)
+
+    def _fill_missing_bg(self, client, batch, width: int, report: str) -> None:
+        self._log("Lượt này thiếu BG đã khóa. Bổ sung danh sách, rồi viết prompt cho BG mới.")
+        guide, rules = self._pair("00_QUY_TRINH_HUONG_DAN.txt", "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt")
+        listing = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
+        material = (
+            BG_FILL_TASK
+            + "\nDANH_SACH_DA_KHOA\n"
+            + listing.strip()
+            + "\n\nCAC_DONG\n"
+            + format_source_rows(batch, width)
+            + "\nBAO_CAO\n"
+            + report.strip()
+        )
+        addition = self._complete_whole(client, "bg-fill", [("HUONG_DAN", guide), ("QUY_TAC", rules)], material)
+        if not re.search(r"BG_\d+", addition):
+            raise JobError("Chưa bổ sung được BG vào danh sách. Không viết prompt khi còn thiếu bối cảnh.")
+        self._write("DANH_SACH_CHAR_BG.txt", listing.rstrip() + "\n\nBO_SUNG_BG\n" + addition.strip() + "\n")
+        new_ids = [token for token in _bg_ids(addition) if token not in _bg_ids(listing)]
+        if new_ids:
+            self._log("Viết prompt cho " + ", ".join(new_ids) + ".")
+            bg_rules = self._rule("02_PROMPT_THAM_CHIEU_CHAR_BG.txt")
+            fresh = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
+            prompt = self._complete_whole(
+                client,
+                "bg-add",
+                [("HUONG_DAN", guide), ("QUY_TAC", bg_rules)],
+                BG_ADD_TASK + "\nBG_MOI\n" + ", ".join(new_ids) + "\nDANH_SACH_DA_KHOA\n" + fresh.strip() + "\n",
+            )
+            current = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.")
+            self._write("PROMPT_BG.txt", current.rstrip() + "\n" + prompt.strip() + "\n")
 
     def _qa_batch(self, client, guide, qa_rules, line_rules, reference, records, width):
         rows = [(record["n"], self._lines[record["n"] - 1]) for record in records]
@@ -715,3 +780,16 @@ class Job:
             "digest": self._digest,
         }
         atomic_write(self.data_dir / "state.json", json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def _bg_ids(text: str) -> list[str]:
+    found: list[str] = []
+    for token in re.findall(r"BG_\d+", text):
+        if token not in found:
+            found.append(token)
+    return found
+
+
+def _thieu_bg(text: str) -> bool:
+    folded = text.upper()
+    return "BG_GAP" in folded or "MISSING_REQUIRED_BG" in folded
