@@ -17,6 +17,7 @@ KHÓA SỬA — ẢNH NHÓM, SỐ CON, BỘ MÁY
 - Khi QA không đạt, ghi rõ từng dòng: lỗi gì, chỗ nào sai, sửa cái gì. Chỉ sửa đúng chi tiết đó. Không viết lại cả prompt và không sửa điều báo cáo không nêu.
 - Lần kiểm lại chỉ gồm các dòng vừa sửa. Dòng không sửa giữ kết quả QA trước.
 - Dòng còn lỗi sau khi sửa thì ghi nhật ký, giữ prompt hiện có và chạy tiếp đến hết file. Không dừng giữa chừng.
+- Khi đã chạy xong toàn bộ dòng, tạo lại đúng các dòng còn lỗi rồi ghi đè vào file prompt. Dòng không lỗi không viết lại.
 
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.

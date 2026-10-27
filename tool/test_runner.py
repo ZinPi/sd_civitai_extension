@@ -253,6 +253,73 @@ class RunnerTests(unittest.TestCase):
         stored = (self.data / "NHAT_KY.txt").read_text(encoding="utf-8")
         self.assertIn("BÁO CÁO QA", stored)
 
+    def test_failed_prompt_is_rewritten_after_the_file_is_complete(self):
+        fail = (
+            "001 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "EVIDENCE: The room BG does not match the yard.\n"
+            "REQUIRED_FIX: Use the yard, not the bedroom.\n"
+            "TOOL_QA: FAIL\n"
+        )
+
+        class Rebuild(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+                self.repairs = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_01 phòng\nBG_02 sân\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 bedroom.\nBG_02 yard.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count <= 3:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: Hermes trains in the bedroom, 170 cm.\n"
+                        "002 | CHAR_01.BG_01 | IMAGE_PROMPT: KEEP-LINE-TWO the street stays.\n",
+                        "stop",
+                    )
+                self.repairs += 1
+                if self.repairs < 3:
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: BATCH still in the bedroom, 170 cm.\n",
+                        "stop",
+                    )
+                return Completion(
+                    "001 | CHAR_01.BG_02 | IMAGE_PROMPT: END REBUILD Hermes trains in the yard, 170 cm.\n",
+                    "stop",
+                )
+
+        script = Rebuild()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Hermes tập ở sân.\nCô bé nhìn phố.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("END REBUILD Hermes trains in the yard", prompts)
+        self.assertIn("KEEP-LINE-TWO the street stays", prompts)
+        self.assertNotIn("BATCH still in the bedroom", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 3)
+        self.assertIn("001. Hermes tập ở sân.", repair_users[2])
+        self.assertNotIn("002. Cô bé nhìn phố.", repair_users[2])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Chạy xong. Tạo lại 1 dòng còn lỗi: 001", journal)
+        self.assertIn("Đã tạo lại dòng 001", journal)
+
     def test_failed_line_numbers_keep_only_cited_rows(self):
         report = (
             "001 | FAIL_H  \n"

@@ -375,6 +375,7 @@ class Job:
         self._logs: list[str] = []
         self._ceiling = CEILING
         self._qa_omitted_rule = False
+        self._leftover: dict[int, str] = {}
         self._load()
 
     def begin(self, source_text: str, settings: dict, mode: str) -> None:
@@ -488,7 +489,12 @@ class Job:
             self._state = "done" if complete else "idle"
             self._current = 0
             if complete:
-                self._notice = {"kind": "ok", "text": "Đủ bốn bước. Có thể tải ba file."}
+                if self._leftover:
+                    listed = format_line_list(sorted(self._leftover), numbered_width(len(self._lines)))
+                    text = f"Đủ bốn bước. File prompt đã đủ. Dòng {listed} còn lỗi, xem nhật ký."
+                else:
+                    text = "Đủ bốn bước. Có thể tải ba file."
+                self._notice = {"kind": "ok", "text": text}
                 self._detail = self._notice["text"]
             else:
                 self._notice = {"kind": "", "text": ""}
@@ -519,6 +525,7 @@ class Job:
         self._lines = lines
         self._digest = digest
         self._qa_omitted_rule = False
+        self._leftover = {}
 
     def _validate_settings(self, settings: dict) -> None:
         if not str(settings.get("base_url") or "").strip() or not str(settings.get("api_key") or "").strip():
@@ -626,6 +633,7 @@ class Job:
             self._log(f"Đã khóa {index}/{total} dòng.")
             if status == "truncated":
                 self._ceiling = max(1, count // 2)
+        reference, locked = self._rebuild_failed(client, guide, qa_rules, rules, reference, locked, width)
         self._final_qa(client, guide, qa_rules, rules, reference, locked, width)
         self._mark(4, "done")
 
@@ -644,6 +652,71 @@ class Job:
             excerpt = " ".join(repaired.split())[:1200]
             raise JobError("Lượt này vẫn không đủ một prompt cho mỗi dòng. Không nhận bản thiếu.\n\n" + excerpt)
         return kept, status
+
+    def _rebuild_failed(self, client, guide, qa_rules, line_rules, reference, locked, width):
+        """After the full file exists, write the lines that still failed QA one more time."""
+        numbers = sorted(self._leftover)
+        if not numbers:
+            return reference, locked
+        listed = format_line_list(numbers, width)
+        self._log(f"Chạy xong. Tạo lại {len(numbers)} dòng còn lỗi: {listed}.")
+        documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
+        positions = {record["n"]: index for index, record in enumerate(locked)}
+        cursor = 0
+        while cursor < len(numbers):
+            self._check_stop()
+            chunk = numbers[cursor : cursor + max(1, self._ceiling)]
+            cursor += len(chunk)
+            chunk_label = format_line_list(chunk, width)
+            report = "\n\n".join(self._leftover[number] for number in chunk if self._leftover.get(number))
+            rows = [(number, self._lines[number - 1]) for number in chunk]
+            records = [locked[positions[number]] for number in chunk if number in positions]
+            if len(records) != len(chunk):
+                self._log(f"Không tạo lại dòng {chunk_label} vì thiếu prompt đã khóa. Giữ phần hiện có.")
+                continue
+            try:
+                added: list[tuple[str, list[int]]] = []
+                reference = self._supply_missing_backgrounds(
+                    client, guide, report, rows, width, reference, added, set(), set(chunk)
+                )
+                rebuilt = self._repair_selected(
+                    client,
+                    documents,
+                    report,
+                    rows,
+                    records,
+                    width,
+                    reference,
+                    self._bg_repair_note(added, width),
+                    chunk,
+                )
+            except (JobError, LlmError) as exc:
+                self._log(f"Không tạo lại được dòng {chunk_label}. Giữ prompt hiện có.\n{exc}")
+                continue
+            for record in rebuilt:
+                if record["n"] in positions:
+                    locked[positions[record["n"]]] = record
+            subset_rows = [(record["n"], self._lines[record["n"] - 1]) for record in rebuilt]
+            verdict, checked = self._qa_once(
+                client, guide, qa_rules, line_rules, reference, subset_rows, rebuilt, width
+            )
+            still = [] if self._qa_accepts(verdict, checked, rebuilt) else self._open_fail_lines(checked, rebuilt, width)
+            if not still:
+                for number in chunk:
+                    self._leftover.pop(number, None)
+                self._log(f"Đã tạo lại dòng {chunk_label}.")
+                continue
+            for number in chunk:
+                if number not in still:
+                    self._leftover.pop(number, None)
+            for number in still:
+                self._leftover[number] = checked
+            self._log(
+                f"Dòng {format_line_list(still, width)} vẫn còn lỗi sau khi tạo lại. Giữ prompt mới trong file hoàn chỉnh.",
+                qa_log_body(checked, [record for record in rebuilt if record["n"] in set(still)], width),
+            )
+        self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
+        return reference, locked
 
     def _qa_batch(self, client, guide, qa_rules, line_rules, reference, records, width):
         rows = [(record["n"], self._lines[record["n"] - 1]) for record in records]
@@ -700,8 +773,10 @@ class Job:
                 return kept, reference
             if round_index == 1:
                 listed = format_line_list(still, width)
+                for number in still:
+                    self._leftover[number] = report
                 self._log(
-                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp để ra file hoàn chỉnh.",
+                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp. Sẽ tạo lại khi chạy xong.",
                     qa_log_body(report, subset, width),
                 )
                 return kept, reference
