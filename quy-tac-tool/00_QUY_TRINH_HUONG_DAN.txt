@@ -5,6 +5,14 @@ KHÓA SỬA — SỐ ĐO VÀ BG
 - Tạo bối cảnh tham chiếu bằng cách tham khảo tác phẩm rồi viết BG. Cùng một bối cảnh có thể có nhiều trạng thái BG. Phân tích từng trường hợp rồi áp dụng: cùng một nơi lúc buổi sáng, qua đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Cùng nơi và cùng trạng thái thì một BG.
 - Prompt ảnh theo dòng phải có ít nhất một BG. BG đó phải thích hợp với đúng dòng đang viết, đúng trạng thái đã tạo từ tác phẩm. Một prompt được có nhiều BG. Không tự đặt mã BG mới trong prompt dòng.
 
+KHÓA SỬA — ẢNH NHÓM, SỐ CON, BỘ MÁY
+- CHAR riêng của một người vẫn là một identity và một trạng thái. Có ảnh nhóm thì vẫn giữ CHAR riêng của từng thành viên.
+- Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau được khóa thêm một CHAR nhóm cho đúng tập đó. Ảnh nhóm vẽ mỗi thành viên một lần, vẫn là từng người, đúng số đo đã khóa của người đó. Không dính thành một người và không biến thành đám đông.
+- Prompt dòng, khi đúng các thành viên đó cùng có mặt và bảng đã có CHAR nhóm của đúng tập đó, dùng CHAR nhóm. Không gửi thêm CHAR riêng của các thành viên. Được dùng CHAR nhóm này cả khi tổng ảnh còn dưới 10. Không tự tạo CHAR nhóm ở bước prompt dòng nếu bảng chưa khóa.
+- Gom nhân vật phụ chỉ để không vượt 10 ảnh là việc khác. Việc đó chỉ làm khi tổng sắp vượt 10, và không gom người diễn chính vào nhóm tạm. Một prompt vẫn không viết trên 10 ảnh tham chiếu.
+- Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Ghi đúng số. Mỗi con là một cơ thể sống riêng, cùng số đo, khác vị trí. Không cấp mã CHAR mới cho từng con. Nguồn nói một con thì vẽ một con.
+- Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy hoặc bộ đồ đã lắp, đặt riêng, nhiều bộ phận nối thành một bộ, là một CHAR cho cả bộ, với các số đo của bộ. Không tách từng bộ phận thành CHAR mới. Không ghi bộ đó vào người đang đứng xem.
+
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.
 - Thực hiện tuần tự; không bỏ qua bước. Bước sau dùng thành quả đã FINAL PASS/LOCK của bước trước. Nếu thiếu đầu vào, QA FAIL hoặc còn lỗi, sửa và RE-QA trước khi tiếp tục.
@@ -16,7 +24,8 @@ QUY TẮC CHUNG
 - Mở và đọc toàn bộ quy tắc 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt.
 - Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
 - Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
-- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ và vũ khí nhân vật cầm được ghi cùng CHAR đó. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
+- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
+- Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau thì khóa thêm CHAR nhóm theo khóa đầu file. Cùng một ngoại hình sinh vật lặp nhiều con thì một CHAR, ghi đúng số con.
 - Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn. Dòng nào bước 4 sẽ vẽ thì bảng đã có BG đúng trạng thái, và đã có CHAR khi nhân vật đủ điều kiện tạo CHAR. Thiếu mục nào thì bổ sung ở lần này.
 - Lần 3: liệt kê trạng thái chính xác, rồi gán CHAR_XX và BG_XX phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
 - Chỉ LOCK khi bảng đã đồng bộ. Bước 4 dùng đúng bảng này để không còn GAP vì thiếu CHAR hoặc BG.

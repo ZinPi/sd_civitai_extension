@@ -2052,7 +2052,10 @@ A. BỔ SUNG QUY TẮC CHAR REFERENCE-STATE
 A1. MỘT CHAR CANONICAL = MỘT SUBJECT/IDENTITY + MỘT EXACT REFERENCE STATE
 
 - Một CHAR canonical chỉ được khóa đúng một subject/identity ở đúng một reference state.
-- Không gộp nhiều identity khác nhau vào cùng một CHAR canonical.
+- Không gộp nhiều identity khác nhau vào cùng một CHAR canonical của một người.
+- CHAR nhóm là ảnh tham chiếu thêm, không thay CHAR riêng của từng thành viên. Ảnh nhóm chứa đúng các thành viên đã đặt tên. Mỗi người vẫn là một người, đúng số đo đã khóa, hiện một lần. Không dính thành một người.
+- CHAR sinh vật của một ngoại hình được viết một lần. Prompt cảnh sau được dùng ảnh đó cho đúng số con, không tạo thêm bộ ảnh cho từng con.
+- CHAR của bộ máy đã lắp mô tả cả bộ đã nối và các số đo của bộ. Không viết một CHAR cho từng bộ phận của cùng bộ đó.
 - Không gộp nhiều state khác nhau của cùng identity vào cùng một CHAR canonical.
 - Không trộn thường phục + giáp + bị thương + thức tỉnh trong cùng một bộ 3 ảnh reference của một CHAR canonical.
 - Cả 3 ảnh chức năng phải là cùng một identity, cùng một exact state, cùng một physical scale, cùng một outfit và cùng một thiết kế; chỉ khác camera/framing theo đúng chức năng từng ảnh.

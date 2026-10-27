@@ -6,6 +6,12 @@ KHÓA PHẠM VI ÁP DỤNG:
 - B5 xuất IMAGE_PROMPT dưới dạng VĂN BẢN, không gọi generator để tạo ảnh/video. “Chọn” visual beat, camera, panel là quyết định AI phải dựa trên source, không mặc nhiên là tùy chọn người dùng.
 - INPUT ĐỦ CHO B5: ID CHAR_XX/BG_XX và state đã khóa ở B3 cùng PROMPT CHAR/BG dạng TXT từ B4. Không cần có ảnh reference đã render, ảnh tải lên hoặc ảnh được người dùng phê duyệt; không được báo GAP chỉ vì thiếu FILE ẢNH THẬT.
 - Trong chế độ TXT, số “ảnh reference CHAR + BG” để xét ngưỡng CHAR_GROUP là số ID tham chiếu cần dùng cho đúng một IMAGE_PROMPT (trước tối ưu), KHÔNG phải số file ảnh đã tạo. Mọi đoạn B5 mô tả ảnh reference vật lý/được gắn thực tế chỉ áp dụng nếu ảnh thực sự tồn tại ở công đoạn tạo ảnh bên ngoài; B5 không bắt buộc phải có chúng để viết prompt.
+KHÓA ẢNH NHÓM, SỐ CON VÀ BỘ MÁY:
+- CHAR nhóm đã khóa chứa đúng các thành viên đã đặt tên. Mỗi thành viên vẫn là một người, đúng số đo, hiện một lần.
+- Khi đúng các thành viên đó cùng có mặt, prompt dùng CHAR nhóm và không gửi CHAR riêng của các thành viên. Việc này được phép cả khi tổng ảnh còn dưới 10. Không tự tạo CHAR nhóm nếu bảng chưa khóa.
+- Gom nhân vật phụ để khỏi vượt 10 ảnh vẫn chỉ làm khi tổng sắp vượt 10, và không gom người diễn chính vào nhóm tạm. Trần 10 ảnh vẫn giữ.
+- Một CHAR sinh vật đã khóa dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
+- Bộ máy đã lắp là một CHAR của cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 ACTIVE MODE: 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT
 MỤC TIÊU: tạo prompt ảnh theo từng dòng/câu của tác phẩm, dùng CHAR/BG đã khóa từ B3, bổ sung các khóa kỹ thuật hữu ích của rule ảnh cảnh nhỏ nhưng KHÔNG nhập workflow phân cảnh/đạo diễn SMALL_SCENE.
 
@@ -326,7 +332,8 @@ CHAR_ID lấy từ bước trích xuất. Prompt dòng không xét lại điều
 CHAR và BG đều là ảnh tham chiếu.
 Một prompt không viết trên 10 ảnh tham chiếu. Tổng CHAR + BG trong prompt tối đa là 10.
 Khi liệt kê đủ sẽ vượt 10, gom các nhân vật phụ vào CHAR_GROUP để prompt còn không quá 10 ảnh tham chiếu.
-Tổng đã trong mức 10 thì không gom.
+Tổng đã trong mức 10 thì không gom thêm nhân vật phụ thành nhóm tạm.
+CHAR nhóm đã khóa cho một tập thành viên có tên vẫn được dùng khi các thành viên đó cùng có mặt, kể cả khi tổng còn dưới 10. Khi dùng CHAR nhóm, không gửi CHAR riêng của các thành viên.
 
 Khi đó có thể gom các nhân vật phụ phù hợp vào CHAR_GROUP để giảm số ID CHAR tham chiếu phải liệt kê trong IMAGE_PROMPT.
 
@@ -3261,7 +3268,7 @@ Cấm dùng template này để chèn narrative explanation thừa. Mỗi câu p
 
 
 --- BEGIN VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE | SOURCE_LINES 3459-3459 | SHA256 675e822693f711b667f9cf54faa1bd73d7b425305f782b9c33e9cc97c1050f8f ---
-CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu. Chỉ gom CHAR phụ khi tổng sẽ vượt 10. Tổng đã trong mức 10 thì không gom. Nhân vật diễn chính giữ CHAR riêng.
+CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu. Chỉ gom CHAR phụ khi tổng sẽ vượt 10. Tổng đã trong mức 10 thì không gom thêm nhóm tạm. Nhân vật diễn chính giữ CHAR riêng. CHAR nhóm đã khóa vẫn dùng khi đúng thành viên cùng có mặt, và không gửi thêm CHAR riêng của thành viên.
 --- END VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE ---
 
 
@@ -3284,8 +3291,18 @@ CHAR_08 (giant fox spirit, fox spirit), [SIZE_LOCK].
 CHAR_12 (the sealed sword, sword/weapon), [SIZE_LOCK].
 CHAR_18 (ritual staff, staff/tool), 165 cm long.
 
-CHỈ VẬY THÔI.
-Không tự ý bổ sung nội dung khác vào phần định danh CHAR.
+CHỈ VẬY THÔI với một người, một sinh vật hoặc một vật.
+Không tự ý bổ sung quần áo, mặt hoặc lý lịch vào phần định danh CHAR.
+
+Ảnh nhóm đã khóa ghi đủ từng thành viên và số đo của người đó:
+CHAR_297 (Helga and Lucian, two people), Helga 137 cm, Lucian 173 cm.
+Mỗi thành viên hiện một lần. Không gửi thêm CHAR riêng của thành viên.
+
+Một CHAR sinh vật dùng cho nhiều con thì ghi loài, số đo và đúng số con:
+CHAR_255 (small test mouse, mouse), 12 cm body and 10 cm tail, exactly three living mice.
+
+Bộ máy đã lắp ghi cả bộ và các số đo của bộ:
+CHAR_254 (connected copper distillation set, tool), 70 cm bench footprint, 35 cm tall.
 Mọi quy tắc, ví dụ, template hoặc QA trước đó về CÁCH GHI CHAR nếu khác khóa này đều bị khóa này ghi đè; các quy tắc khác không liên quan đến cách ghi CHAR giữ nguyên hoàn toàn.
 
 ========================================================================================================================

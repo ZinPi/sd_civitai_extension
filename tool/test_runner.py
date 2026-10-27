@@ -449,5 +449,27 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("không có prompt", journal)
 
 
+class RuleLockTests(unittest.TestCase):
+    def test_group_creature_and_machine_locks_are_in_the_tool_rules(self):
+        root = Path(__file__).resolve().parents[1] / "quy-tac-tool"
+        joined = "\n".join(
+            (root / name).read_text(encoding="utf-8")
+            for name in (
+                "00_QUY_TRINH_HUONG_DAN.txt",
+                "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt",
+                "02_PROMPT_THAM_CHIEU_CHAR_BG.txt",
+                "03_PROMPT_ANH_THEO_DONG.txt",
+                "04_QA_PROMPT_THEO_DONG.txt",
+            )
+        )
+        self.assertIn("CHAR nhóm", joined)
+        self.assertIn("không gửi thêm char riêng", joined.lower())
+        self.assertIn("đúng số con", joined)
+        self.assertIn("bộ máy đã lắp", joined)
+        self.assertIn("không viết trên 10", joined)
+        self.assertIn("CHAR_297 (Helga and Lucian, two people)", joined)
+        self.assertIn("exactly three living mice", joined)
+
+
 if __name__ == "__main__":
     unittest.main()

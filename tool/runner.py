@@ -43,11 +43,14 @@ Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số t
 Làm đủ các lần của bước trích trong quy tắc và xuất danh sách CHAR, BG.
 Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn không có số thì phân tích tác phẩm và đối tượng, rồi sáng tạo kích thước hợp lý.
 Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
+Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau thì khóa thêm một CHAR nhóm cho đúng tập đó. Giữ CHAR riêng của từng người.
+Cùng một ngoại hình sinh vật lặp nhiều con thì một CHAR, ghi đúng số con. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng người cầm.
 """
 
 MERGE_TASK = """CHỈ GỘP BƯỚC 1.
 Các phần trích bên dưới là của cùng một tác phẩm.
 Đếm số câu khác nhau trên toàn bộ các phần, rồi xuất một danh sách CHAR và BG duy nhất theo quy tắc.
+Giữ CHAR nhóm, CHAR sinh vật dùng cho nhiều con, và CHAR của bộ máy đã lắp. Không gộp các thành viên thành một người. Không tách một bộ máy thành nhiều CHAR.
 """
 
 CHAR_TASK = """CHỈ LÀM BƯỚC 2.
@@ -55,6 +58,8 @@ Danh sách đã khóa nằm trong DU_LIEU.
 Viết prompt tham chiếu cho mọi CHAR trong danh sách.
 Không viết prompt BG ở bước này.
 Ghi đúng số đo đã khóa. Số đo sáng tạo hợp lý đã khóa là hợp lệ, không được bỏ.
+CHAR nhóm vẽ mỗi thành viên một lần, vẫn là từng người, đúng số đo của người đó.
+CHAR sinh vật ghi loài và số đo. CHAR của bộ máy ghi cả bộ đã nối và các số đo của bộ.
 """
 
 BG_TASK = """CHỈ LÀM BƯỚC 3.
@@ -69,7 +74,9 @@ Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
 Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã BG mới.
-Nhân vật đã khóa mà có mặt trong hình thì header phải có CHAR_XX của nhân vật đó, và phần chữ ghi đúng số đo đã khóa.
+Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ ghi đúng số đo đã khóa của từng người.
+Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
+Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
 Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
 Giữ đúng số đo đã khóa.
@@ -80,7 +87,11 @@ Không viết lại quy tắc.
 FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Không yêu cầu tạo mã BG mới. Nếu BG không thích hợp, chỉ định BG đã tạo nào đúng với dòng.
-FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR_XX hoặc phần chữ không ghi số đo đã khóa.
+FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
+FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
+Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
+FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
+FAIL khi bộ máy đã lắp không có CHAR của cả bộ, bị tách từng bộ phận thành nhiều CHAR, hoặc bị ghi vào người đang xem.
 FAIL khi dòng diễn ra trong một nơi vật lý mà prompt dùng BG chuyển cảnh trừu tượng thay cho BG vật lý đã tạo.
 Suy nghĩ, hồi tưởng hoặc việc sắp tới được vẽ bằng BG của nơi đó, hoặc ghép với BG nơi đang đứng. Không FAIL vì ảnh có nơi được nhớ. Không bắt sửa thành chỉ phản ứng trong phòng hiện tại.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
@@ -91,7 +102,8 @@ REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy t�
 Giữ nguyên số dòng và số thứ tự đã cho.
 Chỉ xuất các dòng được yêu cầu sửa, đúng định dạng trong quy tắc. Không viết lại dòng không được gửi.
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
-Nhân vật có mặt trong hình thì header có CHAR_XX và phần chữ ghi số đo đã khóa.
+Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi số đo đã khóa.
+Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
 Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
 Giữ đúng số đo đã khóa.
 """

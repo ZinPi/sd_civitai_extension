@@ -37,6 +37,14 @@ Thứ tự ưu tiên khi QA:
 Nếu QA rule cũ mâu thuẫn Master B5:
 → Master B5 quyết định cách hiểu.
 
+KHÓA QA — ẢNH NHÓM, SỐ CON, BỘ MÁY:
+- Không FAIL vì prompt dùng CHAR nhóm đã khóa khi đúng các thành viên cùng có mặt, kể cả khi tổng ảnh còn dưới 10.
+- FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
+- FAIL khi thành viên có mặt mà header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó.
+- FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
+- FAIL khi bộ máy đã lắp không có CHAR của cả bộ, bị tách từng bộ phận thành nhiều CHAR, hoặc bị ghi vào người đang đứng xem.
+- Không FAIL việc gom nhân vật phụ khi tổng sắp vượt 10. FAIL nếu gom người diễn chính vào nhóm tạm chỉ để giảm số ảnh. Trần 10 ảnh vẫn giữ.
+
 QA KHÔNG được:
 - biến lại workflow thành SMALL_SCENE;
 - tạo scene/đạo diễn scene để thay OUTPUT_SLOT;
@@ -381,8 +389,10 @@ Kiểm:
 - CHAR và BG đều là ảnh tham chiếu;
 - một prompt không viết trên 10 ảnh tham chiếu;
 - khi tổng sẽ vượt 10, gom nhân vật phụ vào CHAR_GROUP để còn không quá 10;
-- tổng đã trong mức 10 thì không gom;
-- không ghép nhân vật đang diễn chính trong prompt vào CHAR_GROUP;
+- tổng đã trong mức 10 thì không gom thêm nhóm tạm;
+- CHAR nhóm đã khóa vẫn được dùng khi đúng thành viên cùng có mặt;
+- khi dùng CHAR nhóm, không gửi thêm CHAR riêng của thành viên;
+- không ghép nhân vật đang diễn chính trong prompt vào nhóm tạm chỉ để giảm số ảnh;
 
 Không được bỏ core reference chỉ để né limit.
 
@@ -390,8 +400,9 @@ FAIL_H:
 - INVALID_REFERENCE_TOKEN;
 - MISSING_REQUIRED_REFERENCE;
 - WRONG_CHAR_GROUP_USE;
-- MAIN_ACTOR_GROUPED_IN_CHAR_GROUP;
+- MAIN_ACTOR_GROUPED_IN_CHAR_GROUP chỉ khi người diễn chính bị nhét vào nhóm tạm.
 - REFERENCE_LIMIT_CONFLICT.
+Không dùng MAIN_ACTOR_GROUPED_IN_CHAR_GROUP khi prompt dùng CHAR nhóm đã khóa của đúng thành viên.
 
 
 QA-09 — REFERENCE ROLE / B3 ↔ REFERENCE AUTHORITY

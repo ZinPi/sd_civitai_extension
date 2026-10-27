@@ -5,7 +5,9 @@ KHÓA THEO QUY TRÌNH HƯỚNG DẪN:
 - Đây là bước 1. Tên bước là `1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH`. File quy tắc là `01_TRICH_NHAN_VAT_VA_BOI_CANH.txt`.
 - Đầu vào đã khóa: `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE`. Không dùng bản TTS. Không dùng SRT làm nguồn hiện hành.
 - Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
-- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ và vũ khí nhân vật cầm được ghi cùng CHAR đó. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
+- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy hoặc bộ đồ đã lắp, đặt riêng, là một CHAR cho cả bộ, với các số đo của bộ. Không tách từng bộ phận thành CHAR mới. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
+- Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau được khóa thêm một CHAR nhóm cho đúng tập đó. Giữ CHAR riêng của từng thành viên. Ảnh nhóm vẽ mỗi người một lần, đúng số đo của người đó.
+- Cùng một ngoại hình sinh vật được dùng cho nhiều con thì chỉ một CHAR. Ghi đúng số con và số đo. Không cấp mã mới cho từng con.
 - Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn để bảng đủ cho bước 4. Thiếu thì bổ sung ở lần này.
 - Lần 3: liệt kê trạng thái chính xác, rồi gán `CHAR_XX` và `BG_XX` phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
 - Bảng này là nguồn ID duy nhất của prompt theo dòng. Prompt dòng không được rơi vào GAP vì một CHAR hoặc BG đã phải có từ bước này.
@@ -132,7 +134,7 @@ Nhân vật được gán CHAR khi có một trong các điều kiện:
 - nhân vật cầm vũ khí.
 
 Tuổi, trang phục và vết thương liệt kê thành trạng thái của CHAR đó.
-Công cụ và vũ khí nhân vật cầm ghi cùng CHAR đó.
+Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ.
 Một dòng tính một lần. Nguồn một câu một dòng thì một dòng là một câu.
 Số IMAGE_PROMPT không dùng để gán CHAR và không dùng để loại CHAR.
 
@@ -191,7 +193,7 @@ Mặc định:
 Đối với NHÂN VẬT — ACTIVE:
 - gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi cầm công cụ, hoặc khi cầm vũ khí.
 - tuổi, trang phục và vết thương là trạng thái của CHAR đó.
-- công cụ và vũ khí nhân vật cầm ghi cùng CHAR đó.
+- công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ.
 - chỉ 1 dòng, không đổi ngoại hình nhiều, không cầm công cụ và không cầm vũ khí: không gán CHAR.
 - bắt buộc lưu SOURCE_SENTENCE_IDS để audit.
 - không được dùng số IMAGE_PROMPT làm gate quyết định CHARACTER ở bước 1.
