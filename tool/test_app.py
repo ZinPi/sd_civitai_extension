@@ -131,14 +131,26 @@ class AppTests(unittest.TestCase):
         self.assertEqual(offline.json()["message"], "Không nối được API.")
         self.assertNotIn("API không hợp lệ", offline.text)
 
+    def test_saving_the_key_is_read_the_next_time_the_page_opens(self):
+        with mock.patch.object(HttpLlm, "list_models", lambda self: ["m"]):
+            before = self.client.get("/api/settings")
+            self.assertEqual(before.json()["api_state"], "invalid")
+            Path(self.root, "config.json").write_text(
+                "\ufeff" + json.dumps({"provider": "teamsoclo", "api_key": "sk-test"}),
+                encoding="utf-8",
+            )
+            after = self.client.get("/api/settings")
+        self.assertEqual(after.json()["api_state"], "ok")
+        self.assertEqual(after.json()["models"], ["m"])
+
     def test_tuansu_uses_its_chat_endpoint_without_showing_the_address(self):
         self.write_config(provider="tuansu", api_key="sk-or-v1-secret")
         with mock.patch.object(HttpLlm, "list_models", lambda self: ["vendor/m"]):
             response = self.client.get("/api/settings")
+            picked = self.client.put("/api/settings", json={"model": "vendor/m"})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertNotIn("tuansuapi", response.text)
         self.assertNotIn("sk-or-v1-secret", response.text)
-        picked = self.client.put("/api/settings", json={"model": "vendor/m"})
         self.assertEqual(picked.status_code, 200)
         self.assertEqual(picked.json()["model"], "vendor/m")
         stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))

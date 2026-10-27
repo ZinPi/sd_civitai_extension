@@ -272,6 +272,9 @@ class HttpLlm:
         except httpx.TransportError as exc:
             raise LlmError("Không nối được API.", "network") from exc
         if response.status_code in {401, 403}:
+            body = response.text
+            if response.status_code == 403 and "1010" in body:
+                raise LlmError("Không nối được API.", "network")
             raise LlmError(f"{self._label()} từ chối API. Dán lại rồi bấm Kiểm tra.", "auth")
         if response.status_code >= 400:
             raise LlmError(f"Không lấy được danh sách model của {self._label()}.", "bad")

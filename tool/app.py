@@ -62,7 +62,7 @@ def read_config(path: Path) -> dict:
     api_key = ""
     if path.is_file():
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
         except json.JSONDecodeError:
             raw = {}
         if isinstance(raw, dict):
@@ -145,7 +145,7 @@ def create_app(
     settings_path = data / "settings.json"
     secret_path = Path(config_path) if config_path is not None else ROOT / "config.json"
     job = Job(rules_path, data)
-    probe = {"done": False, "state": "invalid", "message": NEED_KEY, "models": []}
+    probe = {"state": "invalid", "message": NEED_KEY, "models": []}
     app = FastAPI(title="Tạo prompt ảnh")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -160,9 +160,6 @@ def create_app(
             pass
 
     def ensure_probe() -> dict:
-        if probe["done"]:
-            return probe
-        probe["done"] = True
         secret = read_config(secret_path)
         if not secret["api_key"]:
             probe["state"] = "invalid"
