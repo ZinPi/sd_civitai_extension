@@ -25,6 +25,7 @@ const download = document.querySelector("#download");
 const reference = document.querySelector("#reference");
 const run = document.querySelector("#run");
 const next = document.querySelector("#next");
+const repair = document.querySelector("#repair");
 const stop = document.querySelector("#stop");
 const clear = document.querySelector("#clear");
 const connection = document.querySelector("#connection");
@@ -47,10 +48,13 @@ function updateCount() {
   const done = doneCount();
   const allDone = done === 4 && job?.state === "done";
   const running = Boolean(job?.running);
-  run.textContent = primaryLabel();
-  run.disabled = running || allDone || total === 0;
+  const resume = Boolean(job?.can_resume) && !running;
+  run.textContent = resume ? "Chạy tiếp" : primaryLabel();
+  run.disabled = running || (allDone && !resume) || total === 0;
   run.setAttribute("aria-busy", running ? "true" : "false");
-  next.hidden = running || allDone || job?.state === "error" || total === 0;
+  next.hidden = running || allDone || job?.state === "error" || job?.state === "stopped" || total === 0;
+  repair.hidden = running || !(job?.repair_lines || []).length;
+  repair.disabled = running;
 }
 
 async function readError(response) {
@@ -142,8 +146,8 @@ function hasFile() {
 
 function primaryLabel() {
   if (job?.running) return "Đang chạy…";
+  if (job?.can_resume || job?.state === "stopped") return "Chạy tiếp";
   if (job?.state === "error") return "Chạy lại bước này";
-  if (job?.state === "stopped") return "Chạy tiếp";
   const done = doneCount();
   if (done === 0) return "Chạy cả bốn bước";
   if (done === 4) return "Đã xong bốn bước";
@@ -248,8 +252,10 @@ function schedule() {
 async function start(mode) {
   run.disabled = true;
   next.disabled = true;
+  repair.disabled = true;
   if (!(await saveSettings())) {
     next.disabled = false;
+    repair.disabled = false;
     await refresh(false);
     return;
   }
@@ -259,6 +265,7 @@ async function start(mode) {
     body: JSON.stringify({ source_text: source.value, mode }),
   });
   next.disabled = false;
+  repair.disabled = false;
   if (!response.ok) {
     const message = await readError(response);
     showNotice({ kind: "error", text: message });
@@ -334,10 +341,11 @@ drop.addEventListener("drop", async (event) => {
 });
 
 run.addEventListener("click", () => {
-  if (job?.state === "error") start("next");
+  if (job?.can_resume || job?.state === "error" || job?.state === "stopped") start("next");
   else start("all");
 });
 next.addEventListener("click", () => start("next"));
+repair.addEventListener("click", () => start("repair"));
 stop.addEventListener("click", async () => {
   stop.disabled = true;
   await fetch("/api/job/stop", { method: "POST" });

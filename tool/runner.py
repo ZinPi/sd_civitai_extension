@@ -376,6 +376,7 @@ class Job:
         self._ceiling = CEILING
         self._qa_omitted_rule = False
         self._leftover: dict[int, str] = {}
+        self._can_resume = False
         self._load()
 
     def begin(self, source_text: str, settings: dict, mode: str) -> None:
@@ -388,7 +389,8 @@ class Job:
             self._state = "running"
             self._notice = {"kind": "", "text": ""}
             self._detail = "Bắt đầu."
-            self._mode = mode if mode in {"all", "next"} else "all"
+            self._mode = mode if mode in {"all", "next", "repair"} else "all"
+            self._can_resume = False
             self._save()
         self._thread = threading.Thread(target=self._thread_main, daemon=True)
         self._thread.start()
@@ -443,6 +445,8 @@ class Job:
                 ],
                 "files": files,
                 "source_text": self._source_text if include_source else "",
+                "can_resume": bool(self._can_resume and self._state in {"error", "stopped"} and not self._running),
+                "repair_lines": sorted(self._leftover) if self._state == "done" and not self._running else [],
             }
 
     def output_path(self, filename: str) -> Path:
@@ -458,6 +462,9 @@ class Job:
         except JobError as exc:
             self._finish("error", "error", str(exc))
         except LlmError as exc:
+            if exc.kind in {"timeout", "network", "rate"}:
+                with self._lock:
+                    self._can_resume = True
             self._finish("error", "error", str(exc))
         except Exception as exc:
             self._finish("error", "error", "Lỗi không dự tính: " + str(exc))
@@ -470,16 +477,19 @@ class Job:
         self._ensure_rules()
         client = self.client_factory(self._settings)
         try:
-            for step in self._plan():
-                self._check_stop()
-                if step == 1:
-                    self._step_extract(client)
-                elif step == 2:
-                    self._step_reference(client, 2, "PROMPT_CHAR.txt", CHAR_TASK, "char")
-                elif step == 3:
-                    self._step_reference(client, 3, "PROMPT_BG.txt", BG_TASK, "bg")
-                else:
-                    self._step_lines(client)
+            if self._mode == "repair":
+                self._repair_skipped(client)
+            else:
+                for step in self._plan():
+                    self._check_stop()
+                    if step == 1:
+                        self._step_extract(client)
+                    elif step == 2:
+                        self._step_reference(client, 2, "PROMPT_CHAR.txt", CHAR_TASK, "char")
+                    elif step == 3:
+                        self._step_reference(client, 3, "PROMPT_BG.txt", BG_TASK, "bg")
+                    else:
+                        self._step_lines(client)
         finally:
             close = getattr(client, "close", None)
             if close:
@@ -525,7 +535,6 @@ class Job:
         self._lines = lines
         self._digest = digest
         self._qa_omitted_rule = False
-        self._leftover = {}
 
     def _validate_settings(self, settings: dict) -> None:
         if not str(settings.get("base_url") or "").strip() or not str(settings.get("api_key") or "").strip():
@@ -633,7 +642,6 @@ class Job:
             self._log(f"Đã khóa {index}/{total} dòng.")
             if status == "truncated":
                 self._ceiling = max(1, count // 2)
-        reference, locked = self._rebuild_failed(client, guide, qa_rules, rules, reference, locked, width)
         self._final_qa(client, guide, qa_rules, rules, reference, locked, width)
         self._mark(4, "done")
 
@@ -652,6 +660,29 @@ class Job:
             excerpt = " ".join(repaired.split())[:1200]
             raise JobError("Lượt này vẫn không đủ một prompt cho mỗi dòng. Không nhận bản thiếu.\n\n" + excerpt)
         return kept, status
+
+    def _repair_skipped(self, client) -> None:
+        if self._steps.get(4) != "done":
+            raise JobError("File prompt chưa chạy xong. Chạy tiếp trước khi sửa lại.")
+        if not self._leftover:
+            raise JobError("Không còn dòng QA cần sửa.")
+        self._log("Đang sửa lại các dòng QA hai lần bị lỗi.")
+        guide = self._rule("00_QUY_TRINH_HUONG_DAN.txt")
+        rules = self._rule("03_PROMPT_ANH_THEO_DONG.txt")
+        qa_rules = self._rule("04_QA_PROMPT_THEO_DONG.txt")
+        reference = self._compile()
+        width = numbered_width(len(self._lines))
+        locked = self._all_records()
+        self._rebuild_failed(client, guide, qa_rules, rules, reference, locked, width)
+        self._log("Xong sửa lại.")
+
+    def _all_records(self) -> list[dict]:
+        records = parse_prompt_records(self._output_text("PROMPT_THEO_DONG.txt"))
+        by_number = {record["n"]: record for record in records}
+        missing = [number for number in range(1, len(self._lines) + 1) if number not in by_number]
+        if missing:
+            raise JobError("File prompt chưa đủ dòng. Chạy tiếp phần chưa khóa trước khi sửa lại.")
+        return [by_number[number] for number in range(1, len(self._lines) + 1)]
 
     def _rebuild_failed(self, client, guide, qa_rules, line_rules, reference, locked, width):
         """After the full file exists, write the lines that still failed QA one more time."""
@@ -776,7 +807,7 @@ class Job:
                 for number in still:
                     self._leftover[number] = report
                 self._log(
-                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp. Sẽ tạo lại khi chạy xong.",
+                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp. Bấm Sửa lại khi file xong.",
                     qa_log_body(report, subset, width),
                 )
                 return kept, reference
@@ -1060,10 +1091,12 @@ class Job:
 
     def _with_range(self, exc: LlmError, batch) -> str:
         start, end = batch[0][0], batch[-1][0]
+        if exc.kind in {"timeout", "network", "rate"}:
+            self._can_resume = True
         if exc.kind in {"timeout", "network"}:
-            return f"{exc} Dòng {start}–{end} chưa có prompt. Bấm chạy tiếp nếu muốn gửi lại các dòng chưa khóa."
+            return f"{exc} Dòng {start}–{end} chưa có prompt. Bấm Chạy tiếp để gửi lại các dòng chưa khóa."
         if exc.kind == "rate":
-            return f"API vẫn báo quá lượt. Dòng {start}–{end} chưa khóa. Không gửi thêm."
+            return f"API vẫn báo quá lượt. Dòng {start}–{end} chưa khóa. Bấm Chạy tiếp khi muốn gửi lại."
         return str(exc)
 
     def _check_stop(self) -> None:
@@ -1163,6 +1196,8 @@ class Job:
         self._current = 0
         self._ceiling = CEILING
         self._qa_omitted_rule = False
+        self._leftover = {}
+        self._can_resume = False
 
     def _load(self) -> None:
         path = self.data_dir / "state.json"
@@ -1202,6 +1237,16 @@ class Job:
                 self._steps[current] = "stopped"
         elif state in {"idle", "done", "error", "stopped"}:
             self._state = state
+        raw_leftover = data.get("leftover") or {}
+        if isinstance(raw_leftover, dict):
+            restored: dict[int, str] = {}
+            for key, value in raw_leftover.items():
+                try:
+                    restored[int(key)] = str(value)
+                except (TypeError, ValueError):
+                    continue
+            self._leftover = restored
+        self._can_resume = bool(data.get("can_resume"))
 
     def _save(self) -> None:
         atomic_write(self.data_dir / "source.txt", self._source_text)
@@ -1214,5 +1259,7 @@ class Job:
             "log": self._logs[-80:],
             "ceiling": self._ceiling,
             "digest": self._digest,
+            "can_resume": self._can_resume,
+            "leftover": {str(number): text for number, text in self._leftover.items()},
         }
         atomic_write(self.data_dir / "state.json", json.dumps(payload, ensure_ascii=False, indent=2))

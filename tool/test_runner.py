@@ -138,7 +138,9 @@ class RunnerTests(unittest.TestCase):
         job = Job(self.rules, self.data, client_factory=lambda _settings: Slow())
         job.begin(self.source, self.settings, "next")
         job._thread.join(10)
-        self.assertIn("Không tự gửi lại", job.snapshot()["notice"]["text"])
+        snapshot = job.snapshot()
+        self.assertIn("Không tự gửi lại", snapshot["notice"]["text"])
+        self.assertTrue(snapshot["can_resume"])
 
     def test_remembered_place_qa_does_not_stop_the_next_turn(self):
         fail = (
@@ -308,6 +310,17 @@ class RunnerTests(unittest.TestCase):
         job._thread.join(10)
         snapshot = job.snapshot()
         self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(snapshot["repair_lines"], [1])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("BATCH still in the bedroom", prompts)
+        self.assertIn("KEEP-LINE-TWO the street stays", prompts)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bấm Sửa lại khi file xong", journal)
+        job.begin("Hermes tập ở sân.\nCô bé nhìn phố.\n", self.settings, "repair")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(snapshot["repair_lines"], [])
         prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
         self.assertIn("END REBUILD Hermes trains in the yard", prompts)
         self.assertIn("KEEP-LINE-TWO the street stays", prompts)
@@ -317,7 +330,6 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("001. Hermes tập ở sân.", repair_users[2])
         self.assertNotIn("002. Cô bé nhìn phố.", repair_users[2])
         journal = "\n".join(snapshot["log"])
-        self.assertIn("Chạy xong. Tạo lại 1 dòng còn lỗi: 001", journal)
         self.assertIn("Đã tạo lại dòng 001", journal)
 
     def test_failed_line_numbers_keep_only_cited_rows(self):
