@@ -149,6 +149,68 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(saved, text)
         self.assertEqual(len(parse_prompt_records(saved)), 800)
 
+    def test_missing_bg_is_added_then_the_lines_are_written(self):
+        class GapScript(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                if step == "lines" and not any(item[0] == "bg-fill" for item in self.calls):
+                    self.calls.append((step, user))
+                    return Completion("BG_GAP — Chưa có BG_XX được khóa cho các dòng 002-003.", "stop")
+                if step == "bg-fill":
+                    self.calls.append((step, user))
+                    return Completion("DONG 002 | BG_02 | phòng\nBG_02 phòng trong nhà\n", "stop")
+                if step == "bg-add":
+                    self.calls.append((step, user))
+                    return Completion("BG_02 wooden room with a window.\n", "stop")
+                return super().complete(system, user, max_output_tokens)
+
+        script = GapScript()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin(self.source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        listing = (self.data / "DANH_SACH_CHAR_BG.txt").read_text(encoding="utf-8")
+        backgrounds = (self.data / "PROMPT_BG.txt").read_text(encoding="utf-8")
+        combined = (self.data / "FILE_TONG_HOP.txt").read_text(encoding="utf-8")
+        self.assertIn("BG_02", listing)
+        self.assertIn("BG_01", listing)
+        self.assertIn("wooden room", backgrounds)
+        self.assertIn("BG_02", combined)
+        prompts = parse_prompt_records((self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8"))
+        self.assertEqual([record["n"] for record in prompts], [1, 2, 3, 4])
+        self.assertEqual(sum(1 for step, _user in script.calls if step == "bg-fill"), 1)
+
+    def test_a_second_bg_gap_stops_the_batch(self):
+        class AlwaysGap(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                if step == "lines":
+                    self.calls.append((step, user))
+                    return Completion("BG_GAP vẫn thiếu BG cho dòng này.", "stop")
+                if step == "bg-fill":
+                    self.calls.append((step, user))
+                    return Completion("BG_02 sân\n", "stop")
+                if step == "bg-add":
+                    self.calls.append((step, user))
+                    return Completion("BG_02 yard.\n", "stop")
+                return super().complete(system, user, max_output_tokens)
+
+        script = AlwaysGap()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin(self.source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "error")
+        self.assertIn("Đã bổ sung BG", snapshot["notice"]["text"])
+        self.assertEqual(sum(1 for step, _user in script.calls if step == "bg-fill"), 1)
+
     def test_timeout_does_not_raise_a_generic_error(self):
         class Slow(Script):
             def complete(self, system, user, max_output_tokens):
