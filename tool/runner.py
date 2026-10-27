@@ -77,7 +77,6 @@ Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái c�
 Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ ghi đúng số đo đã khóa của từng người.
 Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
 Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
-Một CHAR chỉ có một số đo đã khóa. Thân thể chưa có CHAR riêng thì vẽ người không định danh, không gán CHAR của trạng thái khác.
 Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
 Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
 Chưa có BG đúng nơi thì không lấy BG khác để lấp và không giấu địa danh của BG sai.
@@ -90,7 +89,7 @@ FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Nếu BG không thích hợp và bảng đã có BG đúng, chỉ định BG đó. Nếu chưa có BG đúng nơi, nói cần tạo BG từ tác phẩm. Prompt dòng không tự đặt mã BG.
 FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
-Không FAIL khi prompt vẽ một thân thể hoặc trạng thái khác và không dùng CHAR của trạng thái hiện tại. Một CHAR chỉ có một số đo đã khóa. Không bắt gắn số đo khác.
+Mỗi lỗi phải nêu số dòng, loại lỗi, chỗ sai và cách sửa đúng chi tiết đó.
 FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
 Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
 FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
@@ -103,11 +102,12 @@ Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 """
 
 REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy tắc tạo prompt.
+Với từng dòng được giao: đọc loại lỗi, chỗ sai và cách sửa. Chỉ đổi đúng chi tiết đó.
+Giữ nguyên mọi câu, mã, số đo, panel và nhân vật mà báo cáo không nêu. Không viết lại cả prompt.
+Không thêm cách sửa mà báo cáo không nêu. Không viết lại dòng không được gửi.
 Giữ nguyên số dòng và số thứ tự đã cho.
-Chỉ xuất các dòng được yêu cầu sửa, đúng định dạng trong quy tắc. Không viết lại dòng không được gửi.
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
 Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi số đo đã khóa.
-Không gắn một CHAR với số đo khác số đã khóa. Thân thể chưa có CHAR riêng thì giữ người không định danh.
 Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
 Nếu có BG_VUA_TAO, dùng đúng mã đó cho nơi còn thiếu. Không giữ BG cũ rồi giấu địa danh.
 Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
@@ -272,49 +272,40 @@ def next_bg_id(text: str) -> str:
     return f"BG_{number:0{width}d}"
 
 
-_CM_SIZE = re.compile(r"(\d+(?:[.,]\d+)?)\s*cm", re.I)
-_CHAR_ID = re.compile(r"CHAR_\d+", re.I)
+def _qa_field(block: str, name: str) -> str:
+    match = re.search(rf"(?im)^{name}\s*:\s*(.+)$", block)
+    return " ".join(match.group(1).split()) if match else ""
 
 
-def char_size_counts(records: list[dict]) -> dict[str, dict[str, int]]:
-    """How often each locked size is written next to a CHAR in this batch."""
-    counts: dict[str, dict[str, int]] = {}
-    for record in records:
-        text = f"{record.get('ids', '')} {record.get('body', '')}"
-        for match in _CHAR_ID.finditer(text):
-            char = match.group(0).upper()
-            window = text[match.end() : match.end() + 60]
-            bucket = counts.setdefault(char, {})
-            for size in _CM_SIZE.findall(window):
-                key = size.replace(",", ".")
-                bucket[key] = bucket.get(key, 0) + 1
-    return counts
+def _clip(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
 
 
-def lines_asking_second_size(report: str, records: list[dict], allowed: set[int]) -> list[int]:
-    """FAIL rows that would put a second height on a CHAR the line does not already use."""
-    counts = char_size_counts(records)
-    by_number = {record["n"]: record for record in records}
-    found: list[int] = []
+def fault_brief(report: str, allowed: set[int], width: int) -> str:
+    """One line per QA fail: the line, the error, where it is wrong, and the exact fix."""
+    lines: list[str] = []
     for number, block in qa_fail_blocks(report):
-        if number not in allowed or number not in by_number or number in found:
+        if number not in allowed:
             continue
-        header = {item.upper() for item in _CHAR_ID.findall(str(by_number[number].get("ids", "")))}
-        asked_chars = {item.upper() for item in _CHAR_ID.findall(block)}
-        asked_sizes = [item.replace(",", ".") for item in _CM_SIZE.findall(block)]
-        if not asked_chars or not asked_sizes:
-            continue
-        for char in asked_chars:
-            if char in header:
-                continue
-            bucket = counts.get(char) or {}
-            if not bucket:
-                continue
-            majority = max(bucket, key=bucket.get)
-            if all(size != majority for size in asked_sizes):
-                found.append(number)
-                break
-    return found
+        issue = _qa_field(block, "ISSUE_TYPE")
+        if not issue:
+            first = block.splitlines()[0] if block.splitlines() else ""
+            inline = re.search(r"(?i)FAIL(?:_[A-Z0-9]+)?\b\s*[—:\-]+\s*(.+)", first)
+            issue = " ".join(inline.group(1).split()) if inline else ""
+        evidence = _qa_field(block, "EVIDENCE")
+        fix = _qa_field(block, "REQUIRED_FIX")
+        piece = f"{number:0{width}d}"
+        if issue:
+            piece += f" | {_clip(issue, 120)}"
+        if evidence:
+            piece += f" | chỗ sai: {_clip(evidence, 220)}"
+        if fix:
+            piece += f" | sửa: {_clip(fix, 220)}"
+        lines.append(piece)
+    return "\n".join(lines)
 
 
 def valid_repair_map(text: str, expected: list[int], finish: str) -> dict[int, dict]:
@@ -335,7 +326,11 @@ def qa_log_body(report: str, records: list[dict], width: int) -> str:
     """Keep the QA report readable. The page log used to drop everything after one sentence."""
     findings = (report or "").strip() or "(QA không trả nội dung.)"
     prompts = format_records(records, width).strip()
-    body = "BÁO CÁO QA\n" + findings
+    brief = fault_brief(report, {record["n"] for record in records}, width)
+    body = ""
+    if brief:
+        body = "LỖI CẦN SỬA\n" + brief + "\n\n"
+    body += "BÁO CÁO QA\n" + findings
     if prompts:
         body += "\n\nPROMPT ĐANG BỊ CHẤM\n" + prompts
     if len(body) > 20000:
@@ -660,8 +655,10 @@ class Job:
         if not open_lines:
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
             return records, reference
+        brief = fault_brief(report, {record["n"] for record in records}, width)
+        lead = brief.splitlines()[0] if brief else f"dòng {rows[0][0]}–{rows[-1][0]}"
         self._log(
-            f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.",
+            f"QA chưa đạt. {lead}. Sửa đúng chi tiết này.",
             qa_log_body(report, records, width),
         )
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
@@ -694,7 +691,8 @@ class Job:
             return kept, reference
         if open_lines:
             self._log(
-                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(open_lines, width)}."
+                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(open_lines, width)}.",
+                "LỖI CẦN SỬA\n" + fault_brief(report, set(open_lines), width),
             )
             reference = self._supply_missing_backgrounds(
                 client, guide, report, rows, width, reference, added, covered, set(open_lines)
@@ -730,14 +728,8 @@ class Job:
         )
 
     def _open_fail_lines(self, report: str, records: list[dict], width: int) -> list[int]:
-        allowed = {record["n"] for record in records}
-        skipped = set(lines_asking_second_size(report, records, allowed))
-        if skipped:
-            self._log(
-                "QA bắt gắn số đo khác cho CHAR đã khóa ở dòng "
-                f"{format_line_list(sorted(skipped), width)}. Giữ prompt đã có."
-            )
-        return [number for number in failed_line_numbers(report, allowed) if number not in skipped]
+        del width
+        return failed_line_numbers(report, {record["n"] for record in records})
 
     def _bg_repair_note(self, added: list[tuple[str, list[int]]], width: int) -> str:
         if not added:
@@ -824,10 +816,12 @@ class Job:
         for attempt in range(2):
             selected_rows = [(number, source[number]) for number in pending]
             selected_records = [current[number] for number in pending]
+            brief = fault_brief(report, set(pending), width)
             repair = (
                 REPAIR_TASK
                 + ("\n" + MANGA_REPAIR if manga else "")
                 + ("\n" + bg_note if bg_note else "")
+                + ("\nLỖI CẦN SỬA\n" + brief + "\n" if brief else "")
                 + "\nBAO_CAO_QA\n"
                 + report
                 + "\nDONG_CAN_SUA\n"

@@ -14,7 +14,7 @@ KHÓA SỬA — ẢNH NHÓM, SỐ CON, BỘ MÁY
 - Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy hoặc bộ đồ đã lắp, đặt riêng, nhiều bộ phận nối thành một bộ, là một CHAR cho cả bộ, với các số đo của bộ. Không tách từng bộ phận thành CHAR mới. Không ghi bộ đó vào người đang đứng xem.
 - Dòng cần một nơi vật lý mà bảng chưa có BG của nơi đó: tạo BG từ tác phẩm, rồi sửa prompt. Không lấy BG của nơi khác để lấp. Không giấu địa danh của BG sai.
 - Lần kiểm lại nếu nêu dòng khác, chỉ sửa các dòng còn lỗi.
-- Một CHAR chỉ có một số đo đã khóa. Không gắn CHAR của trạng thái này cho thân thể khác. Thân thể chưa có CHAR riêng thì vẽ người không định danh. Không bắt ghi thêm một số đo khác cho CHAR đã khóa.
+- Khi QA không đạt, ghi rõ từng dòng: lỗi gì, chỗ nào sai, sửa cái gì. Chỉ sửa đúng chi tiết đó. Không viết lại cả prompt và không sửa điều báo cáo không nêu.
 
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.

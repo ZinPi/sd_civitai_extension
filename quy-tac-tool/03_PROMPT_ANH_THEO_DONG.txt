@@ -13,7 +13,7 @@ KHÓA ẢNH NHÓM, SỐ CON VÀ BỘ MÁY:
 - Một CHAR sinh vật đã khóa dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
 - Bộ máy đã lắp là một CHAR của cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 - Dòng cần một nơi vật lý mà bảng chưa có BG của nơi đó: tạo BG từ tác phẩm rồi mới sửa prompt. Không lấy BG khác để lấp. Không giấu địa danh của BG sai.
-- Một CHAR chỉ có một số đo đã khóa. Thân thể chưa có CHAR riêng thì vẽ người không định danh, không gán CHAR của trạng thái khác.
+- Khi sửa một dòng, chỉ đổi đúng chi tiết báo cáo QA nêu. Giữ nguyên mọi câu, mã, số đo, panel và nhân vật mà báo cáo không nêu.
 ACTIVE MODE: 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT
 MỤC TIÊU: tạo prompt ảnh theo từng dòng/câu của tác phẩm, dùng CHAR/BG đã khóa từ B3, bổ sung các khóa kỹ thuật hữu ích của rule ảnh cảnh nhỏ nhưng KHÔNG nhập workflow phân cảnh/đạo diễn SMALL_SCENE.
 
