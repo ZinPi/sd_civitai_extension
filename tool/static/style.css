@@ -298,7 +298,6 @@ pre {
 .results .hint { margin-top: 8px; }
 
 .settings { margin: 18px 0; }
-.rules { margin-top: 18px; }
 
 summary {
   cursor: pointer;
@@ -314,10 +313,6 @@ summary {
 
 .limits { margin-top: 4px; }
 .limits summary { font-weight: 600; }
-
-#rules { margin: 10px 0; padding-left: 18px; }
-#rules li { margin: 4px 0; }
-#rules .missing { color: var(--bad); }
 
 .source.drag { outline: 2px dashed var(--accent); outline-offset: 3px; }
 

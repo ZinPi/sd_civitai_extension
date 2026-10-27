@@ -48,6 +48,8 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("tuansuapi", text)
         self.assertNotIn("openai.com", text)
         self.assertNotIn("Chọn bộ quy tắc", text)
+        self.assertNotIn("Quy tắc đang dùng", text)
+        self.assertNotIn("/api/rules", script)
         self.assertNotIn("USD", text)
         self.assertNotIn("ZIP", text)
 
@@ -95,18 +97,11 @@ class AppTests(unittest.TestCase):
         bad = self.client.post("/api/nhip", params={"tab": "../x"})
         self.assertEqual(bad.status_code, 400)
 
-    def test_rules_endpoint_lists_files(self):
-        response = self.client.get("/api/rules")
-        self.assertEqual(response.status_code, 200)
-        files = response.json()["files"]
-        self.assertEqual([item["name"] for item in files], [
-            "00_QUY_TRINH_HUONG_DAN.txt",
-            "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt",
-            "02_PROMPT_THAM_CHIEU_CHAR_BG.txt",
-            "03_PROMPT_ANH_THEO_DONG.txt",
-            "04_QA_PROMPT_THEO_DONG.txt",
-        ])
-        self.assertTrue(all(item["bytes"] > 0 and not item["missing"] for item in files))
+    def test_rules_are_not_listed_on_the_page(self):
+        page = self.client.get("/")
+        self.assertEqual(page.status_code, 200)
+        self.assertNotIn("00_QUY_TRINH_HUONG_DAN.txt", page.text)
+        self.assertEqual(self.client.get("/api/rules").status_code, 404)
 
     def test_run_without_a_key_explains_where_to_fill_it(self):
         response = self.client.post("/api/job", json={"source_text": "Một câu.", "mode": "all"})
