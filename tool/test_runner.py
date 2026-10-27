@@ -149,6 +149,15 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(saved, text)
         self.assertEqual(parse_prompt_records(saved)[-1]["n"], 500)
 
+    def test_prompt_file_stops_at_two_million_characters(self):
+        records = [{"n": number, "ids": "BG_01", "body": "y" * PROMPT_CHARS} for number in range(1, 600)]
+        accepted = self.job._within_output_file([], records, 3)
+        text = format_records(accepted, 3)
+        self.assertLessEqual(len(text), OUTPUT_FILE_CHARS)
+        self.assertGreater(len(format_records(accepted + [records[len(accepted)]], 3)), OUTPUT_FILE_CHARS)
+        self.assertLess(len(accepted), len(records))
+        self.assertEqual(text, format_records(records[: len(accepted)], 3))
+
     def test_timeout_does_not_raise_a_generic_error(self):
         class Slow(Script):
             def complete(self, system, user, max_output_tokens):

@@ -334,6 +334,8 @@ class Job:
         width = numbered_width(total)
         locked = self._valid_locked()
         index = len(locked)
+        if len(format_records(locked, width)) > OUTPUT_FILE_CHARS:
+            raise JobError("File prompt theo dòng đã vượt 2 triệu ký tự. Không khóa thêm.")
         self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
         while index < total:
             self._check_stop()
@@ -361,10 +363,16 @@ class Job:
                 self._log(f"Phản hồi bị cắt. Chưa khóa dòng nào. Lượt sau còn tối đa {self._ceiling} dòng.")
                 continue
             kept = self._qa_batch(client, guide, qa_rules, rules, reference, kept, width)
-            locked.extend(kept)
-            index += len(kept)
-            self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
-            self._log(f"Đã khóa {index}/{total} dòng.")
+            room = self._within_output_file(locked, kept, width)
+            if room:
+                locked.extend(room)
+                index += len(room)
+                self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
+                self._log(f"Đã khóa {index}/{total} dòng.")
+            if len(room) < len(kept):
+                raise JobError(
+                    "File prompt theo dòng sẽ vượt 2 triệu ký tự. Không khóa thêm. Phần đã khóa vẫn giữ."
+                )
             if status == "truncated":
                 self._ceiling = max(1, count // 2)
         self._final_qa(client, guide, qa_rules, rules, reference, locked, width)
@@ -465,6 +473,16 @@ class Job:
         if message_tokens("qa", full, material) <= self._max_input():
             return full, False
         return [("HUONG_DAN", guide), ("QUY_TAC_QA", qa_rules)], True
+
+    def _within_output_file(self, locked: list[dict], extra: list[dict], width: int) -> list[dict]:
+        """Giữ những prompt còn làm file không quá 2 triệu ký tự. Không cắt một prompt."""
+        accepted: list[dict] = []
+        for record in extra:
+            trial = format_records(locked + accepted + [record], width)
+            if len(trial) > OUTPUT_FILE_CHARS:
+                break
+            accepted.append(record)
+        return accepted
 
     def _fit_line_batch(self, documents, reference, rows, width):
         fixed = message_tokens("lines", documents, self._line_material(reference, [], width, LINE_TASK))
