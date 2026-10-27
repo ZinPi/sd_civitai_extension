@@ -1,0 +1,3370 @@
+MASTER QUY TẮC TẠO IMAGE_PROMPT THEO DÒNG / CÂU — TÍCH HỢP ZIP 14 BƯỚC
+VERSION: LINE_IMAGE_PROMPT_INTEGRATED_ZIP14_V4_FINAL
+
+KHÓA PHẠM VI ÁP DỤNG:
+- Mọi quy tắc 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT và EVERY_IMAGE_PROMPT_MUST_HAVE_BG_XX trong B5 áp dụng cho IMAGE_PROMPT THEO DÒNG/CÂU tại B5, sử dụng B3/B4 đã khóa.
+- B5 xuất IMAGE_PROMPT dưới dạng VĂN BẢN, không gọi generator để tạo ảnh/video. “Chọn” visual beat, camera, panel là quyết định AI phải dựa trên source, không mặc nhiên là tùy chọn người dùng.
+- INPUT ĐỦ CHO B5: ID CHAR_XX/BG_XX và state đã khóa ở B3 cùng PROMPT CHAR/BG dạng TXT từ B4. Không cần có ảnh reference đã render, ảnh tải lên hoặc ảnh được người dùng phê duyệt; không được báo GAP chỉ vì thiếu FILE ẢNH THẬT.
+- Trong chế độ TXT, số “ảnh reference CHAR + BG” để xét ngưỡng CHAR_GROUP là số ID tham chiếu cần dùng cho đúng một IMAGE_PROMPT (trước tối ưu), KHÔNG phải số file ảnh đã tạo. Mọi đoạn B5 mô tả ảnh reference vật lý/được gắn thực tế chỉ áp dụng nếu ảnh thực sự tồn tại ở công đoạn tạo ảnh bên ngoài; B5 không bắt buộc phải có chúng để viết prompt.
+ACTIVE MODE: 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT
+MỤC TIÊU: tạo prompt ảnh theo từng dòng/câu của tác phẩm, dùng CHAR/BG đã khóa từ B3, bổ sung các khóa kỹ thuật hữu ích của rule ảnh cảnh nhỏ nhưng KHÔNG nhập workflow phân cảnh/đạo diễn SMALL_SCENE.
+
+========================================================================================================================
+0. KHÓA PHẠM VI
+========================================================================================================================
+
+0.1. Mỗi dòng/câu trong văn bản theo dòng/câu người dùng cung cấp tương ứng đúng MỘT OUTPUT_SLOT_LINE và đúng MỘT IMAGE_PROMPT.
+
+TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT.
+
+Ví dụ:
+- tác phẩm có 360 dòng/câu → 360 IMAGE_PROMPT;
+- tác phẩm có 361 dòng/câu → 361 IMAGE_PROMPT.
+
+0.2. Không:
+- gộp hai OUTPUT_SLOT_LINE thành một IMAGE_PROMPT;
+- tách một OUTPUT_SLOT_LINE thành hai IMAGE_PROMPT độc lập;
+- bỏ OUTPUT_SLOT_LINE;
+- thêm IMAGE_PROMPT không có OUTPUT_SLOT_LINE nguồn;
+- đảo thứ tự OUTPUT_SLOT_LINE.
+
+0.3. IMAGE_PROMPT phải viết bằng tiếng Anh kỹ thuật tự nhiên, đủ rõ để gửi trực tiếp cho image generator.
+
+0.4. Công cụ tạo ảnh được giả định:
+- không biết dòng/câu trước;
+- không biết dòng/câu sau;
+- không biết prompt trước;
+- không nhớ ảnh trước;
+- chỉ thấy prompt hiện tại và các reference thực sự được gắn.
+
+Vì vậy:
+CONTINUITY dùng để phân tích.
+IMAGE_PROMPT cuối phải SELF-CONTAINED về:
+- ai/thực thể nào đang có mặt;
+- role reference;
+- current state;
+- size;
+- action/reaction;
+- spatial relation;
+- object state;
+- BG state;
+- camera/framing;
+- những khóa continuity cần thiết.
+
+0.5. KHÔNG nhập trở lại:
+- PARENT_SCENE workflow;
+- SMALL_SCENE workflow;
+- đạo diễn phân cảnh;
+- SMALL_SCENE_VISUAL_PLAN;
+- rule “source line chỉ khóa số lượng”;
+- rule “1 SMALL_SCENE = 1 IMAGE_PROMPT”.
+
+0.6. OUTPUT_SLOT_LINE được tạo trực tiếp từ từng dòng/câu và là đơn vị quota để tính số IMAGE_PROMPT.
+
+0.7. Mặc định SEMANTIC_ANALYSIS_WINDOW là nội dung của OUTPUT_SLOT_LINE hiện tại.
+
+0.8. Nếu dòng/câu hiện tại tự nó đã đủ nghĩa tạo hình thì không cần vay mượn nội dung của dòng/câu khác.
+
+0.9. Nếu dòng/câu hiện tại không đủ nghĩa, bị cụt, mơ hồ hoặc phụ thuộc ngữ cảnh thì được phép mở rộng SEMANTIC_ANALYSIS_WINDOW bằng nội dung liền kề để làm rõ nghĩa tạo hình.
+
+0.10. Khi cần làm rõ nghĩa, được phép vay mượn dòng/câu liền kề trước, sau, hoặc cả trước và sau, kể cả 2–3 dòng/câu liền kề, chỉ để làm rõ nghĩa tạo hình.
+
+0.11. Việc vay mượn SEMANTIC_ANALYSIS_WINDOW chỉ phục vụ phân tích nội dung, KHÔNG làm thay đổi TOTAL_IMAGE_PROMPT và KHÔNG làm thay đổi nguyên tắc 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+
+Trong master này:
+OUTPUT_SLOT HIỆN TẠI là authority nội dung trực tiếp của IMAGE_PROMPT.
+
+========================================================================================================================
+1. THỨ TỰ AUTHORITY + PHÂN VAI B3 / PROMPT CHAR/BG GẮN ID THAM CHIẾU
+========================================================================================================================
+
+Khi có xung đột, dùng thứ tự tổng quát:
+
+1. Yêu cầu mới nhất của người dùng.
+2. Nội dung thật của SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại.
+3. Continuity canon/source từ các OUTPUT_SLOT trước.
+4. B3 CHARACTER/CHAR/BG master hiện hành cho dữ liệu canon/state/scale/location.
+5. PROMPT CHAR/BG dạng TXT từ B4 gắn đúng ID CHAR_XX/BG_XX và exact reference state đã khóa; không yêu cầu ảnh tham chiếu thật hay bước người dùng duyệt ảnh.
+6. Mapping CHAR/BG hiện hành.
+7. Ngữ cảnh dòng/câu trước/sau dùng để resolve đại từ, timing, state, location và future leak.
+8. Quy tắc master này.
+9. Neutral production completion không làm đổi canon.
+
+PHÂN VAI CỤ THỂ:
+
+B3 là authority cho:
+- CHAR_ID / identity mapping;
+- entity type;
+- state;
+- timeline;
+- canonical SIZE_LOCK;
+- quan hệ CHAR ↔ state/reference;
+- LOCATION_KEY;
+- BG_ID;
+- BG state;
+- location continuity;
+- những khóa canon được ghi bằng dữ liệu dự án.
+
+PROMPT CHAR dạng TXT gắn CHAR_XX đã PASS/LOCK ở B3/B4 là dữ liệu mô tả thiết kế cho exact CHAR reference state về:
+- face appearance;
+- hair geometry/direction;
+- visible body appearance/proportions;
+- silhouette;
+- outfit appearance;
+- fixed visible accessories;
+- material/texture/visual style của reference đó.
+
+PROMPT BG dạng TXT gắn BG_XX đã PASS/LOCK ở B3/B4 là dữ liệu mô tả thiết kế cho exact BG reference state về:
+- visible architecture/terrain appearance;
+- landmark appearance;
+- material appearance;
+- visual layout/topology thể hiện trong canonical BG reference;
+- visual style của environment.
+
+KHÔNG được dùng nội dung PROMPT CHAR/BG gắn ID tham chiếu để âm thầm sửa:
+- timeline;
+- state;
+- SIZE_LOCK;
+- identity mapping;
+- location/BG_ID;
+nếu các dữ liệu đó bị xung đột với B3.
+
+Nếu nội dung PROMPT CHAR_XX/BG_XX (B4) và dữ liệu khóa B3 mâu thuẫn thật sự ở state/size/identity/location:
+→ báo REFERENCE_B3_CONFLICT;
+→ không tự chọn một bên rồi hợp thức hóa.
+
+Không được hy sinh nội dung đúng để làm ảnh “đẹp hơn” hoặc “cinematic hơn”.
+
+========================================================================================================================
+2. ĐIỀU KIỆN CẦN TRƯỚC KHI VIẾT PROMPT
+========================================================================================================================
+
+Trước mỗi OUTPUT_SLOT_LINE phải biết tối thiểu:
+
+OUTPUT_SLOT_ID:
+OUTPUT_SLOT_LINE_ID:
+SEMANTIC_ANALYSIS_WINDOW:
+SOURCE_LINES:
+CURRENT_VISUAL_MOMENT:
+PRIMARY_VISUAL_BEAT:
+REALITY_LAYER:
+ACTIVE_ENTITIES:
+PHYSICAL_ACTORS:
+VISUAL_SOURCE_REFERENCES:
+CURRENT_CHAR_STATE:
+CURRENT_OBJECT_STATE:
+CURRENT_BG:
+CURRENT_BG_STATE:
+TIME:
+WEATHER nếu có:
+CONTINUITY_FROM_PREVIOUS:
+FORBIDDEN_FUTURE_INFORMATION:
+PANEL_REQUIREMENT:
+REFERENCE_COUNT:
+
+Các trường trên là phân tích nội bộ, không bắt buộc xuất thành bảng.
+
+Nếu một dữ liệu canon cần thiết chưa xác định được và không thể resolve từ B3/source/context:
+- không bịa;
+- đánh dấu GAP ở tầng quản lý dữ liệu;
+- không tự tạo CHAR/BG/state mới trong IMAGE_PROMPT.
+
+========================================================================================================================
+3. PREVIOUS / CURRENT / NEXT — TIMING LOCK
+========================================================================================================================
+
+PREVIOUS:
+chỉ kế thừa những gì còn hiệu lực:
+- location;
+- outfit/state;
+- injury;
+- object holder;
+- weapon state;
+- door/open-close state;
+- broken/intact state;
+- position/direction nếu cảnh liên tục;
+- time/weather/environment damage.
+
+CURRENT:
+chỉ dựng nội dung thị giác thuộc SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại.
+
+NEXT:
+- dòng/câu liền kề nằm trong SEMANTIC_ANALYSIS_WINDOW hợp lệ được phép dùng để hoàn chỉnh ý tạo hình;
+- dòng/câu nằm ngoài SEMANTIC_ANALYSIS_WINDOW hoặc ở xa nhiều câu chỉ dùng để biết điều gì CHƯA được phép lộ.
+
+SEMANTIC_ANALYSIS_WINDOW:
+- mặc định bắt đầu từ nội dung của OUTPUT_SLOT hiện tại;
+- nếu dòng/câu hiện tại tự nó đã đủ nghĩa tạo hình thì giữ nguyên nội dung dòng/câu đó;
+- nếu dòng/câu hiện tại không đủ nghĩa, bị cụt, mơ hồ hoặc phụ thuộc ngữ cảnh thì được phép vay mượn dòng/câu liền kề trước, sau, hoặc cả trước và sau, kể cả 2–3 dòng/câu liền kề, chỉ để lấy đủ nghĩa tạo hình;
+- dừng mở rộng ngay khi đã đủ nghĩa để xác định đúng nội dung cần minh họa;
+- việc vay mượn chỉ phục vụ phân tích, không làm thay đổi TOTAL_IMAGE_PROMPT và không làm thay đổi nguyên tắc 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+
+CẤM:
+- lấy action của dòng/câu sau nằm ngoài SEMANTIC_ANALYSIS_WINDOW hợp lệ hoặc ở xa nhiều câu đưa về sớm;
+- đưa reveal/kết quả nằm ngoài SEMANTIC_ANALYSIS_WINDOW hợp lệ vào ảnh hiện tại;
+- cho nhân vật biết điều source chưa tiết lộ trong phạm vi ngữ nghĩa hợp lệ của prompt hiện tại;
+- reset injury/object/location/outfit từ dòng/câu trước;
+- minh họa chủ yếu nội dung nằm ngoài SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại.
+
+========================================================================================================================
+4. PRIMARY VISUAL BEAT
+========================================================================================================================
+
+Mỗi IMAGE_PROMPT phải có một PRIMARY_VISUAL_BEAT rõ.
+
+Có thể là:
+- establishing;
+- discovery;
+- pre-action;
+- action;
+- impact;
+- reaction;
+- revelation;
+- emotional beat;
+- transformation;
+- aftermath;
+- payoff;
+- transition.
+
+PRIMARY_VISUAL_BEAT phải:
+- thuộc SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại;
+- có thể nhìn thấy;
+- đọc được trong ảnh;
+- phù hợp ảnh tĩnh;
+- không đòi hỏi giải thích dài;
+- không vi phạm timing/continuity.
+
+Không nhồi mọi danh từ, mọi action beat vào ảnh chỉ vì chúng cùng nằm trong câu.
+
+========================================================================================================================
+5. CHAR REFERENCE — KHÓA MÔ TẢ TỐI THIỂU THEO QUY TẮC ẢNH CẢNH NHỎ
+========================================================================================================================
+
+5.1. Khi CHAR_XX đã có exact ID và PROMPT thiết kế TXT của reference state đã khóa, IMAGE_PROMPT KHÔNG được viết lại toàn bộ model sheet.
+
+Mỗi CHAR reference chỉ cần khai báo tối thiểu:
+
+CHAR_XX ([TÊN hoặc DANH XƯNG]) — [male / female / animal / creature / monster / spirit / object / other entity type], [SIZE_LOCK].
+
+Ví dụ logic:
+
+CHAR_01 (Noin) — male, 114 cm tall.
+CHAR_05 (mother mage) — female, 166 cm tall.
+CHAR_08 (giant fox spirit) — creature, canonical shoulder/back height and body length from B3 SIZE_LOCK.
+CHAR_12 (the sealed sword) — object, canonical physical size from B3 SIZE_LOCK.
+
+Tên/danh xưng trong ngoặc chỉ là semantic label để người viết/model phân biệt đúng CHAR.
+Nó KHÔNG phải nguồn để thiết kế lại ngoại hình.
+
+5.2. Exact reference chịu trách nhiệm cho:
+- face;
+- hair;
+- eyes;
+- body proportions;
+- canonical outfit/reference state;
+- fixed accessories;
+- species/body structure;
+- canonical visual design.
+
+Không cần restate tóc/mắt/mặt/outfit mỗi IMAGE_PROMPT nếu PROMPT CHAR_XX dạng TXT và state tương ứng đã khóa.
+
+5.3. Chỉ restate thêm một visual trait khi trait đó:
+- bắt buộc để phân biệt derivative entity;
+- thay đổi trong current state;
+- trực tiếp liên quan action;
+- rất dễ bị model làm sai dù đã có reference;
+- là continuity lock đặc biệt người dùng yêu cầu.
+
+5.4. SIZE_LOCK vẫn phải nhắc.
+
+Human/humanoid:
+- dùng chiều cao khóa từ B3.
+
+Phi nhân:
+- dùng canonical size phù hợp B3: height / back height / body length / wingspan / relative scale.
+
+Không tự bịa số đo mới.
+
+5.5. Cấu trúc khuyến nghị:
+
+Use CHAR_XX ([name/title]) as the exact locked visual reference for a [male/female/animal/creature/object/entity type], [canonical height/size]. Preserve the exact locked identity, reference state and physical scale; do not redesign the character.
+
+Không bắt buộc thêm child/adult/human hoặc các mô tả tuổi/loài dư thừa nếu exact reference đã đủ rõ.
+Chỉ thêm chúng khi CURRENT OUTPUT_SLOT thật sự cần phân biệt để tránh sai nghĩa hoặc sai identity.
+
+Sau đó đi thẳng vào:
+- current pose;
+- action;
+- expression;
+- spatial position;
+- interaction.
+
+5.6. REFERENCE ANTI-COPY
+
+Reference khóa DESIGN, không khóa staging của scene.
+
+Không mặc định sao chép:
+- pose;
+- action;
+- facial expression;
+- gaze;
+- camera;
+- framing;
+- composition;
+- staging.
+
+Khóa:
+
+Do not copy the reference-sheet pose, action, facial expression, gaze, camera, framing or staging unless the current OUTPUT_SLOT explicitly requires it.
+
+5.7. CHAR ĐƠN / CHAR_GROUP
+
+CHAR đơn và CHAR_GROUP đều là CHAR và tuân theo cùng các quy tắc CHAR hiện hành.
+
+CHAR_ID lấy từ bước trích xuất. Prompt dòng không xét lại điều kiện tạo CHAR bằng số IMAGE_PROMPT. CHAR_GROUP chỉ để giữ prompt không quá 10 ảnh tham chiếu, không phải tiêu chí cấp CHAR_ID mới.
+
+CHAR và BG đều là ảnh tham chiếu.
+Một prompt không viết trên 10 ảnh tham chiếu. Tổng CHAR + BG trong prompt tối đa là 10.
+Khi liệt kê đủ sẽ vượt 10, gom các nhân vật phụ vào CHAR_GROUP để prompt còn không quá 10 ảnh tham chiếu.
+Tổng đã trong mức 10 thì không gom.
+
+Khi đó có thể gom các nhân vật phụ phù hợp vào CHAR_GROUP để giảm số ID CHAR tham chiếu phải liệt kê trong IMAGE_PROMPT.
+
+Không ghép vào CHAR_GROUP bất kỳ nhân vật nào đang diễn chính trong IMAGE_PROMPT/cảnh hiện tại.
+
+Nhân vật diễn chính phải tiếp tục dùng CHAR reference riêng.
+
+Nếu tổng CHAR + BG không vượt 10 thì dùng CHAR đơn, không gom.
+
+========================================================================================================================
+6. NHÂN VẬT KHÔNG CÓ CHAR_ID
+========================================================================================================================
+
+Theo B3, identity chỉ xuất hiện một lần có thể không được cấp CHAR.
+
+Nếu current OUTPUT_SLOT có một subject không có CHAR_ID:
+- không tự cấp CHAR_XX;
+- mô tả trực tiếp subject theo source/B3 extraction đủ để dựng current scene;
+- không biến mô tả scene-only thành production reference mới;
+- không được dùng mô tả đó để tái định nghĩa CHAR khác.
+
+Background extras không cần CHAR_ID nếu:
+- không phải identity cần continuity;
+- source/context cho phép extras;
+- không bị nhầm với fixed character.
+
+========================================================================================================================
+7. PHYSICAL ACTOR / VISUAL-SOURCE REFERENCE
+========================================================================================================================
+
+Header có CHAR token không đồng nghĩa CHAR đó physically present.
+
+Phải phân biệt:
+
+A. PHYSICAL ACTOR
+CHAR thật có mặt trong scene.
+
+B. VISUAL-SOURCE REFERENCE
+CHAR chỉ làm nguồn ngoại hình cho:
+- clone;
+- decoy;
+- statue;
+- projection;
+- reflection;
+- illusion;
+- construct;
+- derivative object.
+
+Nếu CHAR chỉ là visual source:
+- phải nói rõ real CHAR không physically present;
+- không tạo thêm một bản sống của CHAR đó;
+- derivative entity phải được định nghĩa vật liệu/type/state/scale.
+
+Mẫu:
+
+Use CHAR_01 (Noin), male, 114 cm tall, strictly as the visual-source reference for the artificial ice replica. The real CHAR_01 is not physically present and must not appear separately. The replica reproduces the locked visible identity and canonical physical scale of CHAR_01 but is an inanimate ice construct.
+
+========================================================================================================================
+8. STATE LOCK
+========================================================================================================================
+
+Dùng đúng exact CHAR state đã khóa.
+
+Không:
+- child state ở adult timeline;
+- normal outfit khi current OUTPUT_SLOT đã chuyển armor state;
+- healthy state khi severe injury vẫn còn;
+- physical form thay spirit/transformed state;
+- wet/dirty/burnt persistent state bị reset;
+- reference state tương lai xuất hiện trước thời điểm hợp lệ.
+
+Emotion/pose/action/camera KHÔNG tạo CHAR state mới.
+
+Nếu current source yêu cầu state khác chưa có exact reference:
+- không âm thầm tái định nghĩa CHAR_ID cũ;
+- dùng state được B3/project cho phép hoặc báo GAP.
+
+========================================================================================================================
+9. OBJECT / WEAPON / TOOL CONTINUITY
+========================================================================================================================
+
+Không cần PROP_ID mới để một object có continuity.
+
+Theo dõi:
+- owner/current holder;
+- left/right hand nếu quan trọng;
+- position;
+- orientation;
+- intact/broken;
+- open/closed;
+- sheathed/drawn;
+- active/inactive;
+- held/dropped;
+- worn/carried/placed;
+- consumed/not consumed.
+
+CẤM:
+- kiếm đổi tay vô lý;
+- vật đã rơi tự về tay;
+- vật đã vỡ tự nguyên vẹn;
+- cửa tự đổi trạng thái;
+- item xuất hiện trước khi được nhận;
+- item đã tiêu thụ xuất hiện lại;
+- thêm special prop không có basis.
+
+Object quan trọng phải có:
+- vị trí;
+- contact;
+- orientation;
+- relation với người/môi trường đủ rõ.
+
+========================================================================================================================
+10. REALITY LAYER
+========================================================================================================================
+
+Mỗi prompt phải biết đang ở:
+
+PRESENT
+FLASHBACK
+MEMORY
+DREAM
+VISION
+ILLUSION
+PROJECTION
+REFLECTION
+OTHER CONFIRMED LAYER
+
+Với nội dung thuộc nhóm hồi tưởng / ký ức / suy nghĩ / inner image / dream / vision / fear / hypothetical / hope / plan / reported event:
+- phải resolve background qua B3 hiện hành;
+- dùng đúng BACKGROUND_VISUAL_MODE và exact numbered BG_XX do B3 khóa;
+- không dùng BG_00 như emotional/abstract fallback;
+- nếu nội dung là một past/thought location vật lý cụ thể thì có thể dùng PHYSICAL_BG đúng timeline/state;
+- nếu vẫn cần neo location hiện tại nhưng có lớp mental/emotional treatment thì dùng PHYSICAL_BG_PLUS_DYNAMIC khi B3 đã khóa;
+- nếu background chính là abstract/mental/emotional field thì chỉ dùng DYNAMIC_BG khi B3 đã khóa exact BG_XX đó.
+
+FLASHBACK:
+dùng đúng tuổi/outfit/injury/location state của quá khứ.
+
+MEMORY:
+không tự đưa người đang nhớ vào bên trong memory nếu source không có.
+
+DREAM/VISION:
+không coi là physical reality hiện tại.
+
+ILLUSION/PROJECTION/REFLECTION:
+phân biệt physical actor với visual representation.
+
+Không trộn reality layers chỉ để ảnh “ấn tượng”.
+
+========================================================================================================================
+11. TRANSFORMATION
+========================================================================================================================
+
+Nếu OUTPUT_SLOT mô tả transformation A → B, xác định đúng stage:
+
+PRE_TRANSFORMATION
+MID_TRANSFORMATION
+POST_TRANSFORMATION
+
+Không trộn hai canonical forms không thể cùng tồn tại trong cùng một panel.
+
+Nếu transformed state đã có CHAR reference:
+dùng đúng token/state đó.
+
+Nếu mid-transformation chưa có exact reference:
+- chỉ mô tả transition khi source cho phép;
+- không tự sáng tạo form trung gian thành canon mới.
+
+Nếu line bắt buộc thể hiện nhiều mốc không đồng hiện:
+xử lý bằng PANEL LOGIC ở mục 15.
+
+========================================================================================================================
+12. WORLD / PHYSICAL / MAGICAL EFFECT / FORCE
+========================================================================================================================
+
+Mục này chỉ điều chỉnh hiệu ứng THỰC SỰ TỒN TẠI TRONG THẾ GIỚI CÂU CHUYỆN hoặc tác động vật lý thật.
+
+Bao gồm ví dụ:
+- spell;
+- aura có thật trong canon;
+- lightning/magic circle/runes có thật;
+- fire/ice/water/wind effect có thật;
+- explosion;
+- physical debris;
+- shockwave vật lý;
+- dust/smoke từ action thật;
+- impact force có thật trong scene.
+
+Chỉ tạo WORLD/PHYSICAL/MAGICAL EFFECT khi source/current locked state xác nhận hoặc action vật lý hiện tại tất yếu tạo ra nó.
+
+Khi effect quan trọng, xác định:
+- source/caster;
+- origin;
+- direction;
+- target;
+- shape;
+- color nếu đã khóa;
+- current stage;
+- contact/impact;
+- environment reaction.
+
+Không tự thêm chỉ để fantasy/cinematic hơn:
+- aura;
+- lightning;
+- magic circle;
+- glowing eyes;
+- floating runes;
+- energy burst;
+nếu source/canon không hỗ trợ.
+
+Force/debris/motion phải cùng hướng vật lý hợp lý.
+World effect không được che mất key action/contact.
+
+PHÂN BIỆT BẮT BUỘC:
+
+WORLD/PHYSICAL/MAGICAL EFFECT
+= thứ thật sự xảy ra/tồn tại trong world của story
+→ cần source/canon/action basis.
+
+MANGA SYMBOLIC/MOTION EFFECT
+= ngôn ngữ đồ họa manga dùng để NHẤN cảm xúc/chuyển động đã có thật trong OUTPUT_SLOT
+→ không cần source viết nguyên văn “có dấu gân giận/speed line”;
+→ chỉ cần cảm xúc/chuyển động tương ứng đã được source xác nhận;
+→ điều chỉnh riêng tại mục 18A.
+
+Không được hiểu manga anger mark, stress line, speed line, impact emphasis là magic/world phenomenon trừ khi source thật sự định nghĩa như vậy.
+
+========================================================================================================================
+13. B3 BG AUTHORITY — CHỈ DÙNG BG MÀ B3 TẠO/LOCK
+========================================================================================================================
+
+13.1. B3 hiện hành là authority cho:
+- LOCATION_KEY;
+- BG_ID;
+- exact BG reference state;
+- RESOURCE_ROLE;
+- BACKGROUND_VISUAL_MODE;
+- BG_FUNCTION;
+- REALITY_LAYER;
+- CANONICAL_LOCATION_CONTEXT;
+- PHYSICAL_LOCATION_CONTEXT;
+- DYNAMIC_BG_CONCEPT;
+- fixed layout;
+- topology;
+- landmark;
+- material;
+- time/weather/physical state;
+- reuse/split state.
+
+13.2. B3 hiện hành chính thức có quyền tạo/khóa:
+- PHYSICAL_BG;
+- PHYSICAL_BG_PLUS_DYNAMIC;
+- DYNAMIC_BG;
+- emotional BG;
+- abstract manga BG;
+- thought / inner-image BG;
+- memory / flashback treatment BG;
+- dream / vision BG;
+- hypothetical visualization BG;
+- impact / motion / speed / threat / atmospheric danger BG;
+khi các resource/function đó thật sự cần cho sản xuất.
+
+Master IMAGE_PROMPT KHÔNG tự phát minh loại BG mới ngoài B3.
+
+`BG_00` KHÔNG còn là emotional background chung hoặc fallback.
+Mọi background resource phải dùng exact numbered `BG_XX` theo sequence hiện hành và đúng token/state do B3 khóa.
+
+Với current OUTPUT_SLOT thuộc hồi tưởng / memory / thought / inner image / dream / vision / fear / hypothetical / hope / plan / reported event:
+- dùng đúng routing B3 đã khóa;
+- không mặc định dùng DYNAMIC_BG chỉ vì nội dung phi hiện tại;
+- past/thought content có physical location cụ thể có thể dùng PHYSICAL_BG đúng timeline/state;
+- current physical location + mental/emotional treatment dùng PHYSICAL_BG_PLUS_DYNAMIC khi B3 khóa;
+- abstract/mental/emotional field chủ đạo dùng DYNAMIC_BG khi B3 khóa exact BG_XX.
+
+13.3. Mỗi IMAGE_PROMPT phải có ít nhất một BG_XX thích hợp với dòng đó.
+- Chọn BG đã tạo từ tác phẩm, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG khi dòng cần nhiều nơi hoặc nhiều trạng thái.
+- Cùng một nơi nhưng khác buổi, khác thời tiết hoặc khác trạng thái môi trường thì dùng đúng BG_XX của trạng thái đó. Không lấy BG buổi sáng rồi sửa thành đêm hoặc mưa bằng câu chữ.
+- Không tự đặt mã BG mới trong prompt dòng.
+- CHAR_XX và BG_XX trong prompt chỉ lấy từ bảng đã thống kê đồng bộ và đã LOCK ở bước trích xuất.
+- Không ghi CHAR_GAP hoặc BG_GAP thay cho prompt.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG đó từ tác phẩm ở bước trích xuất và bước prompt BG, theo 02_PROMPT_THAM_CHIEU_CHAR_BG.txt. Không dừng bằng GAP để né việc tạo BG.
+- Prompt dòng gọi BG đã tạo. Không tự đặt mã mới trong prompt dòng.
+
+========================================================================================================================
+14. PHYSICAL BG RECONSTRUCTION
+========================================================================================================================
+
+Với BG vật lý do B3 cấp:
+
+BG reference = ENVIRONMENT DESIGN LOCK.
+BG reference KHÔNG phải fixed camera image.
+
+Phải giữ:
+- canonical architecture/terrain;
+- fixed layout;
+- topology;
+- landmark relationships;
+- material language;
+- physical scale;
+- current environment state.
+
+Có thể đổi:
+- camera angle;
+- shot size;
+- framing;
+miễn không phá topology/layout.
+
+Mỗi scene phải xác định những yếu tố KHẢ DỤNG và CÓ THỂ THẤY trong frame:
+- CHAR/object đứng/ngồi/nằm/bay ở đâu;
+- foreground/midground/background khi framing cần;
+- perspective;
+- natural overlap/occlusion;
+- lighting interaction;
+- floor/surface contact khi subject thật sự chạm một bề mặt và phần contact nằm trong frame;
+- contact shadow khi có bề mặt tiếp xúc/đổ bóng phù hợp và phần đó nhìn thấy được;
+- ambient occlusion khi phù hợp với framing/ánh sáng.
+
+KHÔNG ép phải nhìn thấy:
+- chân;
+- sàn;
+- ground plane;
+- full landmark;
+- contact shadow;
+nếu framing hợp lý là close-up/medium close-up hoặc các phần đó nằm ngoài khung.
+
+Với subject đang bay/lơ lửng/không chạm bề mặt:
+- không tạo floor contact giả;
+- dùng scale cue, overlap, perspective, lighting và environment relation phù hợp để neo subject vào không gian.
+
+Không được tạo cảm giác character sheet bị dán lên background.
+
+Nếu bỏ CHAR ra mà ảnh vẫn chỉ là nguyên BG reference với cùng fixed camera/composition:
+→ phải tái dựng BG cho current OUTPUT_SLOT.
+
+========================================================================================================================
+15. PANEL LOGIC — 1 Ý CẦN MINH HỌA = 1 PANEL
+========================================================================================================================
+
+KHÓA CAO NHẤT:
+PHÂN TÍCH NỘI DUNG CỦA SEMANTIC_ANALYSIS_WINDOW ĐÃ KHÓA CHO OUTPUT_SLOT HIỆN TẠI ĐỂ XÁC ĐỊNH CÓ BAO NHIÊU Ý CẦN MINH HỌA.
+
+1 Ý CẦN MINH HỌA = 1 PANEL.
+2 Ý CẦN MINH HỌA = 2 PANEL.
+3 Ý CẦN MINH HỌA = 3 PANEL.
+N Ý CẦN MINH HỌA = N PANEL.
+
+15.1. CÁCH XÁC ĐỊNH
+
+Đọc SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT và phân tích các ý cần được thể hiện bằng hình ảnh.
+
+Mỗi ý cần minh họa tương ứng đúng MỘT panel.
+
+Không tự thêm ý ngoài source/SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT.
+
+15.2. SINGLE_PANEL
+
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT chỉ có MỘT ý cần minh họa:
+→ dùng SINGLE_PANEL.
+
+15.3. MULTI_PANEL
+
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT có từ HAI ý cần minh họa trở lên:
+→ dùng MULTI_PANEL.
+
+Số panel:
+= đúng số ý cần minh họa.
+
+Thứ tự panel:
+= đúng thứ tự các ý xuất hiện trong SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT.
+
+CẤM:
+- gộp nhiều ý cần minh họa vào một panel;
+- tách một ý cần minh họa thành nhiều panel;
+- bỏ ý;
+- lặp ý;
+- đảo thứ tự ý.
+
+15.4. Mỗi panel phải:
+- minh họa đúng một ý tương ứng;
+- có temporal/reality identity rõ;
+- khai báo đúng CHAR/BG cần cho panel;
+- giữ same identity/scale;
+- giữ continuity;
+- self-contained đủ để model hiểu;
+- không dựa vào panel trước để “nhớ”.
+
+15.5. CROSS-PANEL ISOLATION
+
+Keep all panels visually isolated. Do not transfer, duplicate, merge or leak characters, derivative entities, props, architecture, lighting states or panel-specific elements across panels unless explicitly assigned to both panels.
+
+15.6. Nếu cùng CHAR xuất hiện qua nhiều panel:
+- exact design giữ nguyên;
+- size giữ nguyên;
+- chỉ state thay đổi khi source thật sự thay đổi.
+
+========================================================================================================================
+16. SPATIAL STAGING
+========================================================================================================================
+
+Mỗi subject quan trọng phải có đủ vị trí cần thiết:
+
+FRAME POSITION:
+- left/center/right;
+- foreground/midground/background;
+- nearer/farther;
+- main/secondary subject.
+
+ENVIRONMENT POSITION:
+- beside doorway;
+- against wall;
+- center of road;
+- on bed;
+- behind table;
+- at stairs;
+- above ground;
+- etc.
+
+RELATION:
+- facing;
+- behind;
+- beside;
+- distance;
+- actor-target line;
+- eye-line;
+- occlusion;
+- object between/next to/on/under.
+
+SURFACE CONTACT / SPACE ANCHOR:
+- nếu chân/bàn chân nhìn thấy và subject đứng trên bề mặt → phải đúng đất/sàn;
+- nếu vật đặt trên surface và phần tiếp xúc nhìn thấy → phải đúng contact;
+- contact shadow/ambient occlusion chỉ bắt buộc khi vật lý và framing cần;
+- close-up không bị ép phải lộ chân/sàn;
+- subject bay/lơ lửng không bị ép có floor contact;
+- trong mọi trường hợp vẫn phải giữ perspective, scale cue, overlap/occlusion và lighting interaction đủ để subject thuộc cùng không gian.
+
+Không để image generator phải tự đoán toàn bộ staging.
+
+========================================================================================================================
+17. EXPRESSION / BODY LANGUAGE — VISUALIZATION FIRST
+========================================================================================================================
+
+Không chỉ viết:
+generic angry face
+generic shocked face
+neutral expression
+sad
+conflicted
+embarrassed
+afraid
+
+Phải chuyển thành dấu hiệu nhìn thấy được khi cảm xúc quan trọng:
+
+- eye focus;
+- eyelid tension;
+- brow angle;
+- mouth shape;
+- jaw;
+- chin;
+- shoulder/neck tension;
+- torso lean;
+- hand tension;
+- weight shift;
+- spacing;
+- gaze direction.
+
+Nội tâm/narration/nghĩa bóng không được chép thành lời giải thích dài.
+
+Quy trình:
+1. hiểu nội dung ẩn;
+2. chọn reaction surface;
+3. chọn 2–5 visual cues mạnh nhất;
+4. viết thành visual acting.
+
+========================================================================================================================
+17A. ADJACENT VISUAL REPETITION / CONTENT VISUALIZATION LOCK
+========================================================================================================================
+
+MỤC ĐÍCH:
+
+Ngăn nhiều IMAGE_PROMPT liền kề tạo ra các hình ảnh gần như giống nhau chỉ vì trạng thái vật lý bên ngoài của nhân vật/cảnh ít thay đổi trong một đoạn văn bản dài.
+
+Quy tắc này áp dụng cho MỌI trường hợp, không chỉ nội tâm/suy nghĩ.
+
+Có thể gồm:
+- nhân vật suy nghĩ lâu;
+- hai hoặc nhiều nhân vật hội thoại lâu;
+- một nhân vật ngồi nghe người khác giải thích;
+- nhân vật đọc sách/tài liệu;
+- nhân vật chờ đợi;
+- nhân vật nằm nghỉ hoặc hồi phục;
+- cuộc họp dài;
+- bữa ăn dài;
+- lớp học/bài giảng;
+- thẩm vấn/phỏng vấn/thương lượng;
+- nhân vật quan sát một sự việc;
+- nhân vật phân tích đối thủ/trận chiến;
+- nhân vật di chuyển trong thời gian dài;
+- nhân vật luyện tập một hành động lặp lại;
+- narrator giải thích worldbuilding/lịch sử/hệ thống/ma pháp/tổ chức/địa điểm;
+- đoạn hồi tưởng;
+- đoạn kể lại sự kiện;
+- đoạn giải thích nguyên nhân/hậu quả;
+- đoạn lập kế hoạch;
+- đoạn cân nhắc lựa chọn;
+- đoạn lo sợ/hy vọng/tưởng tượng một khả năng;
+- hoặc bất kỳ chuỗi OUTPUT_SLOT nào mà hình ảnh vật lý bên ngoài có nguy cơ lặp lại.
+
+NGUYÊN TẮC CỐT LÕI:
+
+Không được mặc định lấy HÀNH ĐỘNG VẬT LÝ HIỆN TẠI làm nguồn hình ảnh duy nhất.
+
+Phải phân tích TOÀN BỘ NỘI DUNG CÓ THỂ TRỰC QUAN HÓA của SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT.
+
+Nếu nhiều OUTPUT_SLOT liền kề có:
+- cùng nhân vật;
+- cùng location/BG;
+- cùng tư thế hoặc hành động vật lý chính;
+- cùng trạng thái bên ngoài;
+- và nếu dựng literal sẽ tạo ra các ảnh gần như giống nhau;
+
+→ phải kiểm tra VISUAL_REPETITION_RISK trước khi viết IMAGE_PROMPT.
+
+Các OUTPUT_SLOT liền kề chỉ được dùng để:
+- nhận biết nguy cơ lặp hình;
+- hiểu đúng nghĩa của SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT;
+- giữ continuity;
+- xác định nội dung nào đã được thiết lập và vẫn còn hiệu lực.
+
+Không được lấy event/action/reveal nằm ngoài SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT chỉ để làm ảnh khác đi.
+
+SEMANTIC_ANALYSIS_WINDOW đã khóa cho CURRENT OUTPUT_SLOT là authority nội dung trực tiếp của IMAGE_PROMPT.
+
+========================================================================================================================
+17A.1. NGUỒN HÌNH ẢNH ĐƯỢC PHÉP KHAI THÁC
+========================================================================================================================
+
+Khi trạng thái vật lý hiện tại có nguy cơ tạo ảnh lặp, phải tìm hình ảnh từ chính nội dung SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT theo các hướng sau nếu áp dụng:
+
+A. CURRENT PHYSICAL REALITY
+- hành động thực đang xảy ra;
+- reaction thực;
+- object interaction;
+- environment interaction;
+- thay đổi state thực;
+- thay đổi vị trí thực;
+- chi tiết vật lý mới thực sự có trong SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT.
+
+B. PERSON / ENTITY BEING REFERENCED
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT đang nói, nghĩ, nhớ, phân tích hoặc nhắc đến một người/thực thể cụ thể:
+- có thể minh họa trực tiếp người/thực thể đó;
+- không bắt buộc nhân vật đang nói/nghĩ phải xuất hiện;
+- phải dùng đúng identity/state/timeline được source/B3/context hỗ trợ.
+
+C. OBJECT / ITEM / WEAPON / TOOL BEING REFERENCED
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT tập trung vào một vật, vũ khí, vật phẩm, công cụ, artefact hoặc đối tượng cụ thể:
+- có thể lấy chính đối tượng đó làm chủ thể hình ảnh;
+- có thể minh họa cách nó được dùng, trạng thái hoặc đặc điểm mà current OUTPUT_SLOT đang đề cập nếu source hỗ trợ.
+
+D. LOCATION / ENVIRONMENT BEING REFERENCED
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT nói hoặc nghĩ về một địa điểm:
+- có thể minh họa trực tiếp địa điểm đó;
+- dùng đúng BG/location/state đã được B3/source/context hỗ trợ;
+- không tự invent location/state mới.
+
+E. PAST EVENT / MEMORY
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT nhớ lại hoặc đề cập đến một sự kiện quá khứ:
+- có thể minh họa trực tiếp sự kiện/khoảnh khắc quá khứ đó;
+- không bắt buộc current physical character phải xuất hiện;
+- phải đúng past state/age/outfit/location/timeline;
+- không thêm chi tiết quá khứ không có basis.
+
+F. REPORTED / DESCRIBED EVENT
+Nếu một nhân vật hoặc narrator đang kể/giải thích một sự kiện:
+- có thể minh họa trực tiếp sự kiện được kể;
+- không bắt buộc chỉ vẽ người đang kể;
+- hình ảnh phải bám đúng phần sự kiện mà SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT đang truyền đạt.
+
+G. THOUGHT / INNER IMAGE
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT là nội tâm hoặc suy nghĩ:
+- có thể minh họa nhân vật đang suy nghĩ;
+- có thể minh họa nhân vật đang suy nghĩ + hình ảnh nội dung suy nghĩ;
+- có thể chỉ minh họa trực tiếp nội dung suy nghĩ mà không cần nhân vật đang suy nghĩ xuất hiện.
+
+Không mặc định hình “nhân vật ngồi/đứng suy nghĩ” là lựa chọn chính.
+
+H. FEAR / WORRY / DANGER POSSIBILITY
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT mô tả điều nhân vật đang lo, sợ hoặc cho rằng có thể xảy ra:
+- có thể minh họa trực tiếp viễn cảnh đang được lo/sợ;
+- phải làm rõ đây là feared/imagined/hypothetical visualization nếu sự việc chưa thực sự xảy ra;
+- không được biến khả năng thành canon fact.
+
+I. HOPE / DESIRE / GOAL
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT mô tả điều nhân vật mong muốn, hy vọng hoặc hướng tới:
+- có thể minh họa mục tiêu/kết quả mà nhân vật đang nghĩ tới nếu source đủ basis;
+- không được thể hiện như kết quả đã thực sự xảy ra nếu timeline chưa tới.
+
+J. PLAN / STRATEGY
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT mô tả kế hoạch hoặc chiến thuật:
+- có thể minh họa mục tiêu;
+- đối tượng;
+- vị trí;
+- hành động dự kiến;
+- hoặc kết quả được dự tính;
+miễn current OUTPUT_SLOT/source thực sự hỗ trợ.
+
+Không biến kế hoạch thành sự kiện đã xảy ra.
+
+K. CHOICE / COMPARISON
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT cân nhắc:
+- A hoặc B;
+- hai người;
+- hai sức mạnh;
+- hai cách làm;
+- hai kết quả;
+- trước và sau;
+- lợi và hại;
+
+có thể trực quan hóa các đối tượng/khả năng đang được so sánh.
+
+Nếu đó là nhiều ý cần minh họa riêng:
+→ tuân thủ mục 15: 1 ý cần minh họa = 1 panel.
+
+L. CAUSE / CONSEQUENCE
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT giải thích:
+- nguyên nhân;
+- tác nhân;
+- hậu quả;
+- kết quả;
+- quan hệ nguyên nhân → kết quả;
+
+có thể minh họa trực tiếp phần cause/consequence tương ứng với ý hiện tại.
+
+M. RELATIONSHIP / CHARACTER HISTORY
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT nói về quan hệ hoặc lịch sử giữa các nhân vật:
+- có thể minh họa một khoảnh khắc/sự kiện có thật hỗ trợ đúng nội dung đó;
+- không invent romantic intent, conflict hoặc relationship event mới.
+
+N. WORLDBUILDING / HISTORY / LORE
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT giải thích:
+- quốc gia;
+- thành phố;
+- tổ chức;
+- chủng tộc;
+- lịch sử;
+- tôn giáo;
+- xã hội;
+- luật lệ;
+- văn hóa;
+- dungeon;
+- địa lý;
+- hệ thống thế giới;
+
+có thể minh họa trực tiếp đối tượng/world element đang được giải thích thay vì giữ nguyên cảnh vật lý của narrator/character.
+
+O. SYSTEM / SKILL / MAGIC / MECHANIC / PROCESS
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT giải thích:
+- skill;
+- class;
+- rank;
+- ma pháp;
+- năng lực;
+- cơ chế;
+- quy trình;
+- cách vận hành;
+- điểm mạnh/yếu;
+- giới hạn;
+
+có thể minh họa trực tiếp đối tượng hoặc hiệu quả/cơ chế đang được giải thích nếu source/canon hỗ trợ.
+
+Không tự thêm hiệu ứng, mechanic hoặc capability mới.
+
+P. OPPONENT / THREAT ANALYSIS
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT phân tích đối thủ/nguy hiểm:
+- có thể chuyển trọng tâm sang đối thủ;
+- điểm mạnh/yếu;
+- hành động;
+- vũ khí;
+- năng lực;
+- vị trí;
+- nguy cơ cụ thể;
+nếu current OUTPUT_SLOT/source có basis.
+
+Q. OBSERVATION TARGET
+Nếu nhân vật đang nhìn/quan sát một đối tượng hoặc sự việc trong thời gian dài:
+- không bắt buộc mọi ảnh đều là nhân vật “đang nhìn”;
+- có thể chuyển trọng tâm sang chính thứ đang được quan sát;
+- chi tiết được chú ý;
+- reaction khi nội dung reaction thực sự thay đổi.
+
+R. READING / LISTENING / EXPLANATION
+Nếu nhân vật đang:
+- đọc;
+- nghe;
+- học;
+- được giải thích;
+- nghe báo cáo;
+- nghe kể chuyện;
+
+không bắt buộc mọi ảnh đều giữ hình “đang đọc/đang nghe”.
+
+Có thể trực quan hóa:
+- nội dung tài liệu;
+- người/vật/sự kiện được nhắc tới;
+- kiến thức được giải thích;
+- reaction mới nếu reaction là nội dung chính.
+
+S. LONG CONVERSATION / MEETING / NEGOTIATION
+Nếu nhiều OUTPUT_SLOT là hội thoại dài trong cùng một vị trí:
+- không được mặc định lặp cùng bố cục các nhân vật nói chuyện;
+- có thể minh họa content được nói tới khi content có thể trực quan hóa;
+- có thể ưu tiên speaker/reaction/relationship shift khi đó là ý hiện tại;
+- có thể minh họa sự kiện/người/vật/địa điểm được cuộc nói chuyện đề cập.
+
+T. TRAVEL / WAITING / REST / RECOVERY
+Nếu hành động vật lý chính kéo dài và ít thay đổi:
+- có thể khai thác environment/state/time/object/person/content mà current OUTPUT_SLOT đang tập trung;
+- chỉ dùng thay đổi thời gian, thời tiết, location, injury, object state khi source/continuity thực sự xác nhận;
+- không tự tạo biến cố mới để chống lặp.
+
+U. REPETITIVE PHYSICAL ACTION
+Nếu current sequence là một hành động lặp lại như:
+- luyện tập;
+- làm việc;
+- chế tạo;
+- thu hoạch;
+- đi bộ;
+- chiến đấu kéo dài với cùng động tác nền;
+
+phải ưu tiên các phase, result, target, contact, reaction, object state hoặc progress thật sự được current OUTPUT_SLOT mô tả.
+
+Không tự tạo action mới chỉ để khác hình.
+
+========================================================================================================================
+17A.2. BA DẠNG TRỰC QUAN HÓA HỢP LỆ
+========================================================================================================================
+
+Tùy current OUTPUT_SLOT, có thể chọn một trong ba dạng:
+
+MODE A — CURRENT REALITY ONLY
+Chỉ minh họa cảnh vật lý hiện tại khi chính cảnh hiện tại là cách tốt nhất để thể hiện ý.
+
+MODE B — CURRENT REALITY + CONTENT VISUALIZATION
+Giữ nhân vật/cảnh hiện tại và đồng thời thể hiện hình ảnh nội dung đang:
+- được nghĩ tới;
+- được nhớ tới;
+- được kể;
+- được giải thích;
+- được phân tích;
+- được lo sợ;
+- được hy vọng;
+- được lập kế hoạch;
+- được so sánh.
+
+Nội dung bổ sung phải cùng phục vụ MỘT ý hiện tại nếu vẫn nằm trong một panel.
+
+Không dùng speech bubble/thought bubble/text để thể hiện nội dung đó.
+
+MODE C — CONTENT VISUALIZATION ONLY
+Có thể bỏ hoàn toàn hình nhân vật/cảnh vật lý hiện tại và chỉ minh họa trực tiếp nội dung đang được đề cập nếu:
+- nội dung đó là visual core của current OUTPUT_SLOT;
+- cách này truyền đạt ý rõ hơn;
+- không làm sai source;
+- không làm người xem hiểu nhầm reality/timeline.
+
+KHÓA MANGA — SUY NGHĨ, HỒI TƯỞNG, VIỆC SẮP TỚI:
+Suy nghĩ, hồi tưởng hoặc việc sắp tới là một BG khác.
+Được dùng BG hồi tưởng thay cho BG hiện tại.
+Được kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga.
+Cả hai cách đều hợp lệ.
+CHAR và BG trong prompt đó cộng lại không quá 10 ảnh tham chiếu.
+Vẽ BG hồi tưởng hoặc kết hợp hai BG không phải FUTURE_LEAK.
+FUTURE_LEAK chỉ khi prompt biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+
+Không bắt buộc nhân vật đang nghĩ/nói/nghe/đọc phải xuất hiện trong ảnh.
+
+========================================================================================================================
+17A.3. REALITY / TIME / KNOWLEDGE LOCK
+========================================================================================================================
+
+Khi trực quan hóa nội dung không thuộc physical present, phải xác định đúng loại:
+
+- PRESENT FACT;
+- PAST EVENT;
+- MEMORY;
+- REPORTED EVENT;
+- THOUGHT;
+- IMAGINED POSSIBILITY;
+- FEAR;
+- HOPE;
+- PLAN;
+- PREDICTION;
+- HYPOTHETICAL;
+- DREAM;
+- VISION;
+- ILLUSION;
+- OTHER CONFIRMED LAYER.
+
+Không được:
+- biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+- Dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp hai BG theo hiệu ứng manga, là cách vẽ hợp lệ.
+- biến FEAR thành sự kiện đã xảy ra;
+- biến HOPE thành kết quả đã đạt được;
+- biến PLAN thành hành động đã thực hiện;
+- biến PREDICTION thành canon fact;
+- biến HYPOTHETICAL thành event thật;
+- kéo knowledge/reveal từ tương lai về current OUTPUT_SLOT.
+
+Nếu visual layer có nguy cơ gây hiểu nhầm:
+→ prompt phải nói rõ bản chất memory / imagined / feared / planned / hypothetical / reported của hình ảnh.
+
+========================================================================================================================
+17A.4. QUAN HỆ VỚI QUY TẮC PANEL
+========================================================================================================================
+
+Quy tắc mục 15 vẫn giữ nguyên.
+
+1 ý cần minh họa = 1 panel.
+N ý cần minh họa = N panel.
+
+Ví dụ:
+
+“A đang nghĩ về B”
+= có thể vẫn là MỘT ý.
+
+Panel đó có thể:
+- chỉ có A đang nghĩ;
+- A + hình ảnh B;
+- hoặc chỉ hình ảnh B;
+tùy cách nào minh họa đúng ý tốt nhất.
+
+Không được tự tăng panel chỉ vì dùng content visualization.
+
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT thực sự có nhiều ý cần minh họa riêng:
+→ chia đúng số panel theo mục 15.
+
+========================================================================================================================
+17A.5. ADJACENT VISUAL REPETITION CHECK
+========================================================================================================================
+
+Trước khi khóa IMAGE_PROMPT của current OUTPUT_SLOT, phải nhìn các OUTPUT_SLOT liền kề đủ để phát hiện việc lặp hình.
+
+VISUAL_REPETITION_RISK tồn tại khi các ảnh liền kề có nguy cơ cùng đọc thành gần như một hình vì chúng giữ gần như cùng:
+- primary subject;
+- physical action/pose;
+- location/BG;
+- current state;
+- interaction;
+- visual emphasis;
+
+trong khi nội dung văn bản thực tế đang truyền đạt các ý/thông tin khác nhau có thể trực quan hóa.
+
+Khi VISUAL_REPETITION_RISK = TRUE:
+
+1. Không được giải quyết chỉ bằng đổi camera.
+2. Không được giải quyết chỉ bằng crop/zoom.
+3. Không được giải quyết chỉ bằng đổi left/right.
+4. Không được giải quyết chỉ bằng đổi expression rất nhẹ.
+5. Không được bịa action/event/prop/character/BG mới.
+
+Phải ưu tiên theo thứ tự:
+
+A. trực quan hóa nội dung riêng của SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT;
+B. chuyển trọng tâm sang person/object/location/event/concept được SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT đề cập;
+C. dùng memory/reported/thought/plan/fear/hope/hypothetical visualization khi đúng bản chất source;
+D. dùng reaction/interaction/physical detail thật sự khác khi SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT có;
+E. chỉ khi không còn nội dung thị giác nào khác hợp lệ mới dùng variation về:
+- expression;
+- gaze;
+- body language;
+- staging;
+- framing;
+- camera;
+- foreground/background emphasis.
+
+Camera variation là phương án CUỐI để giảm cảm giác lặp.
+Camera variation không được thay thế content visualization khi SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT có nội dung khác đủ để minh họa.
+
+========================================================================================================================
+17A.6. KHÔNG BỊA ĐỂ CHỐNG LẶP
+========================================================================================================================
+
+Mục tiêu chống lặp hình KHÔNG cho phép sáng tạo event mới.
+
+CẤM tự thêm:
+- hành động mới;
+- sự kiện mới;
+- nhân vật mới;
+- creature mới;
+- object/weapon/item quan trọng mới;
+- location mới;
+- BG state mới;
+- injury mới;
+- destruction mới;
+- magic mới;
+- power mới;
+- relationship mới;
+- memory mới;
+- backstory mới;
+- plan mới;
+- fear mới;
+- hope mới;
+- result mới;
+- future event;
+- lore mới;
+
+chỉ để làm ảnh khác với ảnh trước.
+
+Mọi sự khác biệt thị giác phải có basis từ:
+- SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT;
+- source;
+- B3;
+- continuity hợp lệ;
+- hoặc neutral production completion được mục 22 cho phép.
+
+========================================================================================================================
+17A.7. KHÔNG ÉP KHÁC HÌNH KHI SOURCE THỰC SỰ KHÔNG CÓ GÌ KHÁC
+========================================================================================================================
+
+Nếu SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT và context thật sự không cung cấp bất kỳ nội dung thị giác khác nào ngoài cùng một trạng thái vật lý:
+
+- không bịa nội dung để tạo khác biệt;
+- không kéo nội dung từ line khác;
+- không kéo future event;
+- không phá continuity.
+
+Khi đó được phép giữ cùng trạng thái và chỉ variation hợp lý ở mức:
+- expression;
+- gaze;
+- body language;
+- staging;
+- framing;
+- camera;
+- visible environment emphasis;
+
+miễn vẫn đúng SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT.
+
+SOURCE ACCURACY > FORCED VISUAL VARIETY.
+
+========================================================================================================================
+17A.8. VÍ DỤ NGUYÊN LÝ
+========================================================================================================================
+
+VÍ DỤ 1 — NỘI TÂM DÀI
+
+Chuỗi văn bản:
+- A đang ở trong phòng;
+- nghĩ về người thân trong quá khứ;
+- nhớ một sự kiện đã xảy ra;
+- lo về nguy cơ sắp tới;
+- cân nhắc hai lựa chọn.
+
+Không được mặc định tạo toàn bộ thành:
+A trong phòng → A trong phòng → A trong phòng → A trong phòng → A trong phòng.
+
+Có thể lần lượt ưu tiên:
+- current physical state khi cần thiết lập;
+- người trong quá khứ;
+- sự kiện được nhớ;
+- feared possibility;
+- lựa chọn đang cân nhắc.
+
+Mọi hình phải bám đúng nội dung của OUTPUT_SLOT tương ứng.
+
+VÍ DỤ 2 — HỘI THOẠI DÀI
+
+A và B đứng trong một phòng.
+B kể rằng một thành phố đã bị quái vật tấn công.
+B giải thích khả năng hồi phục của quái vật.
+B nói đoàn hiệp sĩ trước đó đã thất bại.
+
+Không bắt buộc mọi ảnh là A và B đứng nói chuyện.
+
+Tùy current OUTPUT_SLOT có thể minh họa:
+- A và B khi conversation/reaction là ý chính;
+- thành phố bị tấn công;
+- khả năng hồi phục của quái vật;
+- sự thất bại của đoàn hiệp sĩ.
+
+Không được thêm chi tiết ngoài source/B3/context.
+
+VÍ DỤ 3 — WORLDBUILDING TRONG CẢNH TĨNH
+
+Nhân vật vẫn ở cùng một phương tiện/địa điểm trong khi narrator giải thích:
+- vương quốc;
+- thủ đô;
+- học viện;
+- hệ thống quý tộc.
+
+Không bắt buộc lặp cùng một ảnh nhân vật/phương tiện.
+
+Có thể minh họa trực tiếp từng đối tượng worldbuilding tương ứng nếu current OUTPUT_SLOT đủ basis và B3/resource cho phép.
+
+VÍ DỤ 4 — ĐỌC / NGHE / HỌC
+
+Nhân vật ngồi đọc một tài liệu trong nhiều OUTPUT_SLOT.
+Nội dung tài liệu lần lượt nói về:
+- một tổ chức;
+- một artefact;
+- một cuộc chiến;
+- một nhân vật lịch sử.
+
+Không bắt buộc mọi ảnh đều là nhân vật cầm sách.
+
+Có thể dùng content visualization tương ứng với nội dung mỗi OUTPUT_SLOT.
+
+VÍ DỤ 5 — CHỜ ĐỢI / HỒI PHỤC / NGHỈ
+
+Nếu nhân vật gần như không di chuyển nhưng current OUTPUT_SLOT thay đổi trọng tâm sang:
+- vết thương;
+- vật đang cầm;
+- người đang nhớ;
+- âm thanh/sự việc được quan sát;
+- mối nguy được nhắc tới;
+- mục tiêu sắp tới;
+
+có thể chuyển visual focus sang đúng đối tượng đó.
+
+Nếu không có nội dung khác:
+→ giữ current physical reality và chỉ variation hợp lý, không invent.
+
+========================================================================================================================
+17A.9. QA — ADJACENT VISUAL REPETITION
+========================================================================================================================
+
+Trước khi PASS current IMAGE_PROMPT, kiểm tra khi áp dụng:
+
+[ ] Đã nhìn các OUTPUT_SLOT liền kề đủ để nhận biết nguy cơ lặp hình.
+[ ] SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT là authority nội dung trực tiếp.
+[ ] Không lấy action/event/reveal của line khác chỉ để tạo khác biệt.
+[ ] Nếu physical scene lặp nhưng content thay đổi, đã ưu tiên trực quan hóa content hiện tại.
+[ ] Không mặc định nhân vật đang nghĩ/nói/nghe/đọc phải luôn xuất hiện.
+[ ] Memory/past/report/thought/fear/hope/plan/hypothetical được phân biệt đúng reality/time.
+[ ] Không biến khả năng hoặc suy nghĩ thành canon fact.
+[ ] Không future leak.
+[ ] Không invent event/action/prop/character/BG/state để chống lặp.
+[ ] Không dùng camera-only variation khi SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT có content khác rõ ràng có thể minh họa.
+[ ] Nếu source thật sự không có visual alternative, variation chỉ ở mức hợp lý và không bịa.
+[ ] Quy tắc 1 ý cần minh họa = 1 panel vẫn được giữ đúng.
+[ ] Continuity CHAR/BG/state/object/scale vẫn đúng.
+
+FAIL khi:
+- ADJACENT_VISUAL_REPETITION_IGNORED;
+- CONTENT_VISUALIZATION_OPPORTUNITY_IGNORED gây chuỗi ảnh lặp không cần thiết;
+- CAMERA_ONLY_ANTI_REPETITION khi source có content khác đủ để trực quan hóa;
+- INVENTED_VARIATION_CONTENT;
+- WRONG_VISUALIZED_REALITY_LAYER;
+- BORROWED_ADJACENT_EVENT_FOR_VARIETY;
+- FUTURE_CONTENT_USED_FOR_VARIETY.
+
+========================================================================================================================
+17A.10. CÂU KHÓA CUỐI
+========================================================================================================================
+
+KHÔNG ĐƯỢC HIỂU:
+“Mỗi OUTPUT_SLOT phải minh họa đúng hành động vật lý bên ngoài đang diễn ra và không được nhìn vào nội dung được nói/nghĩ/nhớ/giải thích.”
+
+PHẢI HIỂU:
+
+SEMANTIC_ANALYSIS_WINDOW ĐÃ KHÓA CHO CURRENT OUTPUT_SLOT
+→ phân tích TOÀN BỘ nội dung có thể trực quan hóa
+→ chọn hình ảnh truyền đạt đúng ý nhất
+→ ưu tiên tránh lặp hình không cần thiết với các OUTPUT_SLOT liền kề
+→ nhưng không bịa, không future leak, không phá reality layer, không phá continuity.
+
+HÀNH ĐỘNG VẬT LÝ HIỆN TẠI
+KHÔNG PHẢI
+NGUỒN HÌNH ẢNH DUY NHẤT.
+
+NỘI DUNG ĐƯỢC NÓI TỚI / NGHĨ TỚI / NHỚ TỚI / KỂ TỚI / GIẢI THÍCH / PHÂN TÍCH / LO SỢ / HY VỌNG / LẬP KẾ HOẠCH
+CÓ THỂ TRỞ THÀNH HÌNH ẢNH MINH HỌA
+KHI SEMANTIC_ANALYSIS_WINDOW ĐÃ KHÓA CHO CURRENT OUTPUT_SLOT THỰC SỰ HỖ TRỢ.
+
+NẾU NỘI DUNG VĂN BẢN THAY ĐỔI VÀ CÓ THỂ TRỰC QUAN HÓA,
+KHÔNG ĐƯỢC ĐỂ CHUỖI ẢNH LẶP LẠI CHỈ VÌ TRẠNG THÁI VẬT LÝ BÊN NGOÀI KHÔNG THAY ĐỔI.
+
+NẾU SOURCE THỰC SỰ KHÔNG CÓ NỘI DUNG THỊ GIÁC KHÁC,
+KHÔNG ĐƯỢC BỊA CHỈ ĐỂ LÀM ẢNH KHÁC NHAU.
+
+========================================================================================================================
+18. ACTION FRAME / MOTION
+========================================================================================================================
+
+Nếu current moment là action:
+- chọn exact static moment phù hợp;
+- thể hiện anticipation / mid-action / impact / recoil / aftermath tùy OUTPUT_SLOT;
+- không trộn nhiều time stages trên cùng một panel.
+
+Motion cues khi source hỗ trợ:
+- hair;
+- cloth;
+- debris;
+- dust;
+- frost;
+- particles;
+- motion streaks;
+- environment reaction.
+
+Không dùng speed lines/effect giả thay cho action thật.
+
+
+========================================================================================================================
+18A. MANGA SYMBOLIC EFFECT / MANGA MOTION EFFECT LOCK
+========================================================================================================================
+
+Hiệu ứng manga là LỚP NHẤN THỊ GIÁC hỗ trợ CURRENT_VISUAL_MOMENT và PRIMARY_VISUAL_BEAT.
+Hiệu ứng manga KHÔNG tự động tạo BG mới và KHÔNG thay thế canonical BG do B3 khóa.
+
+A. HIỆU ỨNG BIỂU CẢM / TÂM TRẠNG MANGA
+
+Được phép dùng khi phù hợp với cảm xúc thật sự của OUTPUT_SLOT, ví dụ:
+
+- anger mark / cross-vein anger symbol trên trán;
+- irritation mark;
+- upper-face red emphasis;
+- half-face red flush emphasis;
+- upper-face black shadow;
+- half-face black pressure shading;
+- dark stress shading;
+- vertical dark stress lines;
+- black hatching / pressure hatching;
+- embarrassment flush;
+- shock emphasis;
+- awkward tension emphasis;
+- irritation emphasis;
+- emotional pressure emphasis;
+- comedic reaction emphasis;
+- localized manga facial emphasis.
+
+Nguyên tắc:
+- effect phải phản ánh đúng mức cảm xúc thật;
+- effect nhẹ cho cảm xúc nhẹ;
+- effect mạnh chỉ khi cảm xúc mạnh;
+- không biến cảnh nghiêm túc thành gag nếu source không có tone hài;
+- không dùng red flush theo cách gây hiểu sai thành sensual/sexual blush khi source không có;
+- không để symbolic effect che mất facial acting chính.
+
+B. HIỆU ỨNG CHUYỂN ĐỘNG / TỐC ĐỘ / TÁC ĐỘNG
+
+Được phép dùng khi current OUTPUT_SLOT thật sự có motion, speed, strike, slash, recoil, impact hoặc force, ví dụ:
+
+- speed lines;
+- motion lines;
+- running streak lines;
+- acceleration lines;
+- directional movement streaks;
+- slash trails;
+- cutting effect lines;
+- impact burst;
+- radial impact lines;
+- recoil lines;
+- sudden-stop lines;
+- perspective speed lines;
+- background speed streaks;
+- directional force lines;
+- impact pressure lines.
+
+Nguyên tắc:
+- hướng effect phải cùng logic với hướng chuyển động;
+- slash trail phải theo đúng trajectory của vũ khí/chuyển động chém;
+- radial lines phải hội tụ hợp lý vào subject hoặc impact point;
+- impact burst phải xuất phát đúng contact point;
+- debris/dust/motion streak phải phản ứng đúng hướng force;
+- không dùng effect thay cho action thật;
+- không dùng speed lines cho cảnh tĩnh nếu source không có chuyển động;
+- không dùng slash effect nếu không có hành động chém/cắt;
+- không dùng impact burst nếu không có impact tương ứng.
+
+C. HIỆU ỨNG TỐC ĐỘ TRÊN BỐI CẢNH
+
+Khi cần thể hiện tốc độ cao:
+- có thể dùng nhiều đường sọc tốc độ trong phần background;
+- các đường sọc phải cùng hướng với chuyển động/camera;
+- phải giữ subject chính đọc được rõ;
+- không làm biến mất hoàn toàn topology BG nếu BG vật lý vẫn cần nhận diện;
+- không làm người xem hiểu nhầm rằng BG đã đổi location.
+
+D. HIỆU ỨNG ÁP LỰC / CĂNG THẲNG
+
+Khi current OUTPUT_SLOT có psychological pressure, threat, rage hoặc tension mạnh:
+- có thể dùng dark pressure shading;
+- vertical stress lines;
+- concentrated hatching;
+- radial pressure lines;
+- localized black or red emphasis quanh vùng mặt/đầu/chủ thể.
+
+Các hiệu ứng này là visual emphasis, không phải magic effect.
+Không biến chúng thành aura/phép thuật nếu source không nói có phép thuật.
+
+E. QUAN HỆ VỚI BG
+
+Nếu dùng PHYSICAL BG:
+- BG vẫn phải giữ canonical layout, topology, landmark, perspective, scale và continuity;
+- manga effect chỉ là overlay/emphasis;
+- không biến physical BG thành abstract BG nếu B3 không cấp loại BG đó;
+- không dùng hiệu ứng để che lỗi dựng không gian.
+
+Nếu B3 cấp emotional/abstract/thought/memory/flashback/dream/hypothetical/dynamic BG:
+- dùng đúng BACKGROUND_VISUAL_MODE + BG token/state do B3 khóa;
+- mọi resource dùng exact numbered BG_XX;
+- không dùng BG_00 làm emotional/abstract fallback;
+- không tự tạo BG ngoài B3.
+
+F. HIERARCHY
+
+Ưu tiên thị giác:
+
+PRIMARY SUBJECT / ACTION / REACTION
+> MANGA EFFECT
+> DECORATIVE DETAIL
+
+Manga effect không được cạnh tranh hoặc che mất:
+- mặt;
+- tay;
+- vũ khí;
+- điểm va chạm;
+- object contact;
+- key pose;
+- key reaction;
+- landmark cần đọc.
+
+G. NO TEXT EFFECT
+
+Hiệu ứng manga phải là hiệu ứng hình ảnh KHÔNG CHỮ.
+
+Không tạo:
+- speech bubble;
+- empty speech bubble;
+- thought bubble;
+- dialogue balloon;
+- caption box;
+- narration box;
+- comic text panel;
+- SFX text;
+- readable sound-effect lettering;
+- decorative text element.
+
+H. QA MANGA EFFECT
+
+Trước khi xuất prompt, kiểm tra:
+[ ] effect đúng cảm xúc/hành động hiện tại;
+[ ] cường độ effect đúng mức;
+[ ] hướng effect đúng movement/force;
+[ ] impact/slash effect đúng contact/trajectory;
+[ ] effect không che key action/reaction;
+[ ] effect không làm sai tone;
+[ ] effect không tự biến thành magic;
+[ ] effect không thay BG vật lý bằng abstract BG trái B3;
+[ ] effect không sinh chữ/bóng thoại/SFX lettering.
+
+========================================================================================================================
+19. CAMERA / COMPOSITION
+========================================================================================================================
+
+Camera phải phục vụ PRIMARY_VISUAL_BEAT, không chỉ “đổi góc cho đỡ trùng”.
+
+Phải xác định:
+- shot size;
+- angle;
+- subject priority;
+- readable action;
+- readable reaction;
+- scale cue nếu cần.
+
+Không:
+- close-up nhưng lại yêu cầu thấy toàn bộ full-body + toàn BG;
+- wide shot làm mất key facial reaction nếu reaction là trọng tâm;
+- camera làm creature trông đổi physical scale;
+- camera phá continuity vị trí/object/BG.
+
+Các OUTPUT_SLOT liền kề cùng scene có thể đổi camera:
+- wide;
+- medium;
+- three-quarter;
+- over-the-shoulder;
+- close reaction;
+- impact close-up;
+- low angle;
+- high angle;
+- foreground framing;
+nhưng không reset scene state.
+
+========================================================================================================================
+20. HANDS / CONTACT
+========================================================================================================================
+
+Hands:
+- simple;
+- readable;
+- anatomically clean;
+- naturally contacting props.
+
+Không ép hiện cả hai tay nếu không cần.
+
+Nếu tay/object contact là key beat:
+- framing phải thấy contact;
+- chỉ rõ tay nào khi continuity cần;
+- tránh pose tay phức tạp vô ích.
+
+========================================================================================================================
+21. CROWD / EXTRAS / ERA / CULTURE
+========================================================================================================================
+
+Chỉ thêm extras khi source/context thật sự cần.
+
+Extras phải phù hợp:
+- era;
+- society;
+- culture;
+- technology;
+- location function;
+- clothing.
+
+Không:
+- biến fixed character thành generic extra;
+- thêm crowd chỉ để ảnh “sống động”;
+- thêm đồ hiện đại sai world;
+- thêm costume/architecture sai culture;
+- thêm fantasy ornament vô căn cứ.
+
+========================================================================================================================
+22. NEUTRAL PRODUCTION COMPLETION — LOGIC RÕ
+========================================================================================================================
+
+ĐƯỢC PHÉP bổ sung chi tiết trung tính khi tất cả điều kiện sau cùng đúng:
+
+1. Source/B3 không quy định chi tiết đó.
+2. Chi tiết cần để ảnh vật lý hoàn chỉnh/tự nhiên.
+3. Chi tiết không mang thông tin cốt truyện mới.
+4. Không tạo continuity obligation quan trọng mới.
+5. Không xung đột world/era/BG.
+6. Không làm người xem suy ra một fact canon mới.
+
+Ví dụ được phép:
+- generic ground texture phù hợp;
+- natural shadow;
+- ambient light;
+- minor non-identifying clutter;
+- neutral wall/floor material detail đã phù hợp BG;
+- dust/atmospheric depth rất nhẹ nếu hợp environment;
+- contact shadow/occlusion.
+
+KHÔNG ĐƯỢC dùng neutral completion để invent:
+- named/fixed character;
+- important prop;
+- signature weapon;
+- magical phenomenon;
+- monster;
+- heraldry;
+- plot clue;
+- landmark;
+- room/function mới;
+- destruction state mới;
+- relationship;
+- lore;
+- action/reaction không có basis.
+
+NGUYÊN TẮC:
+Neutral completion được phép hoàn thiện HÌNH THỨC VẬT LÝ.
+Neutral completion không được sáng tạo NỘI DUNG CÂU CHUYỆN.
+
+========================================================================================================================
+23. REFERENCE METADATA ANTI-RENDER
+========================================================================================================================
+
+Thông số đo/ghi chú trong B3 và PROMPT CHAR/BG TXT gắn ID tham chiếu là design constraints, KHÔNG phải nội dung được render lên ảnh.
+
+Không render/copy:
+- text;
+- numbers;
+- CHAR/BG ID;
+- name labels;
+- dimension notes;
+- height labels;
+- rulers;
+- scale bars;
+- measurement arrows/lines;
+- technical annotations;
+- filenames;
+- watermark;
+- logo;
+- UI.
+
+Scale vẫn phải giữ bằng physical proportion, không phải bằng chữ đo.
+
+========================================================================================================================
+24. STYLE LOCK
+========================================================================================================================
+
+Trừ khi project/user khóa style khác:
+
+- polished high-quality 2D fantasy-isekai manga/anime color illustration;
+- cinematic anime storytelling;
+- clean crisp lineart;
+- controlled cel/illustrated shading;
+- clear spatial depth;
+- 16:9 landscape.
+
+Không:
+- photorealism;
+- live action;
+- real-human rendering;
+- 3D;
+- CGI;
+- doll/plastic rendering;
+- game-engine look;
+trừ khi user/source yêu cầu khác.
+
+Khóa style của PROMPT CHAR/BG dạng TXT gắn đúng ID CHAR_XX/BG_XX đã PASS/LOCK là style anchor cao hơn style default; không cần ảnh đã render.
+
+
+FINAL 16:9 MANGA COMPOSITION LOCK
+
+Toàn bộ ảnh thành phẩm luôn nằm trong một canvas 16:9 landscape theo chuẩn video YouTube của project.
+
+Ảnh phải đọc như một manga/anime story illustration hoàn chỉnh được dựng trực tiếp cho OUTPUT_SLOT hiện tại, KHÔNG được trông như:
+- character reference sheet;
+- BG reference sheet;
+- CHAR bị dán lên một BG cố định;
+- nhiều asset reference ghép cơ học;
+- nhân vật xếp hàng như sân khấu;
+- composition kỹ thuật thay vì một cảnh truyện hoàn chỉnh.
+
+Nếu ảnh chỉ có một panel:
+- toàn bộ canvas 16:9 phải đọc như một khung manga/anime hoàn chỉnh;
+- CHAR, BG, props, lighting, perspective, depth, occlusion và camera phải thuộc cùng một không gian vật lý và cùng một thời điểm.
+
+Nếu ảnh có nhiều panel:
+- toàn bộ output VẪN là canvas 16:9 landscape;
+- các panel được bố cục bên trong canvas 16:9;
+- panel có thể chia dọc, ngang, lớn/nhỏ hoặc bất đối xứng theo nội dung;
+- không có quy định “trang manga phải dọc đứng”;
+- toàn bộ composition phải đọc như một manga sequence hoàn chỉnh trong khung 16:9;
+- không được trông như nhiều ảnh rời đặt cạnh nhau.
+
+CHAR phải được dựng BÊN TRONG không gian BG với đúng:
+- perspective;
+- scale;
+- depth;
+- overlap/occlusion;
+- ambient light;
+- lighting interaction;
+- quan hệ với landmark/object khi landmark/object đó liên quan hoặc nằm trong frame;
+- ground plane/contact shadow khi subject thật sự tiếp xúc bề mặt và phần đó nhìn thấy được.
+
+Không ép close-up phải lộ chân/sàn.
+Không ép subject bay/lơ lửng phải có ground contact.
+Nhưng framing nào cũng phải làm CHAR có cảm giác thuộc cùng không gian BG, không phải asset bị dán lên.
+
+BG là environment design lock, không phải một tấm sân khấu cố định.
+Prompt phải tái dựng camera/composition riêng cho CURRENT OUTPUT_SLOT.
+
+========================================================================================================================
+25. TEXT NEGATIVE
+========================================================================================================================
+
+Không tạo bất kỳ dạng text/bubble comic nào, bao gồm:
+- speech bubble;
+- empty speech bubble;
+- thought bubble;
+- dialogue balloon;
+- caption box;
+- narration box;
+- comic text panel;
+- subtitle;
+- SFX text;
+- readable sound-effect lettering;
+- decorative text element;
+- readable signage nếu không được source/user yêu cầu;
+- watermark;
+- logo;
+- UI;
+- prompt number bên trong ảnh, trừ khi project hiện hành khóa riêng việc in số.
+
+========================================================================================================================
+26. MINOR / CHILD-SAFE KHI ÁP DỤNG
+========================================================================================================================
+
+Với minor:
+- strictly non-sexualized;
+- child-safe;
+- non-suggestive;
+- ordinary age-appropriate body language.
+
+Nếu source có joke/awkward beat:
+- thể hiện confusion/reaction/spacing;
+- không sexualize visual treatment.
+
+========================================================================================================================
+27. REFERENCE BUDGET
+========================================================================================================================
+
+Tổng ảnh tham chiếu trong header:
+CHAR + BG tối đa 10.
+Không viết trên 10 ảnh tham chiếu.
+
+Visual-source CHAR cũng tính vào giới hạn.
+
+Nếu số ID tham chiếu CHAR + BG của một IMAGE_PROMPT vượt 10:
+- được phép dùng CHAR_GROUP theo mục 5.7 để gom các nhân vật phụ phù hợp;
+- không ghép nhân vật đang diễn chính trong IMAGE_PROMPT/cảnh hiện tại vào CHAR_GROUP;
+- nhân vật diễn chính vẫn dùng CHAR_ID tham chiếu riêng;
+- sau khi dùng CHAR_GROUP, tổng ID tham chiếu CHAR + BG liệt kê trong prompt vẫn phải tuân theo giới hạn hiện hành.
+
+Không bỏ reference bắt buộc chỉ để giữ ý phụ.
+
+Nếu vẫn vượt:
+1. bỏ detail/extra không cần reference;
+2. loại background extra;
+3. giảm visual beat phụ nếu không bắt buộc;
+4. tối ưu panel;
+5. nếu vẫn vượt và canonical accuracy không thể giữ → báo REFERENCE_LIMIT_CONFLICT.
+
+========================================================================================================================
+28. THỨ TỰ TỐI ƯU KHI VIẾT IMAGE_PROMPT
+========================================================================================================================
+
+Thứ tự này là hướng tối ưu, không phải mục tiêu tự thân.
+Nếu một prompt đặc biệt cần đảo nhẹ để rõ hơn thì được phép, miễn không mất rule.
+
+A. HEADER
+OUTPUT_SLOT_ID | REFERENCE TOKENS | IMAGE_PROMPT:
+
+B. BODY
+
+1. CURRENT_VISUAL_MOMENT / PRIMARY_VISUAL_BEAT.
+2. EXACT REFERENCE ASSIGNMENT.
+3. Mỗi CHAR/CHAR_GROUP: khai báo theo CHAR reference hiện hành + type/sex + SIZE_LOCK.
+4. Physical actor vs visual-source role.
+5. Current state.
+6. Current action/pose.
+7. Expression/gaze/body language.
+8. Object/weapon/tool state và contact.
+9. Frame position + environment position.
+10. Spatial relation + subject priority.
+11. Exact BG + BG state.
+12. BG reconstruction / perspective / depth / surface contact.
+13. Camera/framing/composition.
+14. Light/time/weather.
+15. Magic/effect/force nếu source có.
+16. Continuity locks / future-leak negatives khi cần.
+17. Panel instruction nếu multi-panel.
+18. Cross-panel isolation nếu multi-panel.
+19. Style lock.
+20. Text/reference-metadata negative.
+
+Không cần lặp cả character model sheet trong body.
+
+========================================================================================================================
+29. OUTPUT FORMAT
+========================================================================================================================
+
+Một reference:
+
+001 | CHAR_01.BG_03 | IMAGE_PROMPT: ...
+
+Nhiều reference:
+
+001 | CHAR_01.CHAR_04.CHAR_07.BG_03 | IMAGE_PROMPT: ...
+
+Chỉ BG:
+
+001 | BG_03 | IMAGE_PROMPT: ...
+
+Nếu CHAR chỉ làm visual-source:
+CHAR token vẫn nằm trong header, vai trò ghi rõ trong body.
+
+Nếu subject không có CHAR_ID:
+không tự thêm CHAR token; mô tả subject trực tiếp trong body.
+
+CHAR tokens đứng trước BG tokens.
+
+Giữ numbering đúng OUTPUT_SLOT/prompt index theo project.
+
+========================================================================================================================
+30. HARD QA TRƯỚC MỖI PROMPT
+========================================================================================================================
+
+A. OUTPUT_SLOT / TIMING
+[ ] đúng OUTPUT_SLOT;
+[ ] không bỏ/gộp/tách;
+[ ] đúng current moment của SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại;
+[ ] không lấy action/reveal của dòng/câu sau nằm ngoài SEMANTIC_ANALYSIS_WINDOW hợp lệ hoặc ở xa nhiều câu;
+[ ] không future reveal;
+[ ] không reset previous continuity.
+
+B. CHAR
+[ ] đúng CHAR_ID;
+[ ] declaration chỉ tối thiểu: CHAR_XX(name/title) + male/female/animal/creature/object/entity type + SIZE_LOCK;
+[ ] không viết lại full model sheet vô ích;
+[ ] exact reference không bị redesign;
+[ ] reference pose/camera không bị copy máy móc;
+[ ] physical actor vs visual-source đúng;
+[ ] không duplicate real CHAR vì visual-source;
+[ ] scale đúng.
+
+C. STATE / OBJECT
+[ ] đúng state/timeline;
+[ ] đúng reality layer;
+[ ] đúng transformation stage;
+[ ] object holder/state/orientation đúng;
+[ ] weapon/tool state đúng.
+
+D. BG
+[ ] BG lấy từ B3;
+[ ] không invent BG_ID;
+[ ] không tự tạo BG cảm xúc/abstract/dynamic nếu B3 không có;
+[ ] đúng canonical location/state/layout;
+[ ] camera có thể đổi nhưng topology không đổi;
+[ ] surface contact/perspective/occlusion hợp lý.
+
+E. PANEL
+[ ] đã phân tích đúng số ý cần minh họa;
+[ ] 1 ý cần minh họa = 1 panel;
+[ ] nhiều ý cần minh họa = nhiều panel;
+[ ] số panel = đúng số ý cần minh họa;
+[ ] không gộp nhiều ý vào một panel;
+[ ] không tách một ý thành nhiều panel;
+[ ] panel đúng thứ tự ý trong SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT;
+[ ] không cross-panel leakage.
+
+F. VISUALIZATION
+[ ] PRIMARY_VISUAL_BEAT đọc được;
+[ ] nội tâm đã chuyển thành visual acting;
+[ ] action moment vật lý hợp lý;
+[ ] camera support key beat;
+[ ] spatial staging đủ rõ.
+
+G. INVENTION
+[ ] magic/effect có basis;
+[ ] crowd/extras có basis;
+[ ] neutral completion chỉ hoàn thiện vật lý;
+[ ] không invent plot/prop/landmark/lore/state.
+
+H. TECHNICAL
+[ ] total CHAR+BG không quá 10 ảnh tham chiếu;
+[ ] English technical prompt;
+[ ] không chép nguyên văn source/thoại;
+[ ] không render reference metadata;
+[ ] không text/subtitle/watermark/logo/UI trái rule;
+[ ] format đúng.
+
+Nếu bất kỳ HARD item NG:
+PHẢI sửa trước khi xuất.
+
+========================================================================================================================
+31. HARD FAIL CODES
+========================================================================================================================
+
+WRONG_OUTPUT_SLOT_ID
+OUTPUT_SLOT_COUNT_MISMATCH
+BORROWED_ACTION_FROM_NEXT_LINE
+FUTURE_REVEAL_LEAK
+PREVIOUS_STATE_RESET
+WRONG_TIMING_STATE
+WRONG_CHAR_ID
+REFERENCE_B3_CONFLICT
+CHAR_REFERENCE_REDESIGN
+UNNECESSARY_FULL_CHAR_REDESCRIPTION
+REFERENCE_POSE_CAMERA_COPY_ERROR
+PHYSICAL_ACTOR_VISUAL_SOURCE_CONFUSION
+DUPLICATED_REFERENCE_CHARACTER
+WRONG_SCALE
+WRONG_REALITY_LAYER
+WRONG_TRANSFORMATION_STAGE
+OBJECT_CONTINUITY_BREAK
+UNSUPPORTED_MAGIC_EFFECT
+INVENTED_IMPORTANT_PROP
+INVENTED_BG_ID
+INVENTED_EMOTION_BG
+WRONG_BG_STATE
+BG_LAYOUT_BREAK
+FIXED_STAGE_BG_COPY
+AMBIGUOUS_SPATIAL_STAGING
+WRONG_PANEL_COUNT
+MERGED_MULTIPLE_IDEAS_INTO_ONE_PANEL
+SPLIT_ONE_IDEA_INTO_MULTIPLE_PANELS
+MISSING_REQUIRED_IDEA_PANEL
+DUPLICATED_IDEA_PANEL
+REORDERED_IDEA_SEQUENCE
+CROSS_PANEL_LEAKAGE
+SEMANTIC_EXPLANATION_NOT_VISUALIZED
+CAMERA_DOES_NOT_SUPPORT_KEY_BEAT
+CANON_INVENTION
+REFERENCE_LIMIT_CONFLICT
+REFERENCE_METADATA_RENDER_RISK
+VERBATIM_SOURCE_IN_IMAGE_PROMPT
+WRONG_OUTPUT_FORMAT
+
+========================================================================================================================
+32. MASTER LOGIC
+========================================================================================================================
+
+MỖI OUTPUT_SLOT_LINE
+→ đọc OUTPUT_SLOT hiện tại + continuity dòng/câu trước/sau
+→ mặc định SEMANTIC_ANALYSIS_WINDOW là nội dung của dòng/câu hiện tại
+→ nếu dòng/câu hiện tại tự nó đã đủ nghĩa tạo hình thì không vay mượn nội dung dòng/câu khác
+→ nếu dòng/câu hiện tại không đủ nghĩa, bị cụt, mơ hồ hoặc phụ thuộc ngữ cảnh thì được phép vay mượn dòng/câu liền kề trước/sau hoặc cả trước và sau, kể cả 2–3 dòng/câu liền kề, chỉ để lấy đủ nghĩa tạo hình
+→ dừng mở rộng ngay khi đã đủ nghĩa; việc vay mượn chỉ phục vụ phân tích nội dung, không làm thay đổi TOTAL_IMAGE_PROMPT và không làm thay đổi nguyên tắc 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT
+→ xác định current visual moment
+→ xác định primary visual beat
+→ resolve CHAR/BG từ B3
+→ khai báo CHAR tối thiểu:
+   CHAR_XX(name/title) + male/female/animal/creature/object/entity type + SIZE_LOCK
+→ không viết lại full appearance nếu exact reference đã có
+→ resolve state/object/reality layer
+→ phân tích SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT để xác định số ý cần minh họa
+→ 1 ý cần minh họa = 1 panel; N ý cần minh họa = N panel
+→ không gộp nhiều ý vào một panel, không tách một ý thành nhiều panel
+→ giữ đúng thứ tự các ý khi chia panel
+→ dựng spatial staging
+→ dựng BG theo BACKGROUND_VISUAL_MODE từ B3, không invent emotion/abstract/thought/memory/flashback/dream/hypothetical/dynamic BG ngoài B3
+→ chọn camera phục vụ key beat
+→ thêm neutral production detail chỉ khi không tạo canon mới
+→ style/text negative
+→ QA
+→ xuất đúng MỘT IMAGE_PROMPT cho OUTPUT_SLOT đó.
+
+========================================================================================================================
+END
+========================================================================================================================
+
+
+========================================================================================================================
+33. BUOC_11 VERBATIM INHERITANCE ADDENDUM — LINE MODE BRIDGE
+========================================================================================================================
+
+MỤC ĐÍCH CỦA ADDENDUM NÀY:
+- bổ sung các HARD LOCK / QA LOCK kỹ thuật của BUOC_11 còn thiếu trong B5;
+- KHÔNG đổi ACTIVE MODE của B5;
+- KHÔNG đưa trở lại quota/workflow SMALL_SCENE cũ;
+- các block BUOC_11 bên dưới được chép NGUYÊN VĂN, không sửa câu chữ.
+
+TERMINOLOGY BRIDGE CHỈ DÙNG ĐỂ ÁP DỤNG CÁC BLOCK BUOC_11 NGUYÊN VĂN BÊN DƯỚI TRONG B5 THEO DÒNG HIỆN HÀNH:
+- `SMALL_SCENE` = current `OUTPUT_SLOT_LINE`.
+- `locked SMALL_SCENE current moment` / `CURRENT VISUAL MOMENT của SMALL_SCENE` = `CURRENT_VISUAL_MOMENT / PRIMARY_VISUAL_BEAT` đã khóa cho current OUTPUT_SLOT.
+- `PARENT SCENE` = current continuous scene/context được resolve từ dòng/câu nguồn + B3 + mapping + continuity của các dòng/câu liên quan.
+- `SMALL_SCENE_VISUAL_PLAN` = internal locked visual plan của current OUTPUT_SLOT được resolve trước khi viết prompt từ `SEMANTIC_ANALYSIS_WINDOW + B3 + mapping + continuity`.
+- `SCENE_ACTIVE_CAST`, `IN_FRAME_ENTITIES`, `OFF_FRAME_BUT_PRESENT`, `RENDER_REQUIRED_ENTITIES` = các field visibility nội bộ của current OUTPUT_SLOT; không làm thay đổi số prompt.
+- mọi câu đếm/quota trong B5 vẫn theo authority hiện hành: `1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT`; `TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT`.
+- bridge này KHÔNG tự tạo BG/CHAR/resource mới và KHÔNG được dùng để ghi đè authority B3 hiện hành.
+- Trong các khối BUOC_11 chép nguyên văn, từ “reference image”, “ảnh đã gắn”, “ảnh đã xác nhận” trong quy trình B5 viết TXT được áp dụng như dữ liệu PROMPT CHAR/BG gắn ID CHAR_XX/BG_XX đã khóa; không bắt buộc có ảnh thật, ảnh tải lên hay bước duyệt ảnh để tạo IMAGE_PROMPT. Các điều khoản về metadata trên ảnh chỉ phát huy tác dụng khi có ảnh thật ở hệ thống tạo ảnh ngoài tool.
+
+KNOWN CONFLICTS KHÔNG ĐƯỢC IMPORT VÀO B5:
+- câu cũ cho phép IMAGE_PROMPT không có BG, hoặc giữ BG là tùy trường hợp. Quy tắc hiện hành: mỗi IMAGE_PROMPT phải có ít nhất một exact numbered BG_XX đã tạo, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG.
+- quota/workflow `1 SMALL_SCENE = 1 IMAGE_PROMPT` và director-chain SMALL_SCENE; B5 hiện hành giữ chế độ theo dòng/câu.
+- rule CHAR_GROUP cũ trigger `>5 reference`, ngưỡng trên 9 CHAR, và hard budget `CHAR + BG <= 9`. Quy tắc hiện hành: CHAR và BG đều là ảnh tham chiếu; một prompt không viết trên 10 ảnh tham chiếu.
+- reference budget cũ mâu thuẫn với trần 10 ảnh. Quy tắc hiện hành giữ trần 10.
+
+Các block sau đây là NGUYÊN VĂN BUOC_11 và được áp dụng cùng terminology bridge ở trên.
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: ACTIVE_RESOURCE_STATE_MODEL | SOURCE_LINES 6-33 | SHA256 06c6f7bb6f78c2a3dd429a81e86eb7896bcd6f86f2042c4a85bb2544be3ec8aa ---
+======================================================================
+ACTIVE RESOURCE-STATE MODEL — CHAR/BG ID / REFERENCE STATE
+======================================================================
+
+1. SOURCE ENTITY/LOCATION KHÁC RESOURCE ID.
+- Nhân vật/thực thể trong tác phẩm là SOURCE ENTITY dùng cho phân tích, script, scene, timeline và continuity.
+- Địa điểm/bối cảnh trong tác phẩm là CANONICAL LOCATION dùng cho scene và continuity.
+- `CHAR_XX` và `BG_XX` là ẢNH/TÀI NGUYÊN THAM CHIẾU của từng REFERENCE STATE thị giác, không phải ID duy nhất đại diện vĩnh viễn cho một nhân vật hoặc một địa điểm.
+
+2. Một identity có thể map tới nhiều CHAR_ID: work suit → `CHAR_01`; ghost form → `CHAR_02`; other-world form → `CHAR_03`; heavily injured/torn state → `CHAR_04`; sick/home-rest visual state → `CHAR_05`. Các CHAR này có thể cùng một identity nhưng là các reference state khác nhau.
+
+3. Một canonical location có thể map tới nhiều BG_ID: normal daylight → `BG_01`; night → `BG_02`; rain → `BG_03`; destroyed/ruined → `BG_04`. Các BG này cùng location nhưng khác reference state môi trường.
+
+4. BIỂU CẢM KHÔNG TẠO CHAR MỚI. Happy/sad/crying/angry/afraid/shocked/suspicious và facial expression khác là SCENE PERFORMANCE. Pose/action/gaze/body language/standing/sitting/running/lying/camera/framing/shot size cũng không tự tạo CHAR mới. Illness, injury, torn clothing, transformation, ghost form, outfit/form khác chỉ tạo CHAR mới khi chúng là visual reference state cần khóa; riêng tư thế nằm không phải state.
+
+5. ID SYNTAX DUY NHẤT: CHAR tuần tự chỉ `CHAR_01`, `CHAR_02`...; BG tuần tự chỉ `BG_01`, `BG_02`... cho cả physical và dynamic background resource. CẤM mọi resource ID có hậu tố state/version, tên state, ký hiệu @, hậu tố chữ hoặc placeholder chữ cái. Header/reference token sản xuất chỉ dùng schema `CHAR_XX` / `BG_XX`. State không gắn vào ID bằng suffix; state được xác định bởi chính exact CHAR_XX/BG_XX đã mapping.
+
+6. MAPPING bắt buộc: SOURCE ENTITY/LOCATION → CURRENT REFERENCE STATE → EXACT `CHAR_XX`/`BG_XX`. Nếu state hiện tại đã có resource riêng, prompt bắt buộc gọi đúng resource đó; cấm gọi base/other-state ID rồi sửa bằng prose.
+
+7. Prompt scene dùng exact ID để khóa visual reference, sau đó text mô tả CURRENT PERFORMANCE: pose, action, expression, gaze, spatial blocking, camera, object interaction. Reference image không khóa pose/camera mặc định.
+
+8. RESOURCE IMMUTABILITY: `CHAR_XX`/`BG_XX` đã khóa không được tự đổi identity/location, reference state, outfit/form, damage state, scale, design/layout để hợp scene. Cần state khác → dùng/cấp ID khác. Chỉ user instruction rõ REDEFINE/REPLACE mới cho phép sửa chính resource đã khóa và phải update mapping phụ thuộc.
+
+9. VERSION KHÔNG PHẢI VISUAL-STATE TOKEN. Visual state luôn được biểu diễn bằng exact CHAR_XX/BG_XX riêng. Revision/version của file/resource-data nếu cần quản lý chỉ là metadata nội bộ; không xuất hiện trong resource token/header và không dùng để thay thế CHAR/BG state ID.
+
+10. SIZE: Dùng đúng số đo đã khóa ở bước trước. Số đo sáng tạo hợp lý đã khóa là hợp lệ, phải ghi lại đúng số đó. Không đổi sang số khác. Không báo GAP vì số đo là số sáng tạo.
+
+11. CHAR_XX là reference namespace cho subject/entity cần khóa hình ảnh; có thể là human, humanoid, creature, spirit, construct hoặc object/weapon/tool/item khi upstream đã cấp CHAR reference độc lập. IMAGE_PROMPT phải nói rõ entity/object type và scale theo resource.
+--- END VERBATIM BUOC_11 BLOCK: ACTIVE_RESOURCE_STATE_MODEL ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: ADVANCED_BACKGROUND_SYSTEM | SOURCE_LINES 36-124 | SHA256 cd8518e6531fb0c44e65fbdd8568f7fea5dabe20219c9966816f86c417512de6 ---
+======================================================================
+ACTIVE ISEKAI-MALE BACKGROUND SYSTEM — EXACT NUMBERED BG_XX ONLY
+======================================================================
+Đây là authority background của IMAGE_PROMPT cho project Isekai nam hiện tại; các rule khác về source/current moment/cast/state/scale/object/continuity/panel/numbering vẫn giữ nguyên.
+
+1. GLOBAL RESOURCE RULE
+- Mọi background reference phải là exact numbered `BG_XX` đã khóa upstream.
+- Background dynamic/impact/threat/speed/destruction/atmosphere đã được upstream xác định là resource riêng bắt buộc gọi đúng BG_XX đó; không dùng base BG khác rồi sửa bằng prose.
+
+2. BACKGROUND_VISUAL_MODE
+Chỉ dùng:
+- `PHYSICAL_BG`;
+- `PHYSICAL_BG_PLUS_DYNAMIC`;
+- `DYNAMIC_BG`.
+Mỗi mode phải được upstream resolve sang exact BG_XX trước khi prompt được viết; nếu chưa resolve exact BG_XX => GAP.
+
+3. HEADER
+Header luôn gọi exact BG_XX đang render.
+
+4. PHYSICAL_BG
+Prompt phải giữ topology/landmark/state/scale của exact BG reference nhưng được phép chọn camera/crop theo current beat. CHAR phải được tích hợp vật lý đúng perspective/depth/contact/occlusion khi các check đó áp dụng.
+
+5. PHYSICAL_BG_PLUS_DYNAMIC
+Prompt dùng exact BG_XX của current physical+dynamic state đã khóa. Phải giữ required topology/geography và đồng thời thực thi motion/impact/threat/energy/environment-reaction cues. Không lấy base BG rồi thêm generic “speed lines/debris” nếu upstream đã yêu cầu resource state riêng.
+
+6. DYNAMIC_BG
+Prompt dùng exact BG_XX của dynamic/graphic/impact/threat/speed/atmosphere field. Physical location continuity vẫn carry qua `PHYSICAL_LOCATION_CONTEXT` nếu event chưa chuyển location. Dynamic field không tự tạo location mới.
+
+7. FOUR-QUESTION CHECK
+Final prompt background phải truyền đạt đủ phần áp dụng của:
+- where actors/opponents are;
+- what is happening;
+- where force/motion/danger is moving;
+- how environment reacts.
+
+8. SPATIAL / 180-DEGREE LOCK
+Giữ `AXIS_180_LOCK`, screen direction, actor/opponent left-right, foreground/background, distance, terrain, obstacle, entry/exit, elevation và combat zone đã khóa. Camera không được đảo trái/phải do crossing axis vô cớ.
+
+9. FORCE LANGUAGE
+Khi action/impact áp dụng, wording phải phản ánh `source -> direction -> intensity -> contact/impact -> result -> environmental reaction`. Debris/dust/glass/flame/water không bay ngẫu nhiên trái force vector.
+
+10. IMPACT CLARITY
+Panel va chạm phải đọc được source/contact/result; effect không che contact point, weapon/limb, target reaction hoặc silhouette chính.
+
+11. ONE DOMINANT EFFECT
+Thực thi hierarchy PRIMARY/SECONDARY/TERTIARY đã khóa. Không để explosion/lightning/fire/smoke/debris/speed lines ngang cường độ.
+
+12. SPEED / ENERGY
+- Speed line/perspective line/radial burst phải cùng hướng movement/impact.
+- Energy thật chỉ khi source có; nêu source/direction/intensity/environment reaction.
+- Graphic black flame/ink/static threat field phải được mô tả symbolic nếu không phải literal magic/fire.
+
+13. DESTRUCTION
+Chỉ mô tả đúng destruction state/power scale đã khóa. Cracks/rubble/crater/collapse phải có continuity với panel trước/sau; không nâng city-scale chỉ vì muốn epic.
+
+14. SCALE CUES
+Khi scale là storytelling information, prompt phải giữ các cue environment đã khóa. Monster/mecha/fortress không được đặt trên background trống đến mức scale mơ hồ nếu upstream có cue.
+
+15. CAMERA / PERSPECTIVE
+Low/high angle, wide-angle, foreshortening, deep vanishing point, diagonal composition, foreground obstruction hoặc Dutch angle chỉ dùng khi hỗ trợ height/speed/danger/action readability. Không lạm dụng “cinematic”, volumetric, dramatic lens hoặc photographic look.
+
+16. DETAIL / DEPTH
+Combat nhanh: ưu tiên `selectively simplified environment, preserve major spatial landmarks` và `graphic motion simplification rather than photographic motion blur`. Establish/re-establish: background đủ chi tiết để định vị topology/scale.
+
+17. SILHOUETTE CLEARANCE
+Không để pillar/wall edge/debris/high-contrast texture cắt qua face, weapon hand, impact point hoặc silhouette action chính nếu không có chủ đích.
+
+18. TEXTURE / CONTRAST
+Dùng texture/line weight/contrast theo profile và current beat; seinen có thể thô/realistic hơn, shounen có thể phóng đại hơn. Không biến mọi cảnh thành heavy-black grim battle.
+
+19. MALE_MANGA_BG_PROFILE
+Thực thi profile upstream khi có: ISEKAI_SHOUNEN / ISEKAI_SEINEN / BATTLE_FANTASY / SURVIVAL / HORROR / COMEDY. Không tự trộn motif của profile khác.
+
+20. BG RHYTHM
+Thực thi BG_RHYTHM_PHASE đã khóa: ESTABLISH / APPROACH / TENSION / CLASH / IMPACT / RECOVERY / ESCALATION / REESTABLISH / HOLD. Không làm mọi prompt thành impact key visual.
+
+21. FINAL_BG_RENDER_PLAN
+Prompt phải hiện thực hóa plan đã khóa: exact BG, topology cues, dynamic function, force, environment reaction, destruction, scale, detail level, effect hierarchy, camera allowance và symbolic-not-literal constraints. Không cần lặp field name nếu prose đã truyền đạt đủ.
+
+22. HARD FAIL
+- wrong exact BG_XX;
+- generic base BG + prose transform thay resource state đã khóa;
+- spatial flip / 180-degree violation;
+- force/debris direction mismatch;
+- impact point bị che hoặc không hiểu source/contact/result;
+- destruction/power vượt source;
+- random VFX;
+- symbolic effect literalized;
+- photographic/3D drift làm mất manga action readability.
+--- END VERBATIM BUOC_11 BLOCK: ADVANCED_BACKGROUND_SYSTEM ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: OUTFIT_DELTA_ONLY_AND_MINIMAL_CHAR_HARD_LOCK | SOURCE_LINES 227-329 | SHA256 eb5f9513f5099c941eac4c898b7925def0c41278fa27bdc3fe5bec834b05998e ---
+D. HARD LOCK — KHÔNG MÔ TẢ LẠI TRANG PHỤC CƠ SỞ
+
+Khi exact CHAR reference đã khóa canonical outfit/current outfit:
+- tuyệt đối KHÔNG mô tả lại toàn bộ trang phục trong IMAGE_PROMPT;
+- không liệt kê màu sắc, lớp áo, cổ áo, tay áo, váy/quần, belt, cape/cloak, giày, trang sức hoặc hoa văn chỉ để nhắc lại reference;
+- không viết lại costume description dài dù CHAR đang là subject chính;
+- không dùng outfit description để “tăng self-contained” nếu exact reference đã được gắn đúng.
+
+Nếu outfit không thay đổi so với exact reference: KHÔNG GHI GÌ VỀ TRANG PHỤC.
+
+E. CHỈ GHI DELTA TRANG PHỤC KHI SOURCE/ANALYSIS XÁC NHẬN CÓ THAY ĐỔI
+
+Chỉ mô tả trang phục khi SMALL_SCENE đã khóa + analysis/continuity đã xác nhận có thay đổi nhìn thấy so với reference/current baseline, ví dụ: dirty, wet, torn, ripped, scorched, bloodstained, mud-stained, damaged, partially removed, missing a specific piece, repaired hoặc visibly altered khác.
+
+Khi đó CHỈ GHI PHẦN THAY ĐỔI (DELTA), không restate toàn bộ outfit.
+
+Ví dụ đạt:
+`CHAR_02 (Seria), 166 cm tall; her clothing is wet.`
+`CHAR_02 (Seria), 166 cm tall; her clothing is dirt-stained.`
+`CHAR_02 (Seria), 166 cm tall; her clothing is torn at the left sleeve.`
+`CHAR_02 (Seria), 166 cm tall; the lower hem of her clothing is scorched.`
+
+Ví dụ KHÔNG đạt:
+`CHAR_02 wears her elaborate purple imperial high-mage ceremonial robe with wide sleeves and a long skirt, now torn at the left sleeve.`
+
+Nguyên tắc:
+`BASE OUTFIT = REFERENCE`
+`CURRENT VISIBLE CHANGE = TEXT DELTA ONLY`
+
+F. OUTFIT CHANGE CÓ REFERENCE STATE RIÊNG
+
+Nếu thay đổi trang phục đã đủ lớn để upstream cấp exact CHAR reference state mới: dùng đúng CHAR_ID mới; body vẫn chỉ ghi `CHAR_XX + tên/danh xưng + chiều cao`; KHÔNG mô tả lại bộ trang phục mới; chỉ thêm delta mới phát sinh sau chính reference state đó nếu source xác nhận.
+
+G. PERFORMANCE CỦA CURRENT MOMENT KHÔNG ĐƯỢC NHẦM VỚI CHAR DESCRIPTION
+
+Sau phần gọi CHAR tối giản, prompt phải đi thẳng vào subject priority, pose, action, expression, gaze, body language, hand/object interaction, spatial blocking, environment position và camera/composition theo đúng SMALL_SCENE/current visual moment.
+
+Nếu CURRENT VISUAL MOMENT đã nêu rõ Toma đang dumbfounded và Seria/những người khác xem tình huống là bình thường, không được lặp lại một đoạn dài reference-state/outfit trước khi mô tả acting.
+
+H. VÍ DỤ ÁP DỤNG CHO TRƯỜNG HỢP NHIỀU CHAR
+
+Thay vì ba câu `Use CHAR_XX as the exact locked visual reference... current ... reference state ...`, dùng:
+`CHAR_01 (Toma), 178 cm tall.`
+`CHAR_02 (Seria), 166 cm tall.`
+`CHAR_03 (the imperial nobleman), 181 cm tall.`
+Sau đó chuyển thẳng sang acting/staging của current moment.
+
+I. NGOẠI LỆ KHI CẦN ENTITY TYPE
+
+Nếu CHAR là non-human, beast, monster, spirit, construct, vehicle, weapon, item, tool hoặc device và chỉ `tên + size` có thể làm model hiểu sai bản chất thực thể, được phép thêm entity type NGẮN NHẤT cần thiết; không biến thành model-sheet description.
+
+Ví dụ:
+`CHAR_12 (Fenrir, wolf-like beast), 210 cm body length.`
+`CHAR_18 (ritual staff), 165 cm long.`
+
+J. REFERENCE ANTI-COPY CÓ THỂ DÙNG 1 LẦN Ở CẤP PROMPT, KHÔNG LẶP THEO TỪNG CHAR
+
+Nếu project vẫn cần câu chống copy pose/reference, dùng một câu chung cho toàn bộ reference set, không lặp lại sau từng CHAR. Ví dụ:
+`Use the listed references only for locked identity/design/scale and BG layout; derive pose, action, expression, gaze, camera and staging from the current visual moment.`
+
+K. ACTIVE OVERRIDE ĐỐI VỚI CÁC RULE/QA CŨ
+
+Khi exact reference hợp lệ đã gắn:
+- các rule cũ yêu cầu lặp face/hair/eyes/body/outfit/state wording trong IMAGE_PROMPT được hiểu là dữ liệu đó PHẢI ĐƯỢC KHÓA Ở RESOURCE/REFERENCE LAYER, không phải bắt buộc lặp lại trong body;
+- các mẫu `Use CHAR_XX as the exact locked visual reference for a real physical... in [CURRENT STATE]` KHÔNG còn là mẫu bắt buộc cho CHAR người/humanoid;
+- rule cũ “không dùng tên riêng thay CHAR_ID” vẫn đúng ở nghĩa TÊN KHÔNG ĐƯỢC THAY THẾ `CHAR_XX`;
+- nhưng theo lock mới, body ĐƯỢC VÀ MẶC ĐỊNH PHẢI ghi `CHAR_XX (Tên)` hoặc `CHAR_XX (Danh xưng)`; đây không phải dùng tên thay token mà là tên đi KÈM token;
+- QA không được FAIL chỉ vì prompt không nhắc lại current reference-state wording hoặc canonical outfit wording khi exact reference đã đúng.
+
+L. QA HARD GATE — CHAR MINIMAL / NO OUTFIT RESTATEMENT
+
+PASS khi:
+1. header gọi đúng exact CHAR_ID;
+2. body có `CHAR_XX + tên/danh xưng + locked height/size`;
+3. không mô tả lại canonical/base outfit;
+4. nếu có thay đổi trang phục thật sự, chỉ ghi visible delta được source/analysis hỗ trợ;
+5. pose/action/expression/body language/staging đúng current moment;
+6. không dùng tên thay thế CHAR token;
+7. không dùng Japanese script.
+
+HARD FAIL nếu:
+- lặp cả bộ trang phục mặc dù exact reference đã khóa;
+- ghi dài dòng current reference-state name chỉ để diễn giải CHAR_ID;
+- viết lại màu/lớp/hoa văn/kiểu áo quần không cần thiết;
+- khi chỉ cần ghi `clothing is wet/dirty/torn at [location]` lại restate toàn bộ outfit;
+- dùng outfit description mới làm sai hoặc ghi đè reference;
+- bỏ CHAR_ID và chỉ dùng tên;
+- bịa clothing damage/wet/dirty không có trong source/analysis/continuity.
+
+M. CÔNG THỨC MẶC ĐỊNH MỚI
+
+`CURRENT VISUAL MOMENT`
+→ `CHAR_XX (NAME/TITLE), LOCKED HEIGHT/SIZE`
+→ `VISIBLE STATE DELTA ONLY IF SOURCE REQUIRES`
+→ `POSE/ACTION/EXPRESSION/BODY LANGUAGE`
+→ `OBJECT/WEAPON/GEAR CURRENT INTERACTION`
+→ `SPATIAL BLOCKING`
+→ `BG`
+→ `CAMERA/LIGHT/CONTINUITY`
+→ `STYLE/NEGATIVE/QA`
+
+CÂU KHÓA:
+EXACT CHAR REFERENCE ĐÃ KHÓA NGOẠI HÌNH VÀ TRANG PHỤC CƠ SỞ. IMAGE_PROMPT KHÔNG ĐƯỢC KỂ LẠI MODEL SHEET. CHỈ GỌI `CHAR_XX + TÊN/DANH XƯNG + KÍCH THƯỚC`, VÀ CHỈ GHI PHẦN THAY ĐỔI NHÌN THẤY ĐƯỢC SO VỚI REFERENCE KHI SOURCE/ANALYSIS THỰC SỰ XÁC NHẬN.
+--- END VERBATIM BUOC_11 BLOCK: OUTFIT_DELTA_ONLY_AND_MINIMAL_CHAR_HARD_LOCK ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: NO_JAPANESE_NO_VERBATIM_SOURCE | SOURCE_LINES 743-777 | SHA256 a6fbd000e53d01a0602b8253bfab0fb7be2ed0520ae7b10a86e653ca61d9bb88 ---
+======================================================================
+VII-B. HARD LOCK — KHÔNG TIẾNG NHẬT, KHÔNG CHÉP NGUYÊN VĂN TÁC PHẨM VÀO IMAGE_PROMPT
+======================================================================
+
+SOURCE có thể là tiếng Nhật hoặc ngôn ngữ khác để AI đọc và phân tích nội bộ.
+NHƯNG phần sau `IMAGE_PROMPT:` tuyệt đối KHÔNG được chép nguyên văn source/tác phẩm.
+
+Trong IMAGE_PROMPT tuyệt đối cấm:
+- nguyên câu source;
+- một đoạn source verbatim;
+- câu thoại nguyên văn từ tác phẩm;
+- Kanji;
+- Hiragana;
+- Katakana;
+- tên riêng viết bằng chữ Nhật;
+- source quote đặt trong 「」, 『』 hoặc dấu trích dẫn khác;
+- bất kỳ Japanese wording nào dùng để “khóa source”.
+
+CÁCH ĐÚNG:
+1. Đọc source ở lớp phân tích.
+2. Xác định CURRENT MOMENT / KEY / TRƯỚC / HIỆN TẠI / SAU.
+3. Chuyển ý nghĩa thị giác cần thiết thành chỉ dẫn tiếng Anh.
+4. Chỉ mô tả thứ thực sự được phép xuất hiện trong ảnh.
+5. Không future leak.
+6. Không đổi nghĩa chỉ vì bỏ source quote.
+
+Ví dụ KHÔNG ĐƯỢC:
+SOURCE-LOCKED CURRENT MOMENT: [nguyên văn tác phẩm]
+
+Ví dụ ĐƯỢC:
+CURRENT VISUAL MOMENT: CHAR_05 has just stopped in front of the storefront after noticing CHAR_06 beneath the shop eaves.
+
+LANGUAGE GATE:
+Nếu phần IMAGE_PROMPT có tiếng Nhật/ký tự Nhật hoặc nguyên văn tác phẩm => HARD FAIL.
+Phải xóa/chuyển thành English visual instruction source-faithful rồi QA lại.
+--- END VERBATIM BUOC_11 BLOCK: NO_JAPANESE_NO_VERBATIM_SOURCE ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: REFERENCE_METADATA_ANTI_RENDER | SOURCE_LINES 861-900 | SHA256 8a967b045e6e371abd6d9da84334545028799fc01d28727c6cc5b7044d55d1e5 ---
+VIII-B. HARD LOCK — KHÔNG RENDER METADATA / KÍCH THƯỚC / CHỮ GHI CHÚ TỪ ẢNH THAM CHIẾU
+======================================================================
+
+Mọi ảnh CHAR/BG/reference chỉ được dùng để hiểu và khóa dữ liệu thị giác/canonical cần thiết.
+
+Nếu trong ảnh tham chiếu có:
+- chữ;
+- số;
+- tên CHAR/BG;
+- nhãn;
+- annotation;
+- callout;
+- mũi tên;
+- đường đo;
+- thước đo;
+- chiều cao/kích thước ghi bằng chữ hoặc số;
+- bảng kích thước;
+- size chart;
+- ký hiệu kỹ thuật;
+- ghi chú thiết kế;
+- watermark;
+- logo;
+- UI;
+- số thứ tự;
+- layout kiểu reference sheet có text/measurement overlay;
+
+thì các yếu tố trên CHỈ LÀ METADATA/THÔNG TIN HỖ TRỢ để AI hiểu reference, tuyệt đối không phải nội dung được phép vẽ vào scene image.
+
+KÍCH THƯỚC / SCALE:
+- được phép dùng thông tin kích thước từ reference để hiểu và giữ đúng physical scale/relative scale của CHAR;
+- được phép mô tả scale bằng text trong IMAGE_PROMPT khi quy tắc SCALE LOCK yêu cầu;
+- NHƯNG ảnh kết quả không được hiển thị con số kích thước, chiều cao, đơn vị đo, thước đo, đường đo, mũi tên đo hoặc nhãn scale;
+- phải thể hiện scale bằng tỷ lệ hình thể và quan hệ không gian tự nhiên trong scene, không bằng annotation.
+
+CẤM hiểu reference sheet như nội dung cần sao chép nguyên layout.
+Không được vẽ lại chữ, số, nhãn, kích thước, bảng đo hoặc ghi chú chỉ vì chúng xuất hiện trong ảnh tham chiếu.
+
+CÂU KHÓA TIÊU CỰC BẮT BUỘC TRONG MỖI IMAGE_PROMPT:
+Do not render or copy any text, numbers, labels, annotations, character names, dimension notes, height/size labels, rulers, measurement lines, measurement arrows, size charts, technical marks, watermarks, logos, UI elements or other reference-sheet metadata visible in any reference image. Use reference measurements only to preserve natural physical scale and proportions; never display those measurements or metadata in the generated image.
+
+--- END VERBATIM BUOC_11 BLOCK: REFERENCE_METADATA_ANTI_RENDER ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: PER_ENTITY_HARD_REQUIRED | SOURCE_LINES 962-1006 | SHA256 7cca1437d9bece32db479e5452767b25ab2823bd553c85e807bc3be60bd0b5a8 ---
+X-A. HARD-REQUIRED CHO TỪNG CHAR / ENTITY TRONG PROMPT
+======================================================================
+
+Với MỖI CHAR/ENTITY thật sự xuất hiện, prompt phải tự đủ nghĩa cho entity đó.
+
+A. CHAR SỐNG / THỰC THỂ CÓ CƠ THỂ:
+Bắt buộc phải xác định trực tiếp:
+1. CHAR là loại gì: người / thú / quái / linh thể / construct / thực thể đặc biệt...
+2. đúng CHAR ID;
+3. đúng state;
+4. đúng exact CHAR_XX/BG_XX của reference state hiện tại;
+5. đúng scale hoặc relative scale;
+6. POSE: đứng / ngồi / quỳ / nằm / bay / treo / bò / cúi / dựa...;
+7. ACTION: đang làm gì trong đúng KEY beat;
+8. EXPRESSION: biểu cảm nhìn thấy được; nếu neutral thì cũng phải mô tả neutral có kiểm soát;
+9. GAZE/FOCUS khi có ý nghĩa kể chuyện;
+10. BODY LANGUAGE;
+11. FRAME POSITION;
+12. ENVIRONMENT POSITION;
+13. quan hệ không gian/tương tác với CHAR/BG/object khác.
+
+Không được chỉ viết `CHAR_01 is present`.
+Ngay cả CHAR phụ không phải KEY vẫn phải có pose/action tối thiểu và vị trí rõ để model không tự đoán.
+
+Nếu CHAR không hành động:
+- ghi rõ đang đứng yên / ngồi yên / quan sát / bất động / chờ;
+- không để action rỗng.
+
+Nếu expression không phải KEY:
+- vẫn ghi trạng thái phù hợp như neutral attentive, calm guarded, tense silent...;
+- không để model tự suy diễn.
+
+B. CHAR/ENTITY LÀ OBJECT / ITEM / WEAPON / DEVICE / PROP-TYPE RESOURCE:
+Bắt buộc:
+1. nói rõ nó là vật gì;
+2. đúng ID/exact reference-state resource ID;
+3. physical state;
+4. relative size nếu cần;
+5. orientation;
+6. FRAME POSITION;
+7. ENVIRONMENT POSITION / bề mặt chứa;
+8. held/worn/placed/dropped/embedded/open/closed/active...;
+9. owner/contact relation nếu có.
+
+Thiếu HARD-REQUIRED khiến model phải đoán phần cốt lõi => FAIL.
+--- END VERBATIM BUOC_11 BLOCK: PER_ENTITY_HARD_REQUIRED ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: IN_FRAME_OFF_FRAME_CAST_VISIBILITY | SOURCE_LINES 1008-1116 | SHA256 31c2f504a43d373318ff8268006c1e1f677b1f2e6c01f7603257f4a1fcaef87a ---
+[HARD LOCK ADDENDUM — IMAGE_PROMPT PHẢI RENDER ĐỦ IN_FRAME_ENTITIES, KHÔNG CHỈ MAIN SUBJECT]
+
+Khóa này là bắt buộc cho mọi IMAGE_PROMPT SMALL_SCENE và bổ sung cho toàn bộ rule CHAR/reference/staging/self-contained hiện có.
+
+A. AUTHORITY CỦA CAST KHI VIẾT PROMPT
+1. IMAGE_PROMPT không được tự suy cast từ câu narration, source line, tên nhân vật được nhắc nhiều nhất, MAIN_ACTOR hoặc câu mô tả trọng tâm.
+2. Cast visibility của prompt phải lấy trực tiếp từ SMALL_SCENE_VISUAL_PLAN đã PASS:
+- SCENE_ACTIVE_CAST = ai còn thực sự hiện diện vật lý;
+- IN_FRAME_ENTITIES = ai bắt buộc nhìn thấy trong ảnh/panel;
+- OFF_FRAME_BUT_PRESENT = ai vẫn ở scene nhưng được camera/spatial lock loại khỏi khung;
+- RENDER_REQUIRED_ENTITIES nếu upstream đã xuất field này.
+3. Nếu RENDER_REQUIRED_ENTITIES tồn tại, nó phải khớp IN_FRAME_ENTITIES và là danh sách render bắt buộc.
+4. MAIN_ACTOR / PRIMARY SUBJECT / VISUAL PRIORITY chỉ xác định trọng tâm bố cục; không phải danh sách cast.
+
+B. BẮT BUỘC RENDER TOÀN BỘ IN_FRAME_ENTITIES
+Với mỗi entity trong IN_FRAME_ENTITIES:
+- phải có exact CHAR_XX/reference resource phù hợp khi entity cần reference;
+- phải xuất hiện trong REFERENCE_LIST khi rule reference hiện hành yêu cầu;
+- phải được gọi trong IMAGE_PROMPT body;
+- phải có tối thiểu pose/action hoặc trạng thái hiện tại, frame position/environment position và spatial relation đủ để model dựng đúng;
+- entity phụ không được bỏ chỉ vì current beat nói chủ yếu về A.
+
+Nếu IN_FRAME_ENTITIES = A, B, C thì prompt phải có A+B+C.
+Prompt chỉ có A trong trường hợp này = HARD FAIL, dù A là nhân vật trọng tâm.
+
+C. OFF_FRAME_BUT_PRESENT
+Entity thuộc OFF_FRAME_BUT_PRESENT:
+- vẫn phải được giữ trong continuity reasoning;
+- không được render như một subject nhìn thấy trong panel hiện tại;
+- chỉ được nhắc bằng negative/spatial/camera continuity wording khi thực sự cần để chống model kéo họ vào khung;
+- không cần đưa exact CHAR reference vào panel nếu entity hoàn toàn không được nhìn thấy và reference không cần cho một yếu tố visible khác, trừ khi rule upstream/reference packaging bắt buộc.
+Không được biến OFF_FRAME_BUT_PRESENT thành "đã rời scene".
+
+D. PROMPT KHÔNG ĐƯỢC TỰ ĐỔI CAMERA ĐỂ XÓA CAST
+Nếu visual plan đã khóa:
+IN_FRAME_ENTITIES = A+B
+thì IMAGE_PROMPT không được tự chuyển sang extreme close-up A để bỏ B.
+Muốn chỉ render A thì quyết định đó phải được khóa từ bước đạo diễn/visual-plan:
+SCENE_ACTIVE_CAST = A+B
+IN_FRAME_ENTITIES = A
+OFF_FRAME_BUT_PRESENT = B
+với camera/crop reason hợp lệ.
+Nếu prompt writer cho rằng framing upstream cần đổi, phải trả issue upstream; không tự sửa trong prompt.
+
+E. VÍ DỤ BẮT BUỘC — MẸ VÀ CON
+
+CASE 1 — cả hai trong khung:
+SCENE_ACTIVE_CAST: Mẹ, Con.
+IN_FRAME_ENTITIES: Mẹ, Con.
+OFF_FRAME_BUT_PRESENT: NONE.
+CURRENT_VISUAL_MOMENT: Người mẹ dừng lại ngước nhìn mây đen với vẻ lo âu; người con vẫn đứng/đi cạnh mẹ.
+IMAGE_PROMPT bắt buộc gọi exact CHAR của Mẹ + exact CHAR của Con. Mẹ là main subject, nhưng con vẫn phải có vị trí và trạng thái tối thiểu trong khung.
+
+CASE 2 — chỉ mẹ trong close-up:
+SCENE_ACTIVE_CAST: Mẹ, Con.
+IN_FRAME_ENTITIES: Mẹ.
+OFF_FRAME_BUT_PRESENT: Con.
+CAMERA: close-up chặt khuôn mặt/vai mẹ; người con hợp lý nằm ngoài crop.
+IMAGE_PROMPT được phép chỉ render exact CHAR của Mẹ. Prompt phải giữ camera close-up tương thích với visual plan; không được coi Con là đã rời scene.
+
+CASE 3 — sai:
+SCENE_ACTIVE_CAST: Mẹ, Con.
+IN_FRAME_ENTITIES: Mẹ, Con.
+Nhưng IMAGE_PROMPT chỉ gọi CHAR của Mẹ vì narration đang nói về biểu cảm của mẹ.
+=> HARD FAIL: IN_FRAME_ENTITY_DROPPED.
+
+F. MULTI_PANEL
+Với MULTI_PANEL phải kiểm riêng từng panel:
+- entity nào IN_FRAME ở panel nào phải xuất hiện ở panel đó;
+- entry/exit/crop thay đổi giữa panel phải dựa panel breakdown đã khóa;
+- không được vì reference list có đủ CHAR mà body panel lại thiếu entity cần thấy;
+- không được kéo entity OFF_FRAME vào panel không được phép.
+
+G. RELATION VỚI X-A HARD-REQUIRED CHO TỪNG CHAR / ENTITY
+Phần X-A tiếp tục áp dụng đầy đủ cho MỖI entity bắt buộc render.
+Khóa mới này bổ sung bước kiểm trước X-A:
+BƯỚC 1: xác định đầy đủ entity bắt buộc render từ IN_FRAME_ENTITIES.
+BƯỚC 2: sau đó áp dụng toàn bộ HARD-REQUIRED của X-A cho từng entity đó.
+Không được áp dụng X-A chỉ cho main actor rồi bỏ secondary in-frame actor.
+
+H. QA HARD CHECK BỔ SUNG
+Mỗi prompt phải kiểm:
+1. SCENE_ACTIVE_CAST có được đọc từ visual plan không?
+2. IN_FRAME_ENTITIES có được đọc đầy đủ không?
+3. OFF_FRAME_BUT_PRESENT có được đọc đầy đủ không?
+4. Mọi IN_FRAME entity đã có exact mapping/reference đúng chưa?
+5. Mọi IN_FRAME entity đã xuất hiện thật trong prompt body chưa?
+6. Có entity phụ nào bị bỏ chỉ vì MAIN_ACTOR là A không?
+7. Có entity OFF_FRAME nào bị render sai không?
+8. Camera prompt có đúng camera/crop visibility đã khóa không?
+9. Prompt có tự đổi close-up để giảm cast không?
+10. Với multi-panel, cast từng panel có đúng không?
+11. Entry/exit có đúng current moment không?
+12. Prompt có buộc model phải đoán xem B/C còn trong scene hay không không? Nếu có = FAIL.
+
+I. FAIL TYPE BỔ SUNG — HARD FAIL KHI ÁP DỤNG
+MISSING_SCENE_CAST_CONTEXT
+MISSING_IN_FRAME_ENTITY
+IN_FRAME_ENTITY_DROPPED
+IN_FRAME_ENTITY_REFERENCE_MISSING
+IN_FRAME_ENTITY_BODY_MISSING
+OFF_FRAME_ENTITY_WRONGLY_RENDERED
+OFF_FRAME_CONTINUITY_LOST
+CAST_VISIBILITY_MISMATCH
+CAMERA_USED_TO_ERASE_CAST
+ENTRY_EXIT_CAST_MISMATCH
+PANEL_CAST_MISMATCH
+
+Bất kỳ lỗi nào làm một entity bắt buộc trong IN_FRAME_ENTITIES không được render đúng đều là HARD FAIL, không được hạ thành lỗi thẩm mỹ/minor.
+--- END VERBATIM BUOC_11 BLOCK: IN_FRAME_OFF_FRAME_CAST_VISIBILITY ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: WEAPON_TOOL_GEAR_CLASSIFICATION | SOURCE_LINES 1120-1226 | SHA256 889acdb0758670baa059959b0de11d874046cf301d1e9c99c7410b23e89b64d6 ---
+X-B. HARD LOCK — PHÂN LOẠI VŨ KHÍ / CÔNG CỤ / ĐỒ ĐEO CỦA CHAR
+======================================================================
+
+Đây là BƯỚC TRỌNG YẾU BẮT BUỘC, không phải ghi chú phụ.
+
+Trước khi viết hành động của bất kỳ CHAR nào có vũ khí, công cụ, vật dụng nghề nghiệp, vật đeo chiến đấu hoặc gear đặc thù, AI PHẢI mở và đối chiếu file hỗ trợ/resource hiện hành để xác định chính xác vật đó thuộc loại nào.
+
+A. PHÂN LOẠI BẮT BUỘC
+
+LOẠI 1 — TÍCH HỢP TRONG CHAR REFERENCE
+Vật là một phần của thiết kế canonical của CHAR, ví dụ:
+- kiếm đeo hông mặc định;
+- súng nằm trong holster canonical;
+- staff luôn đi kèm thiết kế CHAR;
+- shield đeo lưng;
+- túi dụng cụ, belt pouch, quiver, sheath, scabbard, holster, backpack;
+- gear nghề nghiệp là một phần của reference CHAR.
+
+LOẠI 2 — RESOURCE RIÊNG
+Vật có token/resource riêng trong file hỗ trợ, ví dụ:
+- CHAR riêng cho item/weapon/device;
+- item reference riêng;
+- state riêng;
+- reference state riêng có exact CHAR_XX/BG_XX riêng;
+- effect projectile riêng;
+- resource có thể tồn tại độc lập với CHAR.
+
+B. NẾU VŨ KHÍ/CÔNG CỤ TÍCH HỢP TRONG CHAR
+
+Header không cần thêm token riêng chỉ vì vật là một phần canonical của CHAR.
+NHƯNG BODY PROMPT PHẢI NÓI RÕ TRẠNG THÁI HIỆN TẠI CỦA VẬT TRONG SMALL_SCENE ĐÓ.
+
+Phải ghi rõ một trong các trạng thái nhìn thấy được, tùy source/file hỗ trợ:
+- đang cầm;
+- đang dùng;
+- đang rút ra;
+- vẫn tra vỏ;
+- đang đeo bên hông;
+- đang đeo sau lưng;
+- đang treo trên belt;
+- nằm trong holster;
+- đang mang nhưng chưa dùng;
+- không cầm;
+- không rút;
+- không kích hoạt.
+
+CẤM viết mơ hồ:
+- with his usual weapon;
+- normally equipped;
+- gear as usual;
+- carrying standard equipment.
+
+Phải viết cụ thể kiểu:
+- the sword remains fully sheathed at CHAR_XX's left hip;
+- the handgun stays secured inside the right-side holster and is not drawn;
+- the staff is carried in CHAR_XX's right hand;
+- the shield remains strapped across CHAR_XX's back;
+- the toolkit hangs from the belt but is not being used.
+
+C. NẾU VŨ KHÍ/CÔNG CỤ LÀ RESOURCE RIÊNG
+
+Bắt buộc:
+1. đưa đúng token resource vào REFERENCE_LIST nếu rule hiện hành yêu cầu reference;
+2. mô tả rõ type/exact reference-state resource ID;
+3. mô tả ai sở hữu hoặc đang tiếp xúc;
+4. mô tả orientation;
+5. mô tả vị trí trong frame;
+6. mô tả vị trí trong môi trường;
+7. mô tả held/worn/placed/dropped/embedded/open/closed/active/inactive;
+8. không cho vật tự xuất hiện ở tay CHAR nếu source chưa cho phép.
+
+D. TRẠNG THÁI CẦM / MANG / ĐEO PHẢI THEO SMALL_SCENE HIỆN TẠI
+
+Ngay cả khi vũ khí là một phần canonical của CHAR, prompt không được mặc định rằng CHAR luôn cầm nó.
+
+- reference cho thấy kiếm đeo hông; SMALL_SCENE hiện tại là hội thoại bình thường → sword remains sheathed;
+- SMALL_SCENE hiện tại đã khóa hành động rút kiếm → sword is being drawn;
+- SMALL_SCENE/continuity hiện tại đã khóa vũ khí đã bị ném → không được tự reset về tay chỉ vì reference gốc có vũ khí;
+- SMALL_SCENE/continuity hiện tại đã khóa súng đã cất → không được tạo súng đang cầm.
+
+E. NẾU FILE HỖ TRỢ MÂU THUẪN SOURCE
+
+Nếu file hỗ trợ/resource cũ nói vật tích hợp nhưng source/state mới cho biết vật đã mất, gãy, bỏ lại hoặc chuyển owner:
+- không reset theo reference;
+- ưu tiên state/continuity hiện hành;
+- nếu resource chưa có state phù hợp, đánh GAP và sửa upstream.
+
+F. QA BẮT BUỘC CHO VŨ KHÍ/CÔNG CỤ
+
+Trước khi prompt được FINAL, phải PASS toàn bộ:
+- WEAPON/TOOL CLASSIFICATION CHECK;
+- INTEGRATED OR SEPARATE RESOURCE CHECK;
+- HELD/WORN/CARRIED/NOT-DRAWN STATE CHECK;
+- OWNER CHECK;
+- ORIENTATION CHECK;
+- CONTACT CHECK;
+- SOURCE TIMING CHECK;
+- NO AUTO-EQUIP RESET CHECK.
+
+HARD FAIL CODE khuyến nghị:
+- WEAPON_TOOL_NOT_CLASSIFIED;
+- INTEGRATED_GEAR_STATE_MISSING;
+- SEPARATE_RESOURCE_MISSING_FROM_HEADER;
+- WRONG_WEAPON_TOOL_OWNER;
+- WRONG_WEAPON_TOOL_STATE;
+- AUTO_EQUIP_RESET;
+- SOURCE_MISMATCH_WEAPON_TOOL_USE.
+--- END VERBATIM BUOC_11 BLOCK: WEAPON_TOOL_GEAR_CLASSIFICATION ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: NON_HUMAN_SCALE_LOCK | SOURCE_LINES 1255-1311 | SHA256 eb90d86404f09ba99529f1dcd280dd637d18ea5ca6e116d376b95693e2c36011 ---
+XII. HARD LOCK — CHAR PHI NHÂN LOẠI
+======================================================================
+
+Áp dụng cho:
+- thú;
+- yêu thú;
+- linh thú;
+- ma thú;
+- quái vật;
+- rồng;
+- sinh vật đặc biệt;
+- familiar;
+- pet phi nhân loại;
+- entity dạng thú.
+
+MỖI CHAR PHI NHÂN LOẠI BẮT BUỘC KHÓA 5 LỚP:
+1. LOÀI / DẠNG SINH VẬT.
+2. SIZE LEVEL.
+3. TỶ LỆ SO VỚI NGƯỜI.
+4. BODY MASS / PROPORTIONS.
+5. CẢM GIÁC QUY MÔ.
+
+Có thể dùng hệ nội bộ:
+- SIZE_BEAST_S;
+- SIZE_BEAST_M;
+- SIZE_BEAST_L;
+- SIZE_BEAST_XL;
+- SIZE_BEAST_GIANT.
+
+NHƯNG IMAGE_PROMPT CUỐI KHÔNG ĐƯỢC CHỈ GHI SIZE LEVEL.
+Phải chuyển thành mô tả trực quan.
+
+SAI:
+CHAR_06 is a large beast.
+CHAR_06 is SIZE_BEAST_XL.
+a giant wolf.
+
+ĐÚNG:
+Use CHAR_06 as the exact locked visual reference for a massive amphibious four-legged predator. Preserve its SIZE_BEAST_XL scale: while standing on all fours, its back reaches approximately the chest height of an adult human, its body mass is several times that of an ordinary large animal, and its total body length is visibly greater than an adult human's height.
+
+Khi có người trong ảnh:
+- bắt buộc khóa creature ↔ human scale.
+
+Khi creature đứng một mình:
+- vẫn nhắc lại relative scale hoặc mass để model không tự thu nhỏ.
+
+Khi cận cảnh:
+- vẫn nhắc scale toàn thân.
+
+Nếu creature đã khóa scale:
+- không được ảnh này cỡ mèo, ảnh khác cỡ ngựa;
+- chỉ đổi size khi source có transformation/size-change thật.
+
+CHAR phi nhân loại đã có state size khác:
+- dùng đúng state reference;
+- ví dụ adult-cat form khác kitten form;
+- không dùng base reference rồi mô tả size ngược với reference.
+--- END VERBATIM BUOC_11 BLOCK: NON_HUMAN_SCALE_LOCK ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: ACTION_EMOTION_HANDS_MECHANICS | SOURCE_LINES 1560-1664 | SHA256 adbe9d93c7d15800c66b8074a22a0ac1950a0a48ce7b30eca8c08feda30ecaf3 ---
+XVI. ACTION MECHANICS
+======================================================================
+
+Với hành động quan trọng, khóa:
+- actor;
+- target;
+- tay/vũ khí;
+- grip;
+- contact point;
+- force direction;
+- body orientation;
+- joint movement nếu cần;
+- weight distribution;
+- target reaction;
+- object response;
+- environmental response.
+
+Không chỉ:
+CHAR_01 attacks CHAR_02.
+
+Nếu KEY là cú đánh:
+phải dựng được đường lực và contact.
+
+ACTION FRAME:
+Mỗi ảnh chọn một phase chính:
+- anticipation;
+- acceleration;
+- impact;
+- recoil;
+- follow-through;
+- aftermath.
+
+Không nhồi nhiều phase không thể đồng thời tồn tại.
+
+Motion phụ chỉ thêm nếu SMALL_SCENE/PARENT SCENE continuity hỗ trợ:
+- hair;
+- cloth;
+- water;
+- dust;
+- debris;
+- leaves;
+- magic particles.
+
+======================================================================
+XVII. EMOTION / FACIAL ACTING / BODY LANGUAGE
+======================================================================
+
+Không chỉ ghi:
+- angry;
+- sad;
+- shocked;
+- neutral;
+- confident.
+
+Khi cảm xúc là KEY, chuyển thành dấu hiệu nhìn thấy:
+- eye focus;
+- eyelid tension;
+- brow angle;
+- mouth shape;
+- jaw tension;
+- head angle;
+- chin;
+- neck tension;
+- shoulder tension;
+- torso lean;
+- hand tension;
+- stance;
+- weight shift;
+- distance between CHARs.
+
+Không tự tăng mức cảm xúc:
+- bất ngờ ≠ hoảng loạn;
+- buồn ≠ tuyệt vọng;
+- khó chịu ≠ cuồng nộ.
+
+State CHAR không được tạo riêng chỉ vì facial expression.
+Expression được viết trực tiếp trong scene prompt.
+
+======================================================================
+XVIII. HANDS / CONTACT
+======================================================================
+
+Nếu action có:
+- nắm;
+- kéo;
+- đỡ;
+- chống;
+- giữ;
+- ép;
+- chạm;
+- cầm;
+- đẩy;
+
+phải xác định:
+- tay nào nếu quan trọng;
+- chạm vào đâu;
+- vật/CHAR phản ứng ra sao.
+
+Hands phải:
+- đơn giản;
+- đọc được;
+- anatomy sạch;
+- contact tự nhiên.
+
+Không bắt buộc show cả hai tay nếu không cần.
+--- END VERBATIM BUOC_11 BLOCK: ACTION_EMOTION_HANDS_MECHANICS ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: MANDATORY_TEXT_AND_REFERENCE_METADATA_NEGATIVE | SOURCE_LINES 2264-2289 | SHA256 a5bef82368223642aab47f50dd818fe2fefcd4bc480b95d0edd2e2ecc76a5e10 ---
+XXIX. TEXT NEGATIVE — BẮT BUỘC MỖI PROMPT
+======================================================================
+
+Mỗi IMAGE_PROMPT phải cấm:
+- no speech bubbles;
+- no captions;
+- no subtitles;
+- no SFX text;
+- no readable text;
+- no watermark;
+- no logo;
+- no UI;
+- no prompt number rendered inside the image.
+
+
+BỔ SUNG BẮT BUỘC — REFERENCE-METADATA NEGATIVE:
+
+Ngoài các mục TEXT NEGATIVE ở trên, MỖI IMAGE_PROMPT phải có khóa rõ rằng mọi chữ/số/nhãn/kích thước/annotation nhìn thấy trong ảnh tham chiếu không được render vào ảnh kết quả.
+
+CÂU KHÓA BẮT BUỘC:
+Do not render or copy any text, numbers, labels, annotations, character names, dimension notes, height/size labels, rulers, measurement lines, measurement arrows, size charts, technical marks, watermarks, logos, UI elements or other reference-sheet metadata visible in any reference image. Use reference measurements only to preserve natural physical scale and proportions; never display those measurements or metadata in the generated image.
+
+Lưu ý:
+- câu khóa này cấm HIỂN THỊ metadata trong ảnh;
+- không cấm prompt dùng scale/relative scale để dựng đúng tỷ lệ vật lý;
+- không được xóa SCALE LOCK chỉ vì đã cấm size label.
+--- END VERBATIM BUOC_11 BLOCK: MANDATORY_TEXT_AND_REFERENCE_METADATA_NEGATIVE ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: VISUALIZATION_FIRST_THOUGHT_TO_VISIBLE | SOURCE_LINES 3078-3429 | SHA256 90048c4a0b575d7f3827adc9bf38934fc9bba0e7251205dff67dcae725193d99 ---
+======================================================================
+XX. VISUALIZATION-FIRST / THOUGHT-TO-VISIBLE LOCK
+======================================================================
+
+A. NGUYÊN TẮC CỐT LÕI MỚI
+1. IMAGE_PROMPT là chỉ dẫn dựng hình, không phải bản diễn giải nội dung truyện.
+2. IMAGE_PROMPT phải ưu tiên thứ nhìn thấy được trong khung hình:
+- ai xuất hiện;
+- đang ở đâu;
+- đang làm gì;
+- tư thế như thế nào;
+- ánh mắt nhìn đi đâu;
+- biểu cảm cụ thể ra sao;
+- khoảng cách giữa các nhân vật;
+- đạo cụ/gear ở trạng thái nào;
+- camera dựng khoảnh khắc theo góc nào;
+- ánh sáng/thời gian/môi trường ra sao.
+3. Nếu source có nội tâm hoặc lời bình, nhiệm vụ của IMAGE_PROMPT là tìm “dấu hiệu thị giác tương ứng”, không phải chép ý nghĩ đó vào prompt.
+4. Khi SMALL_SCENE đã khóa chứa nội tâm hoặc suy nghĩ, nội dung đó phải được chuyển thành một khoảnh khắc nhìn thấy được, bằng biểu hiện cơ thể/phản ứng gần nhất và trung thực nhất với ngữ cảnh đã khóa.
+5. Prompt càng ít phần giải thích trừu tượng và càng giàu visual acting/staging thì càng đúng chức năng.
+
+B. ĐỊNH NGHĨA “VISUAL TRANSLATION”
+VISUAL TRANSLATION là quá trình biến “ý nghĩa source” thành “biểu hiện có thể vẽ được”.
+
+Công thức bắt buộc:
+LOCKED SMALL_SCENE MEANING
+-> dùng đúng key beat đã khóa của SMALL_SCENE hiện tại
+-> xác định bằng chứng thị giác của key beat đó
+-> viết thành visual instruction tiếng Anh
+
+Không được đi ngược chiều:
+LOCKED SMALL_SCENE MEANING
+-> chép lại ý nghĩ/narration vào IMAGE_PROMPT
+
+Bằng chứng thị giác có thể gồm:
+- posture;
+- stance;
+- gesture;
+- hand acting;
+- facial acting;
+- eye direction;
+- head angle;
+- shoulder tension;
+- torso lean;
+- stepping / retreating / pivoting;
+- distance giữa các nhân vật;
+- relative placement;
+- contact / no-contact;
+- gear/object state;
+- environmental reaction;
+- camera emphasis.
+
+C. PHÂN LOẠI THÔNG TIN SOURCE VÀ CÁCH CHUYỂN HÓA
+
+1. Source là NỘI TÂM / SUY NGHĨ
+Ví dụ logic:
+- A đang trầm tư suy nghĩ.
+- A cảm thấy khó xử.
+- A chợt nghĩ điều đó thật vô lý.
+- A tự ghê sợ liên tưởng của mình.
+
+Không viết kiểu:
+- A is thinking that...
+- A realizes that...
+- A has an association about...
+- A feels internally conflicted because...
+
+Phải chuyển thành:
+- ngồi yên / đứng khựng;
+- mắt nhìn xuống / nhìn lệch / nhìn xa xăm;
+- nhíu mày nhẹ / mím môi / siết hàm;
+- khoanh tay / một tay chống cằm / ngón tay chạm cằm / siết vạt áo / siết bàn tay;
+- quay mặt đi / né ánh mắt / lùi nửa bước;
+- vai cứng lại / cổ hơi rụt / thân người khép lại.
+
+2. Source là CẢM XÚC
+Ví dụ logic:
+- hoảng sợ;
+- ngạc nhiên;
+- xấu hổ;
+- chán ghét;
+- ghê tởm;
+- miễn cưỡng;
+- bối rối;
+- xúc động.
+
+Không viết trừu tượng dài dòng.
+Phải chuyển thành facial acting + body language cụ thể:
+- eyes widen;
+- brows lift or knit;
+- lips press thin / tremble / part slightly;
+- cheeks flush lightly nếu thực sự cần;
+- shoulders tense / slump;
+- one step back;
+- hands lift defensively;
+- body freezes;
+- gaze averts.
+
+3. Source là SUY LUẬN / NHẬN ĐỊNH / ĐÁNH GIÁ
+- A thấy chuyện này không ổn.
+- A cho rằng B đang giấu điều gì.
+- A nhận ra C nói dối.
+
+Không biến thành câu giải thích trực tiếp.
+Phải chuyển thành dấu hiệu thị giác như:
+- narrowed eyes;
+- suspicious stare;
+- still posture;
+- head tilt;
+- doubtful expression;
+- cautious hand gesture;
+- subtle leaning away.
+
+4. Source là LỜI BÌNH NARRATOR / ẨN DỤ / SO SÁNH
+- như ác quỷ;
+- như tận thế;
+- như bị sét đánh;
+- như vua quỷ gọi đứa trẻ đi;
+- metaphor về baseball / marriage / social disaster.
+
+Quy tắc:
+- không literal hóa ẩn dụ trừ khi source thật sự tạo sự kiện vật lý tương ứng;
+- không vẽ quỷ, sét, tận thế, đám cưới, tương lai, con cái, quái vật, biểu tượng bóng chày... nếu đó chỉ là lời ví von.
+- phải giữ hiện thực vật lý của khoảnh khắc hiện tại và chỉ dùng facial/body acting để biểu đạt mức độ cảm xúc.
+
+5. Source là TƯƠNG LAI GIẢ ĐỊNH / HYPOTHETICAL / WHAT-IF
+- nếu A làm vậy thì B chắc sẽ...
+- rồi sau này có khi...
+- tưởng tượng cảnh...
+
+Không được vẽ như đang thật sự xảy ra.
+Phải neo prompt vào current physical moment.
+Nếu cần giữ nghĩa, chỉ chuyển thành:
+- overactive imagination visible through reaction face;
+- startled pause;
+- speechless stare;
+- tense posture.
+
+6. Source là BACKSTORY / GIẢI THÍCH NHÂN QUẢ KHÔNG THUỘC CURRENT FRAME
+- vì chuyện xảy ra hôm trước nên A cảm thấy...
+- B từng bị phản bội nên...
+
+Không chép background explanation vào IMAGE_PROMPT dài dòng.
+Chỉ giữ thứ ảnh hiện tại cần:
+- guarded posture;
+- distant expression;
+- defensive spacing;
+- visible scar only if canon current SMALL_SCENE requires it;
+- relevant object if physically present now.
+
+7. Source là NỘI DUNG THÔ TỤC / NHẠY CẢM / CẤM KỴ / ADULT JOKE
+- Không đưa nguyên từ khóa nhạy cảm/sexual/gross/incest/explicit vào prompt nếu thứ đó không cần cho hình ảnh hiện tại.
+- Nếu source có narrator joke hoặc thought nhưng ảnh hiện tại chỉ cần phản ứng của nhân vật, hãy mô tả phản ứng nhìn thấy được.
+- Dùng cách diễn đạt an toàn như:
+ - uncomfortable expression;
+ - disgusted self-correction;
+ - awkward family-safe comedy;
+ - non-suggestive;
+ - non-romantic;
+ - child-safe;
+ - emotionally tense;
+ - disturbed reaction.
+- Không nhồi các negative giải thích kiểu semantic dài dòng mang từ khóa explicit nếu ảnh không hề cần vẽ những nội dung đó.
+
+D. HARD LOCK — CHỈ VIẾT THỨ CÓ THỂ NHÌN THẤY
+Mọi IMAGE_PROMPT bắt buộc phải tự hỏi:
+1. Thông tin này có thể nhìn thấy trực tiếp trên ảnh không?
+2. Nếu không nhìn thấy trực tiếp, tôi đã chuyển nó thành pose/expression/staging chưa?
+3. Nếu vẫn chỉ là giải thích nội tâm, phải viết lại.
+
+Nếu một mệnh đề không tạo ra chỉ dẫn thị giác cụ thể, nó phải:
+- bị xóa; hoặc
+- bị chuyển thành visual acting.
+
+E. BẢNG CHUYỂN DỊCH NHANH — TỪ Ý NGHĨA SANG HÌNH ẢNH
+
+1. Trầm tư / suy nghĩ sâu:
+- seated or standing still;
+- arms folded, one hand touching the chin;
+- eyes angled downward or off to the side;
+- brows slightly drawn;
+- mouth closed, neutral or faintly tense.
+
+2. Khó xử / bối rối:
+- shoulders tense;
+- gaze shifts away;
+- lips part slightly;
+- one hand half-raised then stopping;
+- stiff neck posture.
+
+3. Ghê / chán ghét / tự ghét liên tưởng:
+- quick eye aversion;
+- mouth tightened;
+- brows pinched;
+- slight recoil;
+- shoulders stiffen.
+
+4. Nghi ngờ:
+- narrowed eyes;
+- head tilt;
+- still body;
+- guarded stance;
+- one brow subtly raised.
+
+5. Xúc động / nhẹ lòng:
+- shoulders release;
+- softened eyes;
+- warm small smile;
+- relaxed hands;
+- slight forward lean.
+
+6. Im lặng cảnh giác:
+- finger near lips;
+- body held still;
+- eyes fixed toward source of sound;
+- lifted shoulders;
+- shallow-breath tension visible in face.
+
+7. Sợ hãi:
+- widened eyes;
+- frozen posture or step back;
+- open defensive hands;
+- tight jaw;
+- hunched shoulders.
+
+8. Quyết tâm:
+- squared shoulders;
+- firm stance;
+- direct eye line;
+- hand set with purpose;
+- torso leaning into action.
+
+F. LOCK CHO PROMPT CÓ TRẺ EM / MINOR-SAFE VISUALIZATION
+1. Khi nhân vật là child/minor, tuyệt đối tránh nhồi từ khóa sexual explicit kể cả dưới dạng negative nếu chúng không phải là yếu tố vật lý cần dựng.
+2. Với scene có narrator joke, internal association hoặc phần source dễ nhạy cảm:
+- chỉ mô tả facial reaction, awkward pause, self-correction, child-safe spacing, innocent expression, confused expression, protective positioning.
+3. Dùng các cụm kiểm soát an toàn ngắn và kỹ thuật:
+- strictly non-sexualized;
+- child-safe;
+- family-safe;
+- non-suggestive;
+- non-romantic;
+- innocent childhood interaction.
+4. Không dùng một chuỗi dài keyword explicit chỉ để nói “không được vẽ”. Điều đó dễ làm prompt rơi vào semantic noise hoặc safety block mà không giúp dựng ảnh tốt hơn.
+
+G. LOCK CHO NEGATIVE INSTRUCTION
+1. Negative instruction phải ngắn, hữu dụng, phục vụ kiểm soát ảnh.
+2. Negative không được biến prompt thành một bài diễn giải đạo đức hoặc bài tóm tắt nội dung bị cấm.
+3. Nếu current scene không có nguy cơ hiểu nhầm cao, không cần liệt kê một danh sách dài nội dung không liên quan.
+4. Ưu tiên negative theo ba lớp:
+- kỹ thuật: no text, no watermark, no UI, no photorealism;
+- continuity: do not reveal X yet, do not launch spell yet, do not show later-state family;
+- safety/semantic tối giản: keep all characters child-safe / non-suggestive / non-romantic.
+
+H. LOCK CHO CAMERA VÀ STAGING THEO KEY BEAT
+Vì IMAGE_PROMPT là chỉ dẫn hình ảnh, key beat phải được camera support.
+- nếu key beat là phản ứng khó chịu -> medium reaction shot;
+- nếu key beat là khoảng cách tâm lý -> staging tách vị trí;
+- nếu key beat là ai đó bị cả lớp nhìn sang -> medium-wide composition thể hiện eye-line convergence;
+- nếu key beat là bàn tay chuẩn bị phép -> framing phải thấy rõ bàn tay;
+- nếu key beat là self-correction -> framing phải thấy rõ hướng quay mặt đi + biểu cảm.
+
+Không được nói key beat mà staging/camera lại không giúp đọc được key beat đó.
+
+I. LOCK CHO ACTIONABLE DETAIL
+Mỗi IMAGE_PROMPT phải ưu tiên chi tiết hành động có thể vẽ:
+- đứng/ngồi/quỳ/tựa/lùi/bước/chạy/nghiêng;
+- cánh tay đặt ở đâu;
+- bàn tay làm gì;
+- đầu quay hướng nào;
+- ánh mắt hướng đâu;
+- chân đang đứng thế nào;
+- khoảng cách với nhân vật khác;
+- đạo cụ đang được cầm, đeo, hay không hoạt động.
+
+Nếu prompt thiếu actionables mà chỉ có semantic explanation, prompt chưa đạt.
+
+J. KHUNG VIẾT BẮT BUỘC CHO “NỘI DUNG KHÔNG NHÌN THẤY”
+Khi source chứa thứ không nhìn thấy trực tiếp, dùng quy trình sau:
+1. Xác định nội dung ẩn: thought / inference / fear / disgust / metaphor / awkwardness.
+2. Xác định reaction surface:
+- face;
+- eyes;
+- mouth;
+- shoulders;
+- spine/torso;
+- hands;
+- spacing.
+3. Chọn 2–5 dấu hiệu đủ mạnh nhất.
+4. Viết thành visual action sentence.
+5. Bỏ phần giải thích thừa.
+
+Ví dụ chuẩn:
+SMALL_SCENE logic: “A thinks that is strange.”
+Prompt logic: “A holds still with a doubtful expression, one brow slightly raised, eyes narrowed toward B, one arm folded while the other hand touches the chin.”
+
+K. BAD vs GOOD EXAMPLES
+
+1. BAD:
+“A internally realizes that the situation is absurd and feels conflicted about what may happen later.”
+GOOD:
+“A falls briefly silent, eyes shifting aside, brows knit in uncertainty, one hand touching the chin while the other arm folds across the torso.”
+
+2. BAD:
+“A is disgusted by his own inappropriate association involving his parents.”
+GOOD:
+“A briefly looks toward her face, then quickly turns his eyes away with a stiff, uncomfortable expression, brows pinched and mouth tightened.”
+
+3. BAD:
+“The narrator compares the visitor to a demon king stealing children.”
+GOOD:
+“The mother reacts to the cheerful voice with exaggerated fear, body rigid and eyes fixed toward the entrance, while the room itself remains completely ordinary.”
+
+4. BAD:
+“A imagines marriage and future children.”
+GOOD:
+“A freezes with a comically over-serious processing face for one brief beat, then remains in the present entrance conversation.”
+
+5. BAD:
+“B feels deep affection and emotional dependence.”
+GOOD:
+“B smiles with open trust, standing close in a relaxed posture and looking directly up at A with bright, unguarded eyes.”
+
+L. HARD FAIL CONDITIONS TỪ ADDENDUM NÀY
+IMAGE_PROMPT phải FAIL nếu xảy ra một trong các lỗi sau:
+1. Chứa các đoạn semantic/narrative dài nhưng thiếu actionable visual detail.
+2. Chép lại nội tâm, lời bình hoặc giải thích của narrator thay vì chuyển hóa thành biểu cảm/tư thế/hành động.
+3. Dùng explicit sexual/inappropriate terminology không cần thiết cho current visual frame.
+4. Key beat chỉ được “nói” nhưng không được “dựng hình”.
+5. Camera/staging không support được thứ prompt nói là key beat.
+6. Negative block dài và nặng semantic tới mức làm prompt lệch khỏi nhiệm vụ vẽ ảnh.
+7. Với scene có minor, prompt chứa các từ khóa nhạy cảm không cần thiết thay vì diễn đạt child-safe non-suggestive.
+
+M. CHECKLIST NHANH CHO NGƯỜI VIẾT PROMPT
+Trước khi chốt từng SMALL_SCENE, bắt buộc tự kiểm:
+[ ] Tôi đã mô tả ai có mặt chưa?
+[ ] Tôi đã mô tả họ đang ở đâu chưa?
+[ ] Tôi đã mô tả tư thế/hành động chính chưa?
+[ ] Tôi đã mô tả ánh mắt/hướng nhìn chưa?
+[ ] Tôi đã mô tả biểu cảm bằng dấu hiệu nhìn thấy được chưa?
+[ ] Tôi đã mô tả khoảng cách/staging giữa các nhân vật chưa?
+[ ] Tôi đã dựng key beat bằng camera phù hợp chưa?
+[ ] Tôi có đang nhét giải thích nội tâm không nhìn thấy được không?
+[ ] Tôi có thể xóa bớt semantic explanation mà vẫn giữ hình ảnh rõ hơn không?
+[ ] Nếu có child/minor, prompt đã dùng ngôn ngữ an toàn, non-suggestive chưa?
+
+N. CÂU KHÓA CUỐI CỦA ADDENDUM
+“IMAGE_PROMPT DÙNG ĐỂ VẼ ẢNH, KHÔNG DÙNG ĐỂ KỂ LẠI NỘI TÂM.
+MỌI Ý NGHĨA SOURCE PHẢI ĐƯỢC CHUYỂN THÀNH THỨ CÓ THỂ NHÌN THẤY:
+POSE, GESTURE, EXPRESSION, EYE LINE, BODY TENSION, SPACING, STAGING, CAMERA.
+THỨ GÌ KHÔNG NHÌN THẤY ĐƯỢC THÌ KHÔNG CHÉP NGUYÊN XI VÀO PROMPT.
+PHẢI DỊCH NÓ THÀNH NGÔN NGỮ HÌNH ẢNH.”
+--- END VERBATIM BUOC_11 BLOCK: VISUALIZATION_FIRST_THOUGHT_TO_VISIBLE ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: VISUAL_FIRST_SENTENCE_ORDER | SOURCE_LINES 3431-3458 | SHA256 1ff19f9cac7584a89cff102fc306266e3213bc5d1335eeaa43a6680a3857594a ---
+======================================================================
+XXI. VISUAL-FIRST SENTENCE ORDER
+======================================================================
+Khuyến nghị mạnh mẽ thứ tự viết câu trong IMAGE_PROMPT khi mô tả main beat:
+1. Identify who is physically present.
+2. State who is the visual priority.
+3. Describe the pose / body posture of that priority.
+4. Describe face / eyes / mouth / hand acting.
+5. Describe secondary character reactions.
+6. Describe spacing / blocking / relative placement.
+7. State the key beat in visual terms.
+8. Reconstruct BG.
+9. Add camera / lighting.
+10. Add concise technical negatives.
+
+Template khung:
+- The only real physical characters are X, Y, Z.
+- X is the visual priority.
+- X stands/sits/kneels...
+- X's eyes / brows / mouth / hands...
+- Y reacts by...
+- Z remains...
+- The key beat is...
+- Reconstruct BG...
+- Camera...
+- Lighting/time...
+
+Cấm dùng template này để chèn narrative explanation thừa. Mỗi câu phải phục vụ dựng hình.
+--- END VERBATIM BUOC_11 BLOCK: VISUAL_FIRST_SENTENCE_ORDER ---
+
+
+--- BEGIN VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE | SOURCE_LINES 3459-3459 | SHA256 675e822693f711b667f9cf54faa1bd73d7b425305f782b9c33e9cc97c1050f8f ---
+CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu. Chỉ gom CHAR phụ khi tổng sẽ vượt 10. Tổng đã trong mức 10 thì không gom. Nhân vật diễn chính giữ CHAR riêng.
+--- END VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE ---
+
+
+========================================================================================================================
+USER LOCK — CÁCH GHI CHAR TRONG IMAGE_PROMPT — HIGHEST PRIORITY
+========================================================================================================================
+
+Phần ghi CHAR trong IMAGE_PROMPT chỉ ghi đúng:
+
+CHAR_XX ([TÊN hoặc DANH XƯNG hoặc DANH TỪ ĐỒ VẬT/VŨ KHÍ], [LÀ GÌ]), [CHIỀU CAO/KÍCH THƯỚC ĐÃ KHÓA].
+
+Trong ngoặc chỉ gồm:
+- TÊN hoặc DANH XƯNG hoặc DANH TỪ ĐỒ VẬT/VŨ KHÍ;
+- LÀ GÌ: nam giới, nữ giới, động vật, yêu tinh, chủng loại, cây cối, vật phẩm, công cụ, đao, kiếm, vũ khí...
+
+Ví dụ khi ghi trong IMAGE_PROMPT tiếng Anh:
+CHAR_01 (Noin, male), 114 cm tall.
+CHAR_05 (mother mage, female), 166 cm tall.
+CHAR_08 (giant fox spirit, fox spirit), [SIZE_LOCK].
+CHAR_12 (the sealed sword, sword/weapon), [SIZE_LOCK].
+CHAR_18 (ritual staff, staff/tool), 165 cm long.
+
+CHỈ VẬY THÔI.
+Không tự ý bổ sung nội dung khác vào phần định danh CHAR.
+Mọi quy tắc, ví dụ, template hoặc QA trước đó về CÁCH GHI CHAR nếu khác khóa này đều bị khóa này ghi đè; các quy tắc khác không liên quan đến cách ghi CHAR giữ nguyên hoàn toàn.
+
+========================================================================================================================
+USER LOCK — MỌI IMAGE_PROMPT BẮT BUỘC PHẢI CÓ BG_XX — HIGHEST PRIORITY / ABSOLUTE
+========================================================================================================================
+
+ÁP DỤNG TUYỆT ĐỐI CHO TOÀN BỘ PROJECT VÀ MỌI IMAGE_PROMPT.
+
+1. MỖI IMAGE_PROMPT BẮT BUỘC PHẢI CÓ ÍT NHẤT MỘT EXACT NUMBERED `BG_XX` TRONG HEADER.
+
+Header hợp lệ:
+- `001 | BG_03 | IMAGE_PROMPT: ...`
+- `001 | CHAR_01.BG_03 | IMAGE_PROMPT: ...`
+- `001 | CHAR_01.CHAR_04.BG_03 | IMAGE_PROMPT: ...`
+
+Header KHÔNG hợp lệ:
+- `001 | CHAR_01 | IMAGE_PROMPT: ...`
+- `001 | CHAR_01.CHAR_04 | IMAGE_PROMPT: ...`
+- `001 | IMAGE_PROMPT: ...`
+- bất kỳ header nào không có token `BG_XX`.
+
+2. BG PRESENCE = ALWAYS REQUIRED.
+- Không được đánh `N/A` cho việc có BG trong prompt.
+- Close-up, medium shot, full shot, action, dialogue visualization, emotional beat, thought, memory, flashback, dream, vision, hypothetical, montage, abstract treatment, dynamic treatment, symbolic treatment... đều vẫn phải gọi exact numbered `BG_XX` đã được upstream/B3 khóa.
+- Không được dùng lý do “không nhìn thấy nhiều background”, “neutral field”, “no identifiable background”, “no new BG resource”, “plain field”, “white field”, “abstract field” hoặc cách diễn đạt tương tự để bỏ token BG khỏi header.
+
+3. MỖI PROMPT DÒNG PHẢI CÓ ÍT NHẤT MỘT BG THÍCH HỢP VỚI DÒNG ĐÓ.
+- Header có ít nhất một `BG_XX` đã tạo từ tác phẩm. Một prompt được có nhiều `BG_XX`.
+- BG đó phải đúng nơi và đúng trạng thái của dòng đang viết.
+- Cùng một nơi có nhiều trạng thái BG khi tác phẩm dùng nơi đó lúc buổi sáng, rồi ở đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác. Prompt gọi đúng BG_XX của trạng thái đó.
+- Không lấy BG buổi sáng rồi sửa thành đêm hoặc mưa bằng câu chữ.
+- Không tự đặt mã BG mới.
+- Không chọn một BG khác chỉ để lấp chỗ trống khi BG đó không thích hợp với dòng.
+- Không dùng `BG_00` nếu BG đó không phải nơi của dòng.
+
+4. ID LẤY TỪ BẢNG ĐÃ TẠO.
+- Prompt gọi CHAR_XX và BG_XX đã tạo.
+- Khi đã có BG thích hợp, viết prompt và gắn BG đó. Không xuất `BG_GAP` hoặc `CHAR_GAP` thay cho prompt.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG. Cùng nơi và cùng trạng thái thì dùng lại BG đã có. Buổi sáng, ban đêm, mưa hoặc trạng thái môi trường khác rõ là các BG khác nhau.
+- Không tự đặt mã mới trong prompt dòng.
+
+5. HARD GATE TRƯỚC KHI PASS PROMPT:
+Mỗi prompt bắt buộc thỏa đồng thời:
+- header có ít nhất một `BG_XX`;
+- `BG_XX` tồn tại trong resource authority hiện hành;
+- BG đúng current OUTPUT_SLOT;
+- BG đúng state/location/reality layer/background function;
+- CHAR token nếu có phải đứng trước BG token;
+- tổng reference CHAR + BG tuân giới hạn hiện hành.
+
+Chỉ cần thiếu `BG_XX` trong header:
+`PROMPT_RESULT = FAIL_H`.
+Không được semantic-QA tiếp rồi cho PASS bằng suy luận khác.
+
+6. MACHINE INVARIANT BẮT BUỘC:
+`EVERY_IMAGE_PROMPT_MUST_HAVE_BG_XX = TRUE`
+`BG_MISSING_COUNT` phải được quét trên TOÀN scope đang QA.
+
+Điều kiện PASS bắt buộc:
+`BG_MISSING_COUNT = 0`
+
+Nếu:
+`BG_MISSING_COUNT > 0`
+=> `H_OPEN_COUNT > 0`
+=> batch/milestone/final = FAIL_H / NOT PASS.
+
+7. KHÓA CHỐNG FALSE PASS:
+- Có CHAR nhưng không có BG = FAIL_H.
+- Body có mô tả environment nhưng header không có BG token = FAIL_H.
+- Body ghi “neutral/non-location/no identifiable background” nhưng header không có BG token = FAIL_H.
+- Prompt đẹp, đúng CHAR, đúng action, đúng panel nhưng thiếu BG = FAIL_H.
+- Một prompt duy nhất thiếu BG cũng đủ làm FULL FINAL không được PASS.
+
+8. THỨ TỰ REPAIR KHI THIẾU BG HOẶC BG KHÔNG THÍCH HỢP:
+A. Đọc dòng nguồn.
+B. Chọn BG đã tạo, đúng nơi và đúng trạng thái của dòng. Suy nghĩ hoặc hồi tưởng có thể dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp cả hai theo hiệu ứng manga.
+C. Nếu trạng thái đó chưa có BG, tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG, rồi gắn mã đã tạo.
+D. Gắn mã BG đó vào header.
+E. Viết body theo đúng nơi và đúng trạng thái của BG đó.
+F. Giữ nguyên số đo đã khóa.
+G. Không tạo mã BG mới trong prompt dòng và không thay prompt bằng BG_GAP.
+
+9. OVERRIDE:
+Khóa này ghi đè mọi rule, ví dụ, template hoặc cách hiểu trước đó cho phép IMAGE_PROMPT không có BG, cho phép BG presence là optional/conditional/N/A, hoặc cho phép dùng prose thay cho exact `BG_XX` trong header.
+
+Chỉ user instruction rõ ràng REDEFINE/REPLACE khóa này mới được thay đổi.
+========================================================================================================================
+
