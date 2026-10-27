@@ -77,6 +77,7 @@ Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái c�
 Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ ghi đúng số đo đã khóa của từng người.
 Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
 Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
+Một CHAR chỉ có một số đo đã khóa. Thân thể chưa có CHAR riêng thì vẽ người không định danh, không gán CHAR của trạng thái khác.
 Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
 Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
 Chưa có BG đúng nơi thì không lấy BG khác để lấp và không giấu địa danh của BG sai.
@@ -89,6 +90,7 @@ FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Nếu BG không thích hợp và bảng đã có BG đúng, chỉ định BG đó. Nếu chưa có BG đúng nơi, nói cần tạo BG từ tác phẩm. Prompt dòng không tự đặt mã BG.
 FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
+Không FAIL khi prompt vẽ một thân thể hoặc trạng thái khác và không dùng CHAR của trạng thái hiện tại. Một CHAR chỉ có một số đo đã khóa. Không bắt gắn số đo khác.
 FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
 Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
 FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
@@ -105,6 +107,7 @@ Giữ nguyên số dòng và số thứ tự đã cho.
 Chỉ xuất các dòng được yêu cầu sửa, đúng định dạng trong quy tắc. Không viết lại dòng không được gửi.
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
 Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi số đo đã khóa.
+Không gắn một CHAR với số đo khác số đã khóa. Thân thể chưa có CHAR riêng thì giữ người không định danh.
 Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
 Nếu có BG_VUA_TAO, dùng đúng mã đó cho nơi còn thiếu. Không giữ BG cũ rồi giấu địa danh.
 Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
@@ -267,6 +270,51 @@ def next_bg_id(text: str) -> str:
     width = max(len(item) for item in found)
     number = max(int(item) for item in found) + 1
     return f"BG_{number:0{width}d}"
+
+
+_CM_SIZE = re.compile(r"(\d+(?:[.,]\d+)?)\s*cm", re.I)
+_CHAR_ID = re.compile(r"CHAR_\d+", re.I)
+
+
+def char_size_counts(records: list[dict]) -> dict[str, dict[str, int]]:
+    """How often each locked size is written next to a CHAR in this batch."""
+    counts: dict[str, dict[str, int]] = {}
+    for record in records:
+        text = f"{record.get('ids', '')} {record.get('body', '')}"
+        for match in _CHAR_ID.finditer(text):
+            char = match.group(0).upper()
+            window = text[match.end() : match.end() + 60]
+            bucket = counts.setdefault(char, {})
+            for size in _CM_SIZE.findall(window):
+                key = size.replace(",", ".")
+                bucket[key] = bucket.get(key, 0) + 1
+    return counts
+
+
+def lines_asking_second_size(report: str, records: list[dict], allowed: set[int]) -> list[int]:
+    """FAIL rows that would put a second height on a CHAR the line does not already use."""
+    counts = char_size_counts(records)
+    by_number = {record["n"]: record for record in records}
+    found: list[int] = []
+    for number, block in qa_fail_blocks(report):
+        if number not in allowed or number not in by_number or number in found:
+            continue
+        header = {item.upper() for item in _CHAR_ID.findall(str(by_number[number].get("ids", "")))}
+        asked_chars = {item.upper() for item in _CHAR_ID.findall(block)}
+        asked_sizes = [item.replace(",", ".") for item in _CM_SIZE.findall(block)]
+        if not asked_chars or not asked_sizes:
+            continue
+        for char in asked_chars:
+            if char in header:
+                continue
+            bucket = counts.get(char) or {}
+            if not bucket:
+                continue
+            majority = max(bucket, key=bucket.get)
+            if all(size != majority for size in asked_sizes):
+                found.append(number)
+                break
+    return found
 
 
 def valid_repair_map(text: str, expected: list[int], finish: str) -> dict[int, dict]:
@@ -608,6 +656,10 @@ class Job:
         if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(records)):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
             return records, reference
+        open_lines = self._open_fail_lines(report, records, width)
+        if not open_lines:
+            self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
+            return records, reference
         self._log(
             f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.",
             qa_log_body(report, records, width),
@@ -616,10 +668,18 @@ class Job:
         added: list[tuple[str, list[int]]] = []
         covered: set[int] = set()
         reference = self._supply_missing_backgrounds(
-            client, guide, report, rows, width, reference, added, covered
+            client, guide, report, rows, width, reference, added, covered, set(open_lines)
         )
         kept = self._repair_selected(
-            client, documents, report, rows, records, width, reference, self._bg_repair_note(added, width)
+            client,
+            documents,
+            report,
+            rows,
+            records,
+            width,
+            reference,
+            self._bg_repair_note(added, width),
+            open_lines,
         )
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
         if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
@@ -628,13 +688,16 @@ class Job:
             else:
                 self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
             return kept, reference
-        cited = failed_line_numbers(report, {record["n"] for record in kept})
-        if cited:
+        open_lines = self._open_fail_lines(report, kept, width)
+        if not open_lines:
+            self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+            return kept, reference
+        if open_lines:
             self._log(
-                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(cited, width)}."
+                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(open_lines, width)}."
             )
             reference = self._supply_missing_backgrounds(
-                client, guide, report, rows, width, reference, added, covered
+                client, guide, report, rows, width, reference, added, covered, set(open_lines)
             )
             kept = self._repair_selected(
                 client,
@@ -645,6 +708,7 @@ class Job:
                 width,
                 reference,
                 self._bg_repair_note(added, width),
+                open_lines,
             )
             verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
             if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
@@ -655,11 +719,25 @@ class Job:
                 else:
                     self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
                 return kept, reference
-        listed = format_line_list(failed_line_numbers(report, {record["n"] for record in kept}), width)
+            open_lines = self._open_fail_lines(report, kept, width)
+            if not open_lines:
+                self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+                return kept, reference
+        listed = format_line_list(open_lines, width)
         where = f" ở dòng {listed}" if listed else ""
         raise JobError(
             f"QA vẫn chưa đạt{where}. Không sang lượt sau.\n\n" + qa_log_body(report, kept, width)
         )
+
+    def _open_fail_lines(self, report: str, records: list[dict], width: int) -> list[int]:
+        allowed = {record["n"] for record in records}
+        skipped = set(lines_asking_second_size(report, records, allowed))
+        if skipped:
+            self._log(
+                "QA bắt gắn số đo khác cho CHAR đã khóa ở dòng "
+                f"{format_line_list(sorted(skipped), width)}. Giữ prompt đã có."
+            )
+        return [number for number in failed_line_numbers(report, allowed) if number not in skipped]
 
     def _bg_repair_note(self, added: list[tuple[str, list[int]]], width: int) -> str:
         if not added:
@@ -672,10 +750,12 @@ class Job:
         return "BG_VUA_TAO\n" + "\n".join(lines) + "\n"
 
     def _supply_missing_backgrounds(
-        self, client, guide, report, rows, width, reference, added, covered: set[int]
+        self, client, guide, report, rows, width, reference, added, covered: set[int], only: set[int] | None = None
     ) -> str:
         allowed = {number for number, _text in rows}
         needed = [number for number in lines_needing_new_bg(report, allowed) if number not in covered]
+        if only is not None:
+            needed = [number for number in needed if number in only]
         if not needed:
             return reference
         listed = format_line_list(needed, width)
@@ -725,11 +805,14 @@ class Job:
         self._write("XX.TXT", reference)
         return reference
 
-    def _repair_selected(self, client, documents, report, rows, records, width, reference, bg_note: str = ""):
+    def _repair_selected(
+        self, client, documents, report, rows, records, width, reference, bg_note: str = "", only: list[int] | None = None
+    ):
         """Rewrite only the lines QA marked FAIL. Keep every other line in this window."""
         source = {number: text for number, text in rows}
         current = {record["n"]: record for record in records}
-        cited = failed_line_numbers(report, set(current))
+        cited = list(only) if only is not None else failed_line_numbers(report, set(current))
+        cited = [number for number in cited if number in current]
         if cited and len(cited) < len(records):
             self._log(
                 f"Chỉ sửa dòng {format_line_list(cited, width)}. Giữ các dòng QA không nêu lỗi."

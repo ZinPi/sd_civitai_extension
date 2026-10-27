@@ -46,6 +46,8 @@ KHÓA QA — ẢNH NHÓM, SỐ CON, BỘ MÁY:
 - Không FAIL việc gom nhân vật phụ khi tổng sắp vượt 10. FAIL nếu gom người diễn chính vào nhóm tạm chỉ để giảm số ảnh. Trần 10 ảnh vẫn giữ.
 - FAIL khi dòng cần một nơi vật lý mà không BG đã tạo nào đúng, rồi prompt lấy BG khác để lấp hoặc giấu địa danh của BG sai.
 - Việc sửa là tạo BG từ tác phẩm rồi gắn mã đã tạo. Không bắt prompt tự bịa mã BG.
+- Không FAIL khi prompt vẽ thân thể hoặc trạng thái khác và không dùng CHAR của trạng thái hiện tại.
+- Không bắt một CHAR mang số đo khác số đã khóa. Một CHAR chỉ có một số đo.
 
 QA KHÔNG được:
 - biến lại workflow thành SMALL_SCENE;

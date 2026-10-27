@@ -5,7 +5,7 @@ from pathlib import Path
 
 from engine import parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import Job, failed_line_numbers, lines_needing_new_bg, valid_repair_map
+from runner import Job, failed_line_numbers, lines_asking_second_size, lines_needing_new_bg, valid_repair_map
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -617,6 +617,80 @@ class MissingBackgroundTests(unittest.TestCase):
         self.assertNotIn("add-bg", [step for step, _user in script.calls])
         journal = "\n".join(snapshot["log"])
         self.assertIn("Chỉ sửa các dòng còn lỗi: 002", journal)
+
+    def test_second_size_for_another_body_does_not_rewrite_the_line(self):
+        report = (
+            "004 | FAIL\n"
+            "REQUIRED_FIX: Dùng CHAR_01 và ghi đúng số đo 172 cm.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        records = [
+            {
+                "n": 1,
+                "ids": "CHAR_01.BG_01",
+                "body": "CHAR_01 (Hermes, male), 170 cm tall, watches the street.",
+            },
+            {"n": 4, "ids": "BG_03", "body": "A generic young adult sits at the computer."},
+            {
+                "n": 8,
+                "ids": "CHAR_01.BG_03.BG_04",
+                "body": (
+                    "CHAR_01 (Hermes, male), 172 cm tall, is only a visual source. "
+                    "CHAR_01 (Hermes, male), 170 cm tall, wakes in the current room."
+                ),
+            },
+        ]
+        self.assertEqual(lines_asking_second_size(report, records, {1, 4, 8}), [4])
+        same_size = "004 | FAIL\nREQUIRED_FIX: Dùng CHAR_01 và ghi 170 cm.\nTOOL_QA: FAIL\n"
+        self.assertEqual(lines_asking_second_size(same_size, records, {1, 4, 8}), [])
+
+        fail = (
+            "002 | FAIL\n"
+            "REQUIRED_FIX: Dùng CHAR_01 và ghi đúng số đo đã khóa 172 cm.\n"
+            "TOOL_QA: FAIL\n"
+        )
+
+        class KeepGeneric(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_01 phố\nBG_03 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\nBG_03 bedroom.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: CHAR_01 (Hermes, male), 170 cm tall, watches the street.\n"
+                        "002 | BG_03 | IMAGE_PROMPT: A generic young adult sits at the computer.\n",
+                        "stop",
+                    )
+                return Completion("001 | CHAR_01.BG_01 | IMAGE_PROMPT: should not repair.\n", "stop")
+
+        script = KeepGeneric()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Hermes nhìn phố.\nNgười trẻ ngồi trước máy tính.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("generic young adult", prompts)
+        self.assertNotIn("should not repair", prompts)
+        self.assertEqual([step for step, _user in script.calls if step == "repair"], [])
+        self.assertIn("số đo khác", "\n".join(snapshot["log"]))
 
 
 class RuleLockTests(unittest.TestCase):
