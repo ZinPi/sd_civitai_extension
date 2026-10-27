@@ -12,6 +12,8 @@ KHÓA SỬA — ẢNH NHÓM, SỐ CON, BỘ MÁY
 - Gom nhân vật phụ chỉ để không vượt 10 ảnh là việc khác. Việc đó chỉ làm khi tổng sắp vượt 10, và không gom người diễn chính vào nhóm tạm. Một prompt vẫn không viết trên 10 ảnh tham chiếu.
 - Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Ghi đúng số. Mỗi con là một cơ thể sống riêng, cùng số đo, khác vị trí. Không cấp mã CHAR mới cho từng con. Nguồn nói một con thì vẽ một con.
 - Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy hoặc bộ đồ đã lắp, đặt riêng, nhiều bộ phận nối thành một bộ, là một CHAR cho cả bộ, với các số đo của bộ. Không tách từng bộ phận thành CHAR mới. Không ghi bộ đó vào người đang đứng xem.
+- Dòng cần một nơi vật lý mà bảng chưa có BG của nơi đó: tạo BG từ tác phẩm, rồi sửa prompt. Không lấy BG của nơi khác để lấp. Không giấu địa danh của BG sai.
+- Lần kiểm lại nếu nêu dòng khác, chỉ sửa các dòng còn lỗi.
 
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.

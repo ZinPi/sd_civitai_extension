@@ -44,6 +44,8 @@ KHÓA QA — ẢNH NHÓM, SỐ CON, BỘ MÁY:
 - FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
 - FAIL khi bộ máy đã lắp không có CHAR của cả bộ, bị tách từng bộ phận thành nhiều CHAR, hoặc bị ghi vào người đang đứng xem.
 - Không FAIL việc gom nhân vật phụ khi tổng sắp vượt 10. FAIL nếu gom người diễn chính vào nhóm tạm chỉ để giảm số ảnh. Trần 10 ảnh vẫn giữ.
+- FAIL khi dòng cần một nơi vật lý mà không BG đã tạo nào đúng, rồi prompt lấy BG khác để lấp hoặc giấu địa danh của BG sai.
+- Việc sửa là tạo BG từ tác phẩm rồi gắn mã đã tạo. Không bắt prompt tự bịa mã BG.
 
 QA KHÔNG được:
 - biến lại workflow thành SMALL_SCENE;

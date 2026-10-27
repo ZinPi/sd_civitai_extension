@@ -79,6 +79,7 @@ Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng.
 Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
 Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
+Chưa có BG đúng nơi thì không lấy BG khác để lấp và không giấu địa danh của BG sai.
 Giữ đúng số đo đã khóa.
 """
 
@@ -86,13 +87,14 @@ QA_TASK = """CHỈ QA các prompt trong DU_LIEU theo file quy tắc QA.
 Không viết lại quy tắc.
 FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
-Không yêu cầu tạo mã BG mới. Nếu BG không thích hợp, chỉ định BG đã tạo nào đúng với dòng.
+Nếu BG không thích hợp và bảng đã có BG đúng, chỉ định BG đó. Nếu chưa có BG đúng nơi, nói cần tạo BG từ tác phẩm. Prompt dòng không tự đặt mã BG.
 FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
 FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
 Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
 FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
 FAIL khi bộ máy đã lắp không có CHAR của cả bộ, bị tách từng bộ phận thành nhiều CHAR, hoặc bị ghi vào người đang xem.
 FAIL khi dòng diễn ra trong một nơi vật lý mà prompt dùng BG chuyển cảnh trừu tượng thay cho BG vật lý đã tạo.
+Nếu dòng cần một nơi vật lý mà không BG đã tạo nào đúng, FAIL và nói cần tạo BG từ tác phẩm. Không bắt sửa bằng cách giấu địa danh hoặc lấy BG khác để lấp.
 Suy nghĩ, hồi tưởng hoặc việc sắp tới được vẽ bằng BG của nơi đó, hoặc ghép với BG nơi đang đứng. Không FAIL vì ảnh có nơi được nhớ. Không bắt sửa thành chỉ phản ứng trong phòng hiện tại.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
 Nếu không đạt, dòng cuối là TOOL_QA: FAIL
@@ -104,8 +106,16 @@ Chỉ xuất các dòng được yêu cầu sửa, đúng định dạng trong q
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
 Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi số đo đã khóa.
 Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
+Nếu có BG_VUA_TAO, dùng đúng mã đó cho nơi còn thiếu. Không giữ BG cũ rồi giấu địa danh.
 Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
 Giữ đúng số đo đã khóa.
+"""
+
+ADD_BG_TASK = """CHỈ VIẾT PROMPT cho nơi vật lý còn thiếu.
+Không viết prompt theo dòng. Không tự đặt mã BG.
+Đọc dòng nguồn và báo cáo. Các dòng cùng một nơi thì một prompt. Các nơi khác nhau thì mỗi nơi một prompt.
+Mỗi prompt bắt đầu bằng dòng DONG: rồi số dòng nguồn, cách nhau bằng dấu phẩy.
+Dòng sau là PROMPT: rồi mô tả nơi, bố cục và trạng thái. Không chép một BG đã có.
 """
 
 MANGA_REPAIR = """KHÓA SỬA MANGA, ưu tiên hơn REQUIRED_FIX nếu QA bắt xóa nơi được nhớ.
@@ -157,6 +167,106 @@ def failed_line_numbers(report: str, allowed: set[int]) -> list[int]:
 
 def format_line_list(numbers: list[int], width: int) -> str:
     return ", ".join(f"{number:0{width}d}" for number in numbers)
+
+
+def qa_fail_blocks(report: str) -> list[tuple[int, str]]:
+    """Each FAIL row and the text that belongs to it, up to the next FAIL row."""
+    text = report or ""
+    matches = list(
+        re.finditer(
+            r"(?im)^\s*(\d{1,6})\s*[|:]\s*(?:RESULT:\s*)?FAIL(?:_[A-Z0-9]+)?\b",
+            text,
+        )
+    )
+    blocks: list[tuple[int, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        blocks.append((int(match.group(1)), text[match.start() : end]))
+    return blocks
+
+
+_CREATE_BG = re.compile(
+    r"(?i)(upstream|crear|tạo bg|tao bg|resolve bg|chua có bg|chưa có bg|"
+    r"no hay un bg|no physical bg|không có bg|khong co bg|bg đã tạo nào khác|bg fisic)"
+)
+_NEGATED_BG = re.compile(
+    r"(?i)(không dùng|khong dung|do not use|don't use|no usar|no sustitu|"
+    r"sin usar|not use|không lấy|instead of)"
+)
+_POSITIVE_BG = re.compile(
+    r"(?i)(use|dùng|dung|usar|utilizar|utilice|already-created|ya creado)"
+)
+
+
+def _names_existing_bg(block: str) -> bool:
+    for match in re.finditer(r"(?i)BG_\d+", block):
+        before = block[max(0, match.start() - 70) : match.start()]
+        if _NEGATED_BG.search(before):
+            continue
+        if _POSITIVE_BG.search(before):
+            return True
+    return False
+
+
+def lines_needing_new_bg(report: str, allowed: set[int]) -> list[int]:
+    """FAIL rows whose place has no created BG, so a filler BG must not be reused."""
+    found: list[int] = []
+    for number, block in qa_fail_blocks(report):
+        if number not in allowed or number in found:
+            continue
+        if not re.search(r"(?i)WRONG_LOCATION", block):
+            continue
+        if not _CREATE_BG.search(block):
+            continue
+        if _names_existing_bg(block):
+            continue
+        found.append(number)
+    return found
+
+
+def parse_new_places(text: str, allowed: set[int]) -> list[tuple[list[int], str]]:
+    places: list[tuple[list[int], str]] = []
+    numbers: list[int] | None = None
+    body: list[str] = []
+
+    def flush() -> None:
+        nonlocal numbers, body
+        if numbers and body:
+            places.append((numbers, " ".join(body).strip()))
+        numbers = None
+        body = []
+
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        head = re.match(r"(?i)^DONG:\s*(.+)$", line)
+        if head:
+            flush()
+            numbers = []
+            for item in re.findall(r"\d+", head.group(1)):
+                number = int(item)
+                if number in allowed and number not in numbers:
+                    numbers.append(number)
+            continue
+        if numbers is None:
+            continue
+        prompt = re.match(r"(?i)^PROMPT:\s*(.*)$", line)
+        if prompt:
+            if prompt.group(1).strip():
+                body.append(prompt.group(1).strip())
+            continue
+        if line:
+            body.append(line)
+    flush()
+    return places
+
+
+def next_bg_id(text: str) -> str:
+    found = re.findall(r"(?i)BG_(\d+)", text or "")
+    if not found:
+        return "BG_01"
+    width = max(len(item) for item in found)
+    number = max(int(item) for item in found) + 1
+    return f"BG_{number:0{width}d}"
 
 
 def valid_repair_map(text: str, expected: list[int], finish: str) -> dict[int, dict]:
@@ -466,7 +576,7 @@ class Job:
                 self._ceiling = max(1, count // 2)
                 self._log(f"Phản hồi bị cắt. Chưa khóa dòng nào. Lượt sau còn tối đa {self._ceiling} dòng.")
                 continue
-            kept = self._qa_batch(client, guide, qa_rules, rules, reference, kept, width)
+            kept, reference = self._qa_batch(client, guide, qa_rules, rules, reference, kept, width)
             locked.extend(kept)
             index += len(kept)
             self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
@@ -497,26 +607,125 @@ class Job:
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, records, width)
         if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(records)):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
-            return records
+            return records, reference
         self._log(
             f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.",
             qa_log_body(report, records, width),
         )
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
-        kept = self._repair_selected(client, documents, report, rows, records, width, reference)
+        added: list[tuple[str, list[int]]] = []
+        covered: set[int] = set()
+        reference = self._supply_missing_backgrounds(
+            client, guide, report, rows, width, reference, added, covered
+        )
+        kept = self._repair_selected(
+            client, documents, report, rows, records, width, reference, self._bg_repair_note(added, width)
+        )
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
-        if verdict != "pass":
-            if memory_place_false_fail(report) and records_use_manga_memory(kept):
+        if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
+            if memory_place_false_fail(report) and records_use_manga_memory(kept) and verdict != "pass":
                 self._log(f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}.")
-                return kept
-            raise JobError(
-                "QA vẫn chưa đạt sau một lần sửa. Không sang lượt sau.\n\n"
-                + qa_log_body(report, kept, width)
+            else:
+                self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+            return kept, reference
+        cited = failed_line_numbers(report, {record["n"] for record in kept})
+        if cited:
+            self._log(
+                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(cited, width)}."
             )
-        self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
-        return kept
+            reference = self._supply_missing_backgrounds(
+                client, guide, report, rows, width, reference, added, covered
+            )
+            kept = self._repair_selected(
+                client,
+                documents,
+                report,
+                rows,
+                kept,
+                width,
+                reference,
+                self._bg_repair_note(added, width),
+            )
+            verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
+            if verdict == "pass" or (memory_place_false_fail(report) and records_use_manga_memory(kept)):
+                if memory_place_false_fail(report) and records_use_manga_memory(kept) and verdict != "pass":
+                    self._log(
+                        f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}."
+                    )
+                else:
+                    self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+                return kept, reference
+        listed = format_line_list(failed_line_numbers(report, {record["n"] for record in kept}), width)
+        where = f" ở dòng {listed}" if listed else ""
+        raise JobError(
+            f"QA vẫn chưa đạt{where}. Không sang lượt sau.\n\n" + qa_log_body(report, kept, width)
+        )
 
-    def _repair_selected(self, client, documents, report, rows, records, width, reference):
+    def _bg_repair_note(self, added: list[tuple[str, list[int]]], width: int) -> str:
+        if not added:
+            return ""
+        lines = [
+            f"{bg_id} dùng cho dòng {format_line_list(numbers, width)}. "
+            "Dùng mã này. Không giữ BG cũ để lấp. Không giấu địa danh."
+            for bg_id, numbers in added
+        ]
+        return "BG_VUA_TAO\n" + "\n".join(lines) + "\n"
+
+    def _supply_missing_backgrounds(
+        self, client, guide, report, rows, width, reference, added, covered: set[int]
+    ) -> str:
+        allowed = {number for number, _text in rows}
+        needed = [number for number in lines_needing_new_bg(report, allowed) if number not in covered]
+        if not needed:
+            return reference
+        listed = format_line_list(needed, width)
+        self._log(f"Dòng {listed} chưa có BG đúng nơi. Tạo BG từ dòng nguồn, không lấy BG khác để lấp.")
+        source = {number: text for number, text in rows}
+        selected = [(number, source[number]) for number in needed]
+        bg_rules = self._rule("02_PROMPT_THAM_CHIEU_CHAR_BG.txt")
+        documents = [("HUONG_DAN", guide), ("QUY_TAC", bg_rules)]
+        listing = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
+        material = (
+            ADD_BG_TASK
+            + "\nDANH_SACH_DA_KHOA\n"
+            + listing.strip()
+            + "\n\nBAO_CAO_QA\n"
+            + report
+            + "\nDONG_NGUON\n"
+            + format_source_rows(selected, width)
+        )
+        self._ensure_material_fits("add-bg", documents, material, "")
+        text, finish = self._call(client, "add-bg", documents, material)
+        if finish == "length":
+            raise JobError("Lượt tạo BG bị cắt vì hết token đầu ra. Không khóa lượt này.")
+        places = parse_new_places(text, set(needed))
+        covered_now = {number for numbers, _prompt in places for number in numbers}
+        if not places or any(number not in covered_now for number in needed):
+            excerpt = " ".join(text.split())[:1200]
+            raise JobError(
+                f"Dòng {listed} chưa có BG đúng nơi. Lượt tạo BG không trả prompt nơi. Không khóa lượt này.\n\n"
+                + excerpt
+            )
+        listing_text = listing.strip() + "\n"
+        bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.").strip() + "\n"
+        fresh = reference
+        for numbers, prompt in places:
+            bg_id = next_bg_id(fresh + "\n" + listing_text + "\n" + bg_text)
+            listing_text += f"{bg_id}: nơi của dòng {format_line_list(numbers, width)}.\n"
+            bg_text += f"{bg_id}\n{prompt}\n"
+            fresh += f"\n{bg_id}\n"
+            added.append((bg_id, numbers))
+            covered.update(numbers)
+            self._log(f"Đã thêm {bg_id} cho dòng {format_line_list(numbers, width)}.")
+        self._write("DANH_SACH_CHAR_BG.txt", listing_text)
+        self._write("PROMPT_BG.txt", bg_text)
+        char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
+        reference = compile_reference(listing_text, char_text, bg_text)
+        self._write("TBN6A.txt", reference)
+        self._write("XX.TXT", reference)
+        return reference
+
+    def _repair_selected(self, client, documents, report, rows, records, width, reference, bg_note: str = ""):
         """Rewrite only the lines QA marked FAIL. Keep every other line in this window."""
         source = {number: text for number, text in rows}
         current = {record["n"]: record for record in records}
@@ -535,6 +744,7 @@ class Job:
             repair = (
                 REPAIR_TASK
                 + ("\n" + MANGA_REPAIR if manga else "")
+                + ("\n" + bg_note if bg_note else "")
                 + "\nBAO_CAO_QA\n"
                 + report
                 + "\nDONG_CAN_SUA\n"
