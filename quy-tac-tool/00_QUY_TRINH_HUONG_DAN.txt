@@ -31,6 +31,7 @@ QUY TẮC CHUNG
 - Mở và đọc toàn bộ quy tắc 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt.
 - Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
 - Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
+- Nếu người dùng đưa tài liệu phần trước: nhân vật, bối cảnh, vũ khí và công cụ đã có cùng trạng thái thì giữ đúng mã cũ. Chỉ cấp mã mới khi trạng thái mới chưa có. Danh sách và prompt tham chiếu của phần trước được giữ, phần mới được gắn thêm.
 - Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
 - Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau thì khóa thêm CHAR nhóm theo khóa đầu file. Cùng một ngoại hình sinh vật lặp nhiều con thì một CHAR, ghi đúng số con.
 - Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn. Dòng nào bước 4 sẽ vẽ thì bảng đã có BG đúng trạng thái, và đã có CHAR khi nhân vật đủ điều kiện tạo CHAR. Thiếu mục nào thì bổ sung ở lần này.

@@ -14,6 +14,7 @@ const FILE_NAMES = {
 };
 
 const source = document.querySelector("#source");
+const prior = document.querySelector("#prior");
 const count = document.querySelector("#count");
 const notice = document.querySelector("#notice");
 const detail = document.querySelector("#detail");
@@ -240,6 +241,7 @@ async function refresh(includeSource) {
   const data = await response.json();
   if (includeSource && !sourceReady) {
     if (!source.value && data.source_text) source.value = data.source_text;
+    if (!prior.value && data.prior_text) prior.value = data.prior_text;
     sourceReady = true;
     updateCount();
   }
@@ -264,7 +266,7 @@ async function start(mode) {
   const response = await fetch("/api/job", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source_text: source.value, mode }),
+    body: JSON.stringify({ source_text: source.value, prior_text: prior.value, mode }),
   });
   next.disabled = false;
   repair.disabled = false;
@@ -311,6 +313,16 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
 });
 
 source.addEventListener("input", updateCount);
+document.querySelector("#prior-file").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith(".txt")) {
+    showNotice({ kind: "error", text: "Chỉ nhận file .txt." });
+    event.target.value = "";
+    return;
+  }
+  prior.value = await file.text();
+});
 document.querySelector("#file").addEventListener("change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;

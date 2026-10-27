@@ -33,6 +33,20 @@
       </div>
     </section>
 
+    <section class="sheet source" id="prior-drop">
+      <div class="sheet-head">
+        <label for="prior">Tài liệu phần trước</label>
+      </div>
+      <textarea id="prior" rows="5" placeholder="Dán danh sách CHAR/BG đã có, hoặc cả file tổng hợp gồm danh sách và prompt CHAR, BG. Để trống nếu đây là phần đầu." spellcheck="false"></textarea>
+      <div class="row">
+        <label class="file-btn">
+          Chọn file TXT
+          <input id="prior-file" type="file" accept=".txt,text/plain">
+        </label>
+        <p class="hint">Đã có cùng trạng thái thì giữ mã cũ. Chỉ tạo CHAR hoặc BG mới khi trạng thái mới chưa có trong tài liệu này.</p>
+      </div>
+    </section>
+
     <section class="sheet settings" id="api">
       <div class="form">
         <label id="model-wrap" hidden>
@@ -135,6 +149,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=9"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

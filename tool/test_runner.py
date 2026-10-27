@@ -5,7 +5,15 @@ from pathlib import Path
 
 from engine import parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import Job, failed_line_numbers, fault_brief, lines_needing_new_bg, valid_repair_map
+from runner import (
+    Job,
+    failed_line_numbers,
+    fault_brief,
+    lines_needing_new_bg,
+    prior_sections,
+    restore_missing_ids,
+    valid_repair_map,
+)
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -753,6 +761,81 @@ class MissingBackgroundTests(unittest.TestCase):
         self.assertIn("sửa: Put the game BG only on the screen and the room BG on the room.", text)
         self.assertIn("008 | header does not say which BG belongs to which panel.", text)
         self.assertNotIn("007", text)
+
+
+class PriorReferenceTests(unittest.TestCase):
+    def setUp(self):
+        RunnerTests.setUp(self)
+
+    def tearDown(self):
+        RunnerTests.tearDown(self)
+
+    def test_restore_keeps_an_id_the_extract_dropped(self):
+        prior = "DANH_SACH_CHAR_BG\nCHAR_01 cô bé cũ\nBG_01 sân\n"
+        final = "CHAR_02 cô bé mới\n"
+        merged = restore_missing_ids(final, prior)
+        self.assertIn("CHAR_01", merged)
+        self.assertIn("BG_01", merged)
+        self.assertIn("CHAR_02", merged)
+        self.assertEqual(prior_sections(prior)["list"], "CHAR_01 cô bé cũ\nBG_01 sân")
+
+    def test_next_part_keeps_old_prompts_and_adds_only_the_new_state(self):
+        class Continue(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 cô bé cũ\nCHAR_02 cô bé áo mới\nBG_01 sân\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_02 prompt áo mới.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_09 không được gọi.\n", "stop")
+                if step == "qa":
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_02.BG_01 | IMAGE_PROMPT: The girl wears the new dress at the yard.\n",
+                        "stop",
+                    )
+                return super().complete(system, user, max_output_tokens)
+
+        script = Continue()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        prior = (
+            "DANH_SACH_CHAR_BG\n"
+            "CHAR_01 cô bé cũ\n"
+            "BG_01 sân\n\n"
+            "PROMPT_CHAR\n"
+            "CHAR_01 prompt cũ giữ nguyên.\n\n"
+            "PROMPT_BG\n"
+            "BG_01 prompt sân cũ.\n"
+        )
+        job.begin("Cô bé mặc áo mới ở sân.\n", self.settings, "all", prior)
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        listing = (self.data / "DANH_SACH_CHAR_BG.txt").read_text(encoding="utf-8")
+        self.assertIn("CHAR_01", listing)
+        self.assertIn("CHAR_02", listing)
+        chars = (self.data / "PROMPT_CHAR.txt").read_text(encoding="utf-8")
+        self.assertIn("CHAR_01 prompt cũ giữ nguyên.", chars)
+        self.assertIn("CHAR_02 prompt áo mới.", chars)
+        bgs = (self.data / "PROMPT_BG.txt").read_text(encoding="utf-8")
+        self.assertIn("BG_01 prompt sân cũ.", bgs)
+        self.assertNotIn("BG_09", bgs)
+        self.assertNotIn("bg", [step for step, _user in script.calls])
+        extract_users = [user for step, user in script.calls if step == "extract"]
+        self.assertTrue(extract_users)
+        self.assertIn("TAI_LIEU_DA_CO", extract_users[0])
+        self.assertIn("CHAR_01 cô bé cũ", extract_users[0])
+        char_users = [user for step, user in script.calls if step == "char"]
+        self.assertEqual(len(char_users), 1)
+        self.assertIn("CHI_VIET_CAC_MA_MOI", char_users[0])
+        self.assertIn("CHAR_02", char_users[0])
+        self.assertIn("Không viết lại mã đã có.", char_users[0])
 
 
 class RuleLockTests(unittest.TestCase):

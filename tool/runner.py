@@ -48,12 +48,14 @@ Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có s
 Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
 Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau thì khóa thêm một CHAR nhóm cho đúng tập đó. Giữ CHAR riêng của từng người.
 Cùng một ngoại hình sinh vật lặp nhiều con thì một CHAR, ghi đúng số con. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng người cầm.
+Nếu có TAI_LIEU_DA_CO: nhân vật, bối cảnh, vũ khí và công cụ đã có cùng trạng thái thì giữ đúng mã cũ. Không tạo mã mới cho trạng thái đó. Chỉ cấp mã mới khi trạng thái mới chưa có trong tài liệu. Danh sách xuất ra gồm đủ mục cũ và mục mới.
 """
 
 MERGE_TASK = """CHỈ GỘP BƯỚC 1.
 Các phần trích bên dưới là của cùng một tác phẩm.
 Đếm số câu khác nhau trên toàn bộ các phần, rồi xuất một danh sách CHAR và BG duy nhất theo quy tắc.
 Giữ CHAR nhóm, CHAR sinh vật dùng cho nhiều con, và CHAR của bộ máy đã lắp. Không gộp các thành viên thành một người. Không tách một bộ máy thành nhiều CHAR.
+Nếu có TAI_LIEU_DA_CO: giữ nguyên mã và trạng thái đã có. Chỉ thêm trạng thái mới. Không bỏ mục cũ.
 """
 
 CHAR_TASK = """CHỈ LÀM BƯỚC 2.
@@ -266,6 +268,41 @@ def parse_new_places(text: str, allowed: set[int]) -> list[tuple[list[int], str]
     return places
 
 
+def prior_sections(text: str) -> dict[str, str]:
+    """Split a pasted reference into list, CHAR prompts, and BG prompts."""
+    pattern = re.compile(r"(?im)^(DANH_SACH_CHAR_BG|PROMPT_CHAR|PROMPT_BG)\s*$")
+    matches = list(pattern.finditer(text or ""))
+    result = {"list": "", "char": "", "bg": ""}
+    if not matches:
+        result["list"] = (text or "").strip()
+        return result
+    key_of = {"DANH_SACH_CHAR_BG": "list", "PROMPT_CHAR": "char", "PROMPT_BG": "bg"}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        result[key_of[match.group(1).upper()]] = text[match.end() : end].strip()
+    return result
+
+
+def ids_in(text: str, prefix: str) -> set[str]:
+    return {item.upper() for item in re.findall(rf"{prefix}_\d+", text or "", flags=re.I)}
+
+
+def restore_missing_ids(final: str, prior: str) -> str:
+    """Put back CHAR/BG lines from the previous part if extraction dropped them."""
+    if not (prior or "").strip():
+        return final
+    have = {item.upper() for item in re.findall(r"(?:CHAR|BG)_\d+", final or "", flags=re.I)}
+    missing_lines: list[str] = []
+    for line in (prior or "").splitlines():
+        found = [item.upper() for item in re.findall(r"(?:CHAR|BG)_\d+", line, flags=re.I)]
+        if found and any(item not in have for item in found):
+            missing_lines.append(line.strip())
+            have.update(found)
+    if not missing_lines:
+        return final
+    return (final or "").rstrip() + "\n\nMUC_GIU_TU_PHAN_TRUOC\n" + "\n".join(missing_lines) + "\n"
+
+
 def next_bg_id(text: str) -> str:
     found = re.findall(r"(?i)BG_(\d+)", text or "")
     if not found:
@@ -381,13 +418,17 @@ class Job:
         self._qa_omitted_rule = False
         self._leftover: dict[int, str] = {}
         self._can_resume = False
+        self._prior_text = ""
         self._load()
 
-    def begin(self, source_text: str, settings: dict, mode: str) -> None:
+    def begin(self, source_text: str, settings: dict, mode: str, prior_text: str | None = None) -> None:
         with self._lock:
             if self._running:
                 raise AlreadyRunning()
+            if prior_text is not None:
+                self._prior_text = prior_text
             self._prepare(source_text, settings)
+            atomic_write(self.data_dir / "tai_lieu_da_co.txt", self._prior_text)
             self._running = True
             self._stop = False
             self._state = "running"
@@ -449,6 +490,7 @@ class Job:
                 ],
                 "files": files,
                 "source_text": self._source_text if include_source else "",
+                "prior_text": self._prior_text if include_source else "",
                 "can_resume": bool(self._can_resume and self._state in {"error", "stopped"} and not self._running),
                 "repair_lines": sorted(self._leftover) if self._state == "done" and not self._running else [],
             }
@@ -562,23 +604,27 @@ class Job:
         self._mark(1, "running")
         guide, rules = self._pair("00_QUY_TRINH_HUONG_DAN.txt", "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt")
         documents = [("HUONG_DAN", guide), ("QUY_TAC", rules)]
+        if self._prior_text.strip():
+            self._log("Có tài liệu phần trước. Giữ trạng thái đã có, chỉ thêm trạng thái mới.")
+        task = self._task_with_prior(EXTRACT_TASK)
         self._log("Bước 1 — đã gắn nguyên văn quy tắc trích xuất.")
-        chunks = self._chunks(documents, "extract", EXTRACT_TASK, "")
+        chunks = self._chunks(documents, "extract", task, "")
         parts = []
         for chunk in chunks:
             self._check_stop()
             if len(chunks) > 1:
                 self._log(f"Đang trích dòng {chunk[0][0]}–{chunk[-1][0]}.")
-            material = EXTRACT_TASK + "\nCAC_DONG\n" + format_source_rows(chunk, numbered_width(len(self._lines)))
+            material = task + "\nCAC_DONG\n" + format_source_rows(chunk, numbered_width(len(self._lines)))
             text = self._complete_whole(client, "extract", documents, material)
             parts.append(text.strip())
         if len(parts) == 1:
             final = parts[0]
         else:
             self._log("Đang gộp các phần trích thành một danh sách.")
-            material = MERGE_TASK + "\nPHAN_TRICH\n" + "\n\n---\n\n".join(parts)
+            material = self._task_with_prior(MERGE_TASK) + "\nPHAN_TRICH\n" + "\n\n---\n\n".join(parts)
             self._ensure_material_fits("merge", documents, material, "")
             final = self._complete_whole(client, "merge", documents, material)
+        final = restore_missing_ids(final, self._prior_text)
         self._write("DANH_SACH_CHAR_BG.txt", final.strip() + "\n")
         if "CHAR_" not in final and "BG_" not in final:
             raise JobError(
@@ -593,13 +639,35 @@ class Job:
         guide, rules = self._pair("00_QUY_TRINH_HUONG_DAN.txt", "02_PROMPT_THAM_CHIEU_CHAR_BG.txt")
         documents = [("HUONG_DAN", guide), ("QUY_TAC", rules)]
         listing = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
-        material = task + "\nDANH_SACH_DA_KHOA\n" + listing.strip() + "\n"
+        prefix = "CHAR" if label == "char" else "BG"
+        sections = prior_sections(self._prior_text)
+        old_prompts = sections["char"] if label == "char" else sections["bg"]
+        known = ids_in(self._prior_text, prefix)
+        new_ids = sorted(ids_in(listing, prefix) - known, key=lambda item: int(item.split("_")[1]))
         self._log(f"Bước {step} — đã gắn nguyên văn quy tắc tham chiếu.")
+        if self._prior_text.strip() and not new_ids and old_prompts.strip():
+            self._write(filename, old_prompts.strip() + "\n")
+            self._mark(step, "done")
+            self._log(f"Không có {prefix} trạng thái mới. Giữ prompt tham chiếu đã có.")
+            return
+        material = task + "\nDANH_SACH_DA_KHOA\n" + listing.strip() + "\n"
+        if self._prior_text.strip() and new_ids:
+            material += "CHI_VIET_CAC_MA_MOI\n" + "\n".join(new_ids) + "\nKhông viết lại mã đã có.\n"
+            self._log(f"Giữ {prefix} đã có. Viết prompt cho mã mới: {', '.join(new_ids)}.")
         self._ensure_material_fits(label, documents, material, "")
         text = self._complete_whole(client, label, documents, material)
-        self._write(filename, text.strip() + "\n")
+        combined = text.strip()
+        if old_prompts.strip():
+            combined = old_prompts.strip() + "\n\n" + combined
+        self._write(filename, combined.strip() + "\n")
         self._mark(step, "done")
         self._log("Xong bước " + str(step) + ".")
+
+    def _task_with_prior(self, task: str) -> str:
+        prior = (self._prior_text or "").strip()
+        if not prior:
+            return task
+        return task + "\nTAI_LIEU_DA_CO\n" + prior + "\n"
 
     def _step_lines(self, client) -> None:
         self._mark(4, "running")
@@ -1230,6 +1298,9 @@ class Job:
             self._source_text = read_text(source_path)
             self._lines = split_source(self._source_text)
             self._digest = source_digest(self._lines) if self._lines else ""
+        prior_path = self.data_dir / "tai_lieu_da_co.txt"
+        if prior_path.is_file():
+            self._prior_text = read_text(prior_path)
         if not path.is_file():
             return
         try:

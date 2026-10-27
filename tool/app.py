@@ -56,6 +56,7 @@ class SettingsBody(BaseModel):
 
 class JobBody(BaseModel):
     source_text: str = ""
+    prior_text: str = ""
     mode: str = "all"
 
 
@@ -261,7 +262,7 @@ def create_app(
         if not settings.get("model"):
             raise HTTPException(status_code=400, detail=NEED_MODEL)
         try:
-            job.begin(body.source_text, settings, body.mode)
+            job.begin(body.source_text, settings, body.mode, body.prior_text)
         except AlreadyRunning as exc:
             raise HTTPException(status_code=409, detail="Đang chạy một lượt.") from exc
         except JobError as exc:
