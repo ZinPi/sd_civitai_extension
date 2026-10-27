@@ -858,6 +858,15 @@ class RuleLockTests(unittest.TestCase):
         self.assertIn("không viết trên 10", joined)
         self.assertIn("CHAR_297 (Helga and Lucian, two people)", joined)
         self.assertIn("exactly three living mice", joined)
+        self.assertIn("Không được chỉ ghi tên", (root / "03_PROMPT_ANH_THEO_DONG.txt").read_text(encoding="utf-8"))
+        self.assertIn(
+            "Hai prompt liên tiếp không được dùng chung một góc camera",
+            (root / "03_PROMPT_ANH_THEO_DONG.txt").read_text(encoding="utf-8"),
+        )
+        qa = (root / "04_QA_PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("phần chữ prompt chỉ ghi tên", qa)
+        self.assertIn("FAIL khi prompt không có góc camera", qa)
+        self.assertIn("cùng số lượng mã CHAR và cùng số lượng mã BG", qa)
 
 
 if __name__ == "__main__":

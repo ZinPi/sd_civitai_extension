@@ -14,6 +14,9 @@ KHÓA ẢNH NHÓM, SỐ CON VÀ BỘ MÁY:
 - Bộ máy đã lắp là một CHAR của cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 - Dòng cần một nơi vật lý mà bảng chưa có BG của nơi đó: tạo BG từ tác phẩm rồi mới sửa prompt. Không lấy BG khác để lấp. Không giấu địa danh của BG sai.
 - Khi sửa một dòng, chỉ đổi đúng chi tiết báo cáo QA nêu. Giữ nguyên mọi câu, mã, số đo, panel và nhân vật mà báo cáo không nêu.
+- Tên đã có trong danh sách ảnh tham chiếu và đã gắn CHAR thì trong phần chữ prompt bắt buộc ghi CHAR_XX (tên, là gì), số đo đã khóa. Không được chỉ ghi tên.
+- Mỗi prompt phải có góc camera.
+- Hai prompt liên tiếp không được dùng chung một góc camera nếu hai prompt có cùng số lượng mã CHAR và cùng số lượng mã BG.
 ACTIVE MODE: 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT
 MỤC TIÊU: tạo prompt ảnh theo từng dòng/câu của tác phẩm, dùng CHAR/BG đã khóa từ B3, bổ sung các khóa kỹ thuật hữu ích của rule ảnh cảnh nhỏ nhưng KHÔNG nhập workflow phân cảnh/đạo diễn SMALL_SCENE.
 
@@ -1622,6 +1625,8 @@ Các OUTPUT_SLOT liền kề cùng scene có thể đổi camera:
 - high angle;
 - foreground framing;
 nhưng không reset scene state.
+
+Hai prompt liên tiếp không được dùng chung một góc camera nếu hai prompt có cùng số lượng mã CHAR và cùng số lượng mã BG trong header. Số lượng khác nhau thì được dùng lại góc. Mỗi prompt vẫn phải ghi rõ góc camera.
 
 ========================================================================================================================
 20. HANDS / CONTACT

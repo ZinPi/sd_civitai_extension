@@ -79,7 +79,8 @@ Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
 Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã BG mới.
-Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ ghi đúng số đo đã khóa của từng người.
+Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ bắt buộc ghi CHAR_XX (tên, là gì), số đo đã khóa. Không được chỉ ghi tên.
+Mỗi prompt phải có góc camera. Hai prompt liên tiếp không được dùng chung một góc camera nếu cùng số lượng mã CHAR và cùng số lượng mã BG.
 Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
 Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
 Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
@@ -94,6 +95,9 @@ FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc
 Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
 Nếu BG không thích hợp và bảng đã có BG đúng, chỉ định BG đó. Nếu chưa có BG đúng nơi, nói cần tạo BG từ tác phẩm. Prompt dòng không tự đặt mã BG.
 FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
+FAIL khi tên đã gắn CHAR trong danh sách nhưng phần chữ chỉ ghi tên, không ghi CHAR_XX (tên, là gì), số đo đã khóa.
+FAIL khi prompt không có góc camera.
+FAIL khi hai prompt liên tiếp cùng số lượng mã CHAR và cùng số lượng mã BG mà dùng chung một góc camera.
 Mỗi lỗi phải nêu số dòng, loại lỗi, chỗ sai và cách sửa đúng chi tiết đó.
 FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
 Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
@@ -112,7 +116,8 @@ Giữ nguyên mọi câu, mã, số đo, panel và nhân vật mà báo cáo kh�
 Không thêm cách sửa mà báo cáo không nêu. Không viết lại dòng không được gửi.
 Giữ nguyên số dòng và số thứ tự đã cho.
 Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
-Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi số đo đã khóa.
+Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi CHAR_XX (tên, là gì), số đo đã khóa. Không chỉ ghi tên.
+Mỗi prompt phải có góc camera. Hai prompt liên tiếp cùng số lượng mã CHAR và cùng số lượng mã BG thì không dùng chung một góc camera.
 Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
 Nếu có BG_VUA_TAO, dùng đúng mã đó cho nơi còn thiếu. Không giữ BG cũ rồi giấu địa danh.
 Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
