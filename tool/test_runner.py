@@ -4,7 +4,7 @@ from pathlib import Path
 
 from engine import estimate_tokens, format_records, parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import OUTPUT_FILE_CHARS, OUTPUT_PER_LINE, PROMPT_CHARS, Job
+from runner import LINE_BATCH, OUTPUT_FILE_CHARS, OUTPUT_PER_LINE, PROMPT_CHARS, Job
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -94,8 +94,9 @@ class RunnerTests(unittest.TestCase):
         records = parse_prompt_records(prompts)
         self.assertEqual([record["n"] for record in records], [1, 2, 3, 4])
         self.assertTrue(all("BG_" in record["ids"] for record in records))
-        reference = (self.data / "TBN6A.txt").read_text(encoding="utf-8")
-        self.assertEqual(reference, (self.data / "XX.TXT").read_text(encoding="utf-8"))
+        reference = (self.data / "FILE_TONG_HOP.txt").read_text(encoding="utf-8")
+        self.assertFalse((self.data / "TBN6A.txt").exists())
+        self.assertFalse((self.data / "XX.TXT").exists())
         self.assertIn("CHAR_01 cô bé", reference)
         self.assertIn("CHAR_01 front, close, back.", reference)
         joined = "\n".join(user for _step, user in self.script.calls)
@@ -133,11 +134,12 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(PROMPT_CHARS, 4000)
         self.assertEqual(OUTPUT_FILE_CHARS, 2_000_000)
         self.assertEqual(OUTPUT_PER_LINE, estimate_tokens("x" * PROMPT_CHARS))
+        self.assertEqual(LINE_BATCH, 10)
         self.job._settings = {**self.settings, "max_input_tokens": 200_000, "max_output_tokens": 8192}
         rows = [(number, f"Câu {number}.") for number in range(1, 17)]
         count, wanted = self.job._fit_line_batch([("QUY_TAC", "ngan")], "BG_01", rows, 3)
-        self.assertEqual(wanted, 16)
-        self.assertEqual(count, 8)
+        self.assertEqual(wanted, 10)
+        self.assertEqual(count, 10)
 
     def test_prompt_file_near_two_million_characters_is_kept(self):
         records = [{"n": number, "ids": "BG_01", "body": "x" * 3900} for number in range(1, 501)]

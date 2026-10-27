@@ -29,17 +29,17 @@ QUY TẮC CHUNG
 - QA theo quy tắc áp dụng, chỉ LOCK khi đạt.
 
 4- TẠO PROMPT ẢNH THEO DÒNG/CÂU TÁC PHẨM
-- Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "XX.TXT".
-- Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
+- Tổng hợp các dữ liệu hiện có phục vụ việc tạo prompt theo dòng/câu. XUẤT FILE TÊN "FILE_TONG_HOP.txt", gọi là file tổng hợp.
+- Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file tổng hợp đã khóa.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
 - Dùng dữ liệu CHAR/BG và các ID đã tạo; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
 - ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
 - SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo 03_PROMPT_ANH_THEO_DONG.txt; không đổi số prompt.
 - Trong tool chạy API, “mỗi lần chat” được hiểu là mỗi batch xử lý, không bắt buộc hội thoại thủ công.
-- 20 prompt một lượt chỉ là mức trần tham khảo, không phải số bắt buộc.
-- Trước khi gọi API, nếu 20 dòng cùng quy tắc 03_PROMPT_ANH_THEO_DONG.txt và file tham chiếu đã khóa vượt giới hạn token đầu vào hoặc đầu ra của model, giảm số dòng của lượt đó cho đến khi vừa giới hạn.
-- Mỗi lượt vẫn xuất đủ một prompt hoàn chỉnh cho đúng các dòng đã gửi. Không cắt cụt prompt, không gộp dòng, không bỏ dòng để nhét đủ 20.
+- Mỗi lần gửi 10 dòng để tạo prompt.
+- Trước khi gọi API, nếu 10 dòng cùng quy tắc 03_PROMPT_ANH_THEO_DONG.txt và file tổng hợp đã khóa vượt giới hạn token đầu vào hoặc đầu ra của model, giảm số dòng của lượt đó cho đến khi vừa giới hạn.
+- Mỗi lượt vẫn xuất đủ một prompt hoàn chỉnh cho đúng các dòng đã gửi. Không cắt cụt prompt, không gộp dòng, không bỏ dòng để nhét đủ 10.
 - Nếu phản hồi bị cắt vì hết token, không nhận phần bị cắt. Dòng chưa có prompt hoàn chỉnh đưa sang lượt sau với số dòng ít hơn. Dòng đã có prompt hoàn chỉnh và đã đếm đúng thì giữ.
 - Nếu chỉ một dòng cùng quy tắc và file tham chiếu vẫn vượt giới hạn token, dừng lượt đó và báo, không tự cắt quy tắc hoặc file tham chiếu.
 - QA theo toàn bộ quy tắc 04_QA_PROMPT_THEO_DONG.txt; trước khi QA phải mở và đọc đầy đủ 04_QA_PROMPT_THEO_DONG.txt.

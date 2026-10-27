@@ -37,7 +37,7 @@ DEFAULT_SETTINGS = {
     "models": [],
     "api_style": PROVIDERS["teamsoclo"]["style"],
     "max_input_tokens": 120_000,
-    "max_output_tokens": 8192,
+    "max_output_tokens": 10000,
     "request_timeout_seconds": 180,
 }
 
@@ -49,7 +49,7 @@ class SettingsBody(BaseModel):
     model: str = ""
     api_style: str = "responses"
     max_input_tokens: int = 120_000
-    max_output_tokens: int = 8192
+    max_output_tokens: int = 10000
     request_timeout_seconds: int = Field(default=180, ge=30, le=600)
 
 

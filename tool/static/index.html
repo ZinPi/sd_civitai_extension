@@ -58,13 +58,13 @@
               <input id="max-in" type="number" min="1024" max="2000000" step="1" value="120000">
             </label>
             <label>Token đầu ra tối đa
-              <input id="max-out" type="number" min="256" max="200000" step="1" value="8192">
+              <input id="max-out" type="number" min="256" max="200000" step="1" value="10000">
             </label>
             <label>Giây chờ mỗi lượt
               <input id="timeout" type="number" min="30" max="600" step="1" value="180">
             </label>
           </div>
-          <p class="hint">20 dòng chỉ là trần. Mỗi prompt theo dòng có thể dài 4000 ký tự, nên số dòng một lượt giảm cho vừa giới hạn. File prompt theo dòng không được quá 2 triệu ký tự. Không cắt file quy tắc. Hết giờ chờ thì không tự gửi lại.</p>
+          <p class="hint">Mỗi lần gửi 10 dòng để tạo prompt. Mỗi prompt có thể dài 4000 ký tự. File prompt theo dòng quá 2 triệu ký tự thì lỗi, không xuất phần vượt. Không cắt file quy tắc. Hết giờ chờ thì không tự gửi lại.</p>
         </details>
       </div>
     </details>
@@ -134,7 +134,7 @@
         <pre id="preview">Kết quả hiện ở đây sau khi chạy.</pre>
         <p id="preview-note" class="hint" hidden></p>
         <a id="download" class="download" hidden>Tải file này</a>
-        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" hidden>Tải file tham chiếu đã tổng hợp</a>
+        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" hidden>Tải file tổng hợp</a>
       </section>
     </section>
 
