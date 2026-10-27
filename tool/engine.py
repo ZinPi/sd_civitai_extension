@@ -14,14 +14,6 @@ RULE_FILES = (
     "04_QA_PROMPT_THEO_DONG.txt",
 )
 
-RULE_LABELS = {
-    "00_QUY_TRINH_HUONG_DAN.txt": "Thứ tự bốn bước",
-    "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt": "Trích nhân vật và bối cảnh",
-    "02_PROMPT_THAM_CHIEU_CHAR_BG.txt": "Prompt tham chiếu CHAR và BG",
-    "03_PROMPT_ANH_THEO_DONG.txt": "Prompt ảnh theo dòng",
-    "04_QA_PROMPT_THEO_DONG.txt": "QA prompt theo dòng",
-}
-
 OUTPUT_FILES = {
     "danh-sach": "DANH_SACH_CHAR_BG.txt",
     "char": "PROMPT_CHAR.txt",

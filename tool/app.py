@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from engine import OUTPUT_FILES, RULE_FILES, RULE_LABELS, JobError, atomic_write
+from engine import OUTPUT_FILES, JobError, atomic_write
 from khach import KhachTrang
 from llm import PROVIDERS, HttpLlm, LlmError
 from runner import AlreadyRunning, Job
@@ -161,21 +161,6 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
     def roi_tab(tab: str = ""):
         app.state.khach.roi(tab)
         return {"ok": True}
-
-    @app.get("/api/rules")
-    def list_rules():
-        files = []
-        for name in RULE_FILES:
-            path = rules_path / name
-            files.append(
-                {
-                    "name": name,
-                    "label": RULE_LABELS[name],
-                    "bytes": path.stat().st_size if path.is_file() else 0,
-                    "missing": not path.is_file(),
-                }
-            )
-        return {"directory": str(rules_path), "files": files}
 
     @app.get("/api/settings")
     def get_settings():

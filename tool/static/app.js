@@ -284,25 +284,6 @@ async function start(mode) {
   render(await response.json());
 }
 
-async function loadRules() {
-  const response = await fetch("/api/rules");
-  if (!response.ok) {
-    document.querySelector("#rules-dir").textContent = "Không đọc được danh sách quy tắc.";
-    return;
-  }
-  const data = await response.json();
-  document.querySelector("#rules-dir").textContent = data.directory;
-  const list = document.querySelector("#rules");
-  list.replaceChildren();
-  for (const file of data.files) {
-    const item = document.createElement("li");
-    const size = file.missing ? "không thấy file" : `${Math.max(1, Math.round(file.bytes / 1024))} KB`;
-    item.textContent = `${file.name} — ${file.label} — ${size}`;
-    if (file.missing) item.className = "missing";
-    list.appendChild(item);
-  }
-}
-
 document.querySelector("#steps").addEventListener("click", (event) => {
   const row = event.target.closest(".step");
   if (row) selectTab(row.dataset.file);
@@ -427,7 +408,6 @@ function watchTab() {
 }
 
 updateCount();
-loadRules();
 watchTab();
 fetch("/api/settings").then(async (response) => {
   if (response.ok) fillSettings(await response.json());
