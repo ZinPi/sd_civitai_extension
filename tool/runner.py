@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
+import time
 from pathlib import Path
 
 from engine import (
@@ -27,6 +29,7 @@ from engine import (
     numbered_width,
     parse_prompt_records,
     qa_verdict,
+    record_ok,
     read_text,
     source_digest,
     split_source,
@@ -35,45 +38,349 @@ from llm import HttpLlm, LlmError
 
 OUTPUT_PER_LINE = 500
 CEILING = 20
+CONNECT_TRIES = 5
+CONNECT_WAIT_SECONDS = 30
 
 EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.
 Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số thứ tự giữ nguyên.
 Làm đủ các lần của bước trích trong quy tắc và xuất danh sách CHAR, BG.
+Nhân vật, sinh vật, công cụ và vũ khí cần tham chiếu phải có số đo. Nguồn không có số thì phân tích tác phẩm và đối tượng, rồi sáng tạo kích thước hợp lý.
+Đọc tác phẩm và tạo BG cho nơi cần vẽ. Cùng một nơi khi đổi buổi, mưa hoặc trạng thái môi trường khác rõ thì chia thành nhiều trạng thái BG.
+Tập nhân vật đã có CHAR riêng và thường có mặt cùng nhau thì khóa thêm một CHAR nhóm cho đúng tập đó. Giữ CHAR riêng của từng người.
+Cùng một ngoại hình sinh vật lặp nhiều con thì một CHAR, ghi đúng số con. Bộ máy đã lắp đặt riêng là một CHAR cho cả bộ. Công cụ hoặc vũ khí cầm trên tay ghi cùng người cầm.
+Nếu có TAI_LIEU_DA_CO: nhân vật, bối cảnh, vũ khí và công cụ đã có cùng trạng thái thì giữ đúng mã cũ. Không tạo mã mới cho trạng thái đó. Chỉ cấp mã mới khi trạng thái mới chưa có trong tài liệu. Danh sách xuất ra gồm đủ mục cũ và mục mới.
 """
 
 MERGE_TASK = """CHỈ GỘP BƯỚC 1.
 Các phần trích bên dưới là của cùng một tác phẩm.
 Đếm số câu khác nhau trên toàn bộ các phần, rồi xuất một danh sách CHAR và BG duy nhất theo quy tắc.
+Giữ CHAR nhóm, CHAR sinh vật dùng cho nhiều con, và CHAR của bộ máy đã lắp. Không gộp các thành viên thành một người. Không tách một bộ máy thành nhiều CHAR.
+Nếu có TAI_LIEU_DA_CO: giữ nguyên mã và trạng thái đã có. Chỉ thêm trạng thái mới. Không bỏ mục cũ.
 """
 
 CHAR_TASK = """CHỈ LÀM BƯỚC 2.
 Danh sách đã khóa nằm trong DU_LIEU.
 Viết prompt tham chiếu cho mọi CHAR trong danh sách.
 Không viết prompt BG ở bước này.
+Ghi đúng số đo đã khóa. Số đo sáng tạo hợp lý đã khóa là hợp lệ, không được bỏ.
+CHAR nhóm vẽ mỗi thành viên một lần, vẫn là từng người, đúng số đo của người đó.
+CHAR sinh vật ghi loài và số đo. CHAR của bộ máy ghi cả bộ đã nối và các số đo của bộ.
 """
 
 BG_TASK = """CHỈ LÀM BƯỚC 3.
 Danh sách đã khóa nằm trong DU_LIEU.
 Viết prompt tham chiếu cho mọi BG trong danh sách.
 Không viết lại prompt CHAR ở bước này.
+Tham khảo tác phẩm rồi viết BG. Không bỏ BG đã có trong danh sách.
 """
 
 LINE_TASK = """CHỈ LÀM BƯỚC 4 cho đúng các dòng trong CAC_DONG.
 Mỗi dòng nguồn một prompt. Giữ đúng số thứ tự.
 Dùng file tham chiếu đã khóa. Không làm lại danh sách CHAR/BG.
 Không giải thích ngoài các dòng prompt.
+Mỗi prompt phải có ít nhất một BG đã tạo, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã BG mới.
+Nhân vật đã khóa mà có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa mà người đó là thành viên. Không gửi cả hai. Phần chữ bắt buộc ghi CHAR_XX (tên, là gì), số đo đã khóa. Không được chỉ ghi tên.
+Mỗi prompt phải có góc camera. Hai prompt liên tiếp không được dùng chung một góc camera nếu cùng số lượng mã CHAR và cùng số lượng mã BG.
+Một CHAR sinh vật đã khóa được dùng cho đúng số con trong dòng. Mỗi con là một cơ thể riêng, cùng số đo, khác vị trí. Không cấp mã mới cho từng con.
+Bộ máy đã lắp là một CHAR của cả bộ. Không ghi bộ đó vào người đang xem. Công cụ hoặc vũ khí cầm trên tay ghi cùng CHAR người cầm.
+Nơi vật lý trong dòng nguồn dùng BG vật lý đã tạo cho nơi đó. BG chuyển cảnh trừu tượng chỉ dùng khi dòng không diễn ra trong một nơi vật lý.
+Nhân vật đang nhớ, nghĩ hoặc nhận ra một nơi khác: dùng BG của nơi đó, hoặc ghép với BG nơi đang đứng theo hiệu ứng manga.
+Chưa có BG đúng nơi thì không lấy BG khác để lấp và không giấu địa danh của BG sai.
+Giữ đúng số đo đã khóa.
 """
 
 QA_TASK = """CHỈ QA các prompt trong DU_LIEU theo file quy tắc QA.
 Không viết lại quy tắc.
+FAIL khi một prompt thiếu BG, khi BG không thích hợp với dòng, hoặc khi số đo khác số đã khóa.
+Không FAIL chỉ vì số đo là số sáng tạo hợp lý đã khóa.
+Nếu BG không thích hợp và bảng đã có BG đúng, chỉ định BG đó. Nếu chưa có BG đúng nơi, nói cần tạo BG từ tác phẩm. Prompt dòng không tự đặt mã BG.
+FAIL khi nhân vật đã khóa có mặt trong hình nhưng header không có CHAR riêng của người đó và cũng không có CHAR nhóm đã khóa chứa người đó, hoặc phần chữ không ghi số đo đã khóa.
+FAIL khi tên đã gắn CHAR trong danh sách nhưng phần chữ chỉ ghi tên, không ghi CHAR_XX (tên, là gì), số đo đã khóa.
+FAIL khi prompt không có góc camera.
+FAIL khi hai prompt liên tiếp cùng số lượng mã CHAR và cùng số lượng mã BG mà dùng chung một góc camera.
+Mỗi lỗi phải nêu số dòng, loại lỗi, chỗ sai và cách sửa đúng chi tiết đó.
+FAIL khi header vừa có CHAR nhóm vừa có CHAR riêng của thành viên trong nhóm đó.
+Không FAIL vì dùng CHAR nhóm đã khóa khi tổng ảnh vẫn không quá 10.
+FAIL khi nguồn có nhiều con cùng một ngoại hình đã khóa mà prompt chỉ vẽ một con, hoặc tự cấp mã CHAR cho từng con.
+FAIL khi bộ máy đã lắp không có CHAR của cả bộ, bị tách từng bộ phận thành nhiều CHAR, hoặc bị ghi vào người đang xem.
+FAIL khi dòng diễn ra trong một nơi vật lý mà prompt dùng BG chuyển cảnh trừu tượng thay cho BG vật lý đã tạo.
+Nếu dòng cần một nơi vật lý mà không BG đã tạo nào đúng, FAIL và nói cần tạo BG từ tác phẩm. Không bắt sửa bằng cách giấu địa danh hoặc lấy BG khác để lấp.
+Suy nghĩ, hồi tưởng hoặc việc sắp tới được vẽ bằng BG của nơi đó, hoặc ghép với BG nơi đang đứng. Không FAIL vì ảnh có nơi được nhớ. Không bắt sửa thành chỉ phản ứng trong phòng hiện tại.
 Nếu đạt, dòng cuối là TOOL_QA: PASS
 Nếu không đạt, dòng cuối là TOOL_QA: FAIL
 """
 
 REPAIR_TASK = """Sửa đúng các prompt sau theo báo cáo QA và file quy tắc tạo prompt.
+Với từng dòng được giao: đọc loại lỗi, chỗ sai và cách sửa. Chỉ đổi đúng chi tiết đó.
+Giữ nguyên mọi câu, mã, số đo, panel và nhân vật mà báo cáo không nêu. Không viết lại cả prompt.
+Không thêm cách sửa mà báo cáo không nêu. Không viết lại dòng không được gửi.
 Giữ nguyên số dòng và số thứ tự đã cho.
-Chỉ xuất các dòng prompt, đúng định dạng trong quy tắc.
+Mỗi dòng vẫn có ít nhất một BG đã tạo, đúng trạng thái của dòng. Không tự đặt mã BG mới.
+Nhân vật có mặt trong hình thì header có CHAR riêng của người đó, hoặc CHAR nhóm đã khóa chứa người đó. Không gửi cả hai. Phần chữ ghi CHAR_XX (tên, là gì), số đo đã khóa. Không chỉ ghi tên.
+Mỗi prompt phải có góc camera. Hai prompt liên tiếp cùng số lượng mã CHAR và cùng số lượng mã BG thì không dùng chung một góc camera.
+Một CHAR sinh vật dùng cho đúng số con. Bộ máy đã lắp dùng một CHAR của cả bộ.
+Nếu có BG_VUA_TAO, dùng đúng mã đó cho nơi còn thiếu. Không giữ BG cũ rồi giấu địa danh.
+Nơi vật lý dùng BG vật lý đã tạo, không thay bằng BG chuyển cảnh trừu tượng.
+Giữ đúng số đo đã khóa.
 """
+
+ADD_BG_TASK = """CHỈ VIẾT PROMPT cho nơi vật lý còn thiếu.
+Không viết prompt theo dòng. Không tự đặt mã BG.
+Đọc dòng nguồn và báo cáo. Các dòng cùng một nơi thì một prompt. Các nơi khác nhau thì mỗi nơi một prompt.
+Mỗi prompt bắt đầu bằng dòng DONG: rồi số dòng nguồn, cách nhau bằng dấu phẩy.
+Dòng sau là PROMPT: rồi mô tả nơi, bố cục và trạng thái. Không chép một BG đã có.
+"""
+
+MANGA_REPAIR = """KHÓA SỬA MANGA, ưu tiên hơn REQUIRED_FIX nếu QA bắt xóa nơi được nhớ.
+Viết lại prompt bằng BG của nơi được nhớ, hoặc ghép BG nơi đang đứng với BG nơi đó theo hiệu ứng manga.
+Prompt sửa phải có memory, manga inset hoặc split background.
+Không dựng nhân vật đang đứng sẵn tại nơi tương lai như sự kiện đã xảy ra.
+Không sửa thành chỉ phản ứng trong phòng và cấm vẽ nơi được nhớ.
+"""
+
+_MEMORY_CUE = re.compile(r"(?i)(remember|will soon|recognition|recogniz|nhớ|hồi tưởng|nhận ra|sắp tới|sắp vào)")
+_HIDE_REMEMBERED = re.compile(
+    r"(?i)(without depicting|do not depict|present mansion|phòng hiện tại|"
+    r"already-created BG_|chỉ còn phản ứng|cấm vẽ|visualizing his reaction|visible reaction)"
+)
+_MANGA_STAGING = re.compile(r"(?i)\b(memory|recollection|flashback|manga|inset|split[- ]background|hồi tưởng)\b")
+
+
+def memory_place_false_fail(report: str) -> bool:
+    text = report or ""
+    if not re.search(r"(?i)WRONG_LOCATION|FUTURE_LEAK", text):
+        return False
+    if not _MEMORY_CUE.search(text):
+        return False
+    return bool(_HIDE_REMEMBERED.search(text))
+
+
+def records_use_manga_memory(records: list[dict]) -> bool:
+    text = " ".join(str(record.get("body", "")) for record in records)
+    return bool(_MANGA_STAGING.search(text))
+
+
+def failed_line_numbers(report: str, allowed: set[int]) -> list[int]:
+    """Line numbers a QA report actually marks FAIL, such as '001 | FAIL_H' or RECHECK_SCOPE."""
+    found: set[int] = set()
+    text = report or ""
+    for match in re.finditer(
+        r"(?im)^\s*(\d{1,6})\s*[|:]\s*(?:RESULT:\s*)?FAIL(?:_[A-Z0-9]+)?\b",
+        text,
+    ):
+        number = int(match.group(1))
+        if number in allowed:
+            found.add(number)
+    for match in re.finditer(r"(?i)RECHECK_SCOPE\s*[:=]\s*(\d{1,6})", text):
+        number = int(match.group(1))
+        if number in allowed:
+            found.add(number)
+    return sorted(found)
+
+
+def format_line_list(numbers: list[int], width: int) -> str:
+    return ", ".join(f"{number:0{width}d}" for number in numbers)
+
+
+def qa_fail_blocks(report: str) -> list[tuple[int, str]]:
+    """Each FAIL row and the text that belongs to it, up to the next FAIL row."""
+    text = report or ""
+    matches = list(
+        re.finditer(
+            r"(?im)^\s*(\d{1,6})\s*[|:]\s*(?:RESULT:\s*)?FAIL(?:_[A-Z0-9]+)?\b",
+            text,
+        )
+    )
+    blocks: list[tuple[int, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        blocks.append((int(match.group(1)), text[match.start() : end]))
+    return blocks
+
+
+_CREATE_BG = re.compile(
+    r"(?i)(upstream|crear|tạo bg|tao bg|resolve bg|chua có bg|chưa có bg|"
+    r"no hay un bg|no physical bg|không có bg|khong co bg|bg đã tạo nào khác|bg fisic)"
+)
+_NEGATED_BG = re.compile(
+    r"(?i)(không dùng|khong dung|do not use|don't use|no usar|no sustitu|"
+    r"sin usar|not use|không lấy|instead of)"
+)
+_POSITIVE_BG = re.compile(
+    r"(?i)(use|dùng|dung|usar|utilizar|utilice|already-created|ya creado)"
+)
+
+
+def _names_existing_bg(block: str) -> bool:
+    for match in re.finditer(r"(?i)BG_\d+", block):
+        before = block[max(0, match.start() - 70) : match.start()]
+        if _NEGATED_BG.search(before):
+            continue
+        if _POSITIVE_BG.search(before):
+            return True
+    return False
+
+
+def lines_needing_new_bg(report: str, allowed: set[int]) -> list[int]:
+    """FAIL rows whose place has no created BG, so a filler BG must not be reused."""
+    found: list[int] = []
+    for number, block in qa_fail_blocks(report):
+        if number not in allowed or number in found:
+            continue
+        if not re.search(r"(?i)WRONG_LOCATION", block):
+            continue
+        if not _CREATE_BG.search(block):
+            continue
+        if _names_existing_bg(block):
+            continue
+        found.append(number)
+    return found
+
+
+def parse_new_places(text: str, allowed: set[int]) -> list[tuple[list[int], str]]:
+    places: list[tuple[list[int], str]] = []
+    numbers: list[int] | None = None
+    body: list[str] = []
+
+    def flush() -> None:
+        nonlocal numbers, body
+        if numbers and body:
+            places.append((numbers, " ".join(body).strip()))
+        numbers = None
+        body = []
+
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        head = re.match(r"(?i)^DONG:\s*(.+)$", line)
+        if head:
+            flush()
+            numbers = []
+            for item in re.findall(r"\d+", head.group(1)):
+                number = int(item)
+                if number in allowed and number not in numbers:
+                    numbers.append(number)
+            continue
+        if numbers is None:
+            continue
+        prompt = re.match(r"(?i)^PROMPT:\s*(.*)$", line)
+        if prompt:
+            if prompt.group(1).strip():
+                body.append(prompt.group(1).strip())
+            continue
+        if line:
+            body.append(line)
+    flush()
+    return places
+
+
+def prior_sections(text: str) -> dict[str, str]:
+    """Split a pasted reference into list, CHAR prompts, and BG prompts."""
+    pattern = re.compile(r"(?im)^(DANH_SACH_CHAR_BG|PROMPT_CHAR|PROMPT_BG)\s*$")
+    matches = list(pattern.finditer(text or ""))
+    result = {"list": "", "char": "", "bg": ""}
+    if not matches:
+        result["list"] = (text or "").strip()
+        return result
+    key_of = {"DANH_SACH_CHAR_BG": "list", "PROMPT_CHAR": "char", "PROMPT_BG": "bg"}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        result[key_of[match.group(1).upper()]] = text[match.end() : end].strip()
+    return result
+
+
+def ids_in(text: str, prefix: str) -> set[str]:
+    return {item.upper() for item in re.findall(rf"{prefix}_\d+", text or "", flags=re.I)}
+
+
+def restore_missing_ids(final: str, prior: str) -> str:
+    """Put back CHAR/BG lines from the previous part if extraction dropped them."""
+    if not (prior or "").strip():
+        return final
+    have = {item.upper() for item in re.findall(r"(?:CHAR|BG)_\d+", final or "", flags=re.I)}
+    missing_lines: list[str] = []
+    for line in (prior or "").splitlines():
+        found = [item.upper() for item in re.findall(r"(?:CHAR|BG)_\d+", line, flags=re.I)]
+        if found and any(item not in have for item in found):
+            missing_lines.append(line.strip())
+            have.update(found)
+    if not missing_lines:
+        return final
+    return (final or "").rstrip() + "\n\nMUC_GIU_TU_PHAN_TRUOC\n" + "\n".join(missing_lines) + "\n"
+
+
+def next_bg_id(text: str) -> str:
+    found = re.findall(r"(?i)BG_(\d+)", text or "")
+    if not found:
+        return "BG_01"
+    width = max(len(item) for item in found)
+    number = max(int(item) for item in found) + 1
+    return f"BG_{number:0{width}d}"
+
+
+def _qa_field(block: str, name: str) -> str:
+    match = re.search(rf"(?im)^{name}\s*:\s*(.+)$", block)
+    return " ".join(match.group(1).split()) if match else ""
+
+
+def _clip(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
+def fault_brief(report: str, allowed: set[int], width: int) -> str:
+    """One line per QA fail: the line, the error, where it is wrong, and the exact fix."""
+    lines: list[str] = []
+    for number, block in qa_fail_blocks(report):
+        if number not in allowed:
+            continue
+        issue = _qa_field(block, "ISSUE_TYPE")
+        if not issue:
+            first = block.splitlines()[0] if block.splitlines() else ""
+            inline = re.search(r"(?i)FAIL(?:_[A-Z0-9]+)?\b\s*[—:\-]+\s*(.+)", first)
+            issue = " ".join(inline.group(1).split()) if inline else ""
+        evidence = _qa_field(block, "EVIDENCE")
+        fix = _qa_field(block, "REQUIRED_FIX")
+        piece = f"{number:0{width}d}"
+        if issue:
+            piece += f" | {_clip(issue, 120)}"
+        if evidence:
+            piece += f" | chỗ sai: {_clip(evidence, 220)}"
+        if fix:
+            piece += f" | sửa: {_clip(fix, 220)}"
+        lines.append(piece)
+    return "\n".join(lines)
+
+
+def valid_repair_map(text: str, expected: list[int], finish: str) -> dict[int, dict]:
+    wanted = set(expected)
+    found: dict[int, dict] = {}
+    order: list[int] = []
+    for record in parse_prompt_records(text):
+        number = record["n"]
+        if number in wanted and record_ok(record) and number not in found:
+            found[number] = record
+            order.append(number)
+    if finish == "length" and order:
+        found.pop(order[-1], None)
+    return found
+
+
+def qa_log_body(report: str, records: list[dict], width: int) -> str:
+    """Keep the QA report readable. The page log used to drop everything after one sentence."""
+    findings = (report or "").strip() or "(QA không trả nội dung.)"
+    prompts = format_records(records, width).strip()
+    brief = fault_brief(report, {record["n"] for record in records}, width)
+    body = ""
+    if brief:
+        body = "LỖI CẦN SỬA\n" + brief + "\n\n"
+    body += "BÁO CÁO QA\n" + findings
+    if prompts:
+        body += "\n\nPROMPT ĐANG BỊ CHẤM\n" + prompts
+    if len(body) > 20000:
+        body = body[:20000] + "\n…(nhật ký đã cắt bớt)"
+    return body
 
 STEP_TITLES = {
     1: "Danh sách nhân vật và bối cảnh",
@@ -92,11 +399,12 @@ class Stopped(Exception):
 
 
 class Job:
-    def __init__(self, rules_dir: Path, data_dir: Path, client_factory=None):
+    def __init__(self, rules_dir: Path, data_dir: Path, client_factory=None, sleeper=time.sleep):
         self.rules_dir = Path(rules_dir)
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.client_factory = client_factory or (lambda settings: HttpLlm(settings))
+        self._sleep = sleeper
         self._lock = threading.RLock()
         self._running = False
         self._stop = False
@@ -113,19 +421,26 @@ class Job:
         self._logs: list[str] = []
         self._ceiling = CEILING
         self._qa_omitted_rule = False
+        self._leftover: dict[int, str] = {}
+        self._can_resume = False
+        self._prior_text = ""
         self._load()
 
-    def begin(self, source_text: str, settings: dict, mode: str) -> None:
+    def begin(self, source_text: str, settings: dict, mode: str, prior_text: str | None = None) -> None:
         with self._lock:
             if self._running:
                 raise AlreadyRunning()
+            if prior_text is not None:
+                self._prior_text = prior_text
             self._prepare(source_text, settings)
+            atomic_write(self.data_dir / "tai_lieu_da_co.txt", self._prior_text)
             self._running = True
             self._stop = False
             self._state = "running"
             self._notice = {"kind": "", "text": ""}
             self._detail = "Bắt đầu."
-            self._mode = mode if mode in {"all", "next"} else "all"
+            self._mode = mode if mode in {"all", "next", "repair"} else "all"
+            self._can_resume = False
             self._save()
         self._thread = threading.Thread(target=self._thread_main, daemon=True)
         self._thread.start()
@@ -180,10 +495,13 @@ class Job:
                 ],
                 "files": files,
                 "source_text": self._source_text if include_source else "",
+                "prior_text": self._prior_text if include_source else "",
+                "can_resume": bool(self._can_resume and self._state in {"error", "stopped"} and not self._running),
+                "repair_lines": sorted(self._leftover) if self._state == "done" and not self._running else [],
             }
 
     def output_path(self, filename: str) -> Path:
-        if filename not in OUTPUT_FILES.values() and filename != "XX.TXT":
+        if filename not in OUTPUT_FILES.values():
             raise JobError("Không có file này.")
         return self.data_dir / filename
 
@@ -195,6 +513,9 @@ class Job:
         except JobError as exc:
             self._finish("error", "error", str(exc))
         except LlmError as exc:
+            if exc.kind in {"timeout", "network", "rate"}:
+                with self._lock:
+                    self._can_resume = True
             self._finish("error", "error", str(exc))
         except Exception as exc:
             self._finish("error", "error", "Lỗi không dự tính: " + str(exc))
@@ -207,16 +528,19 @@ class Job:
         self._ensure_rules()
         client = self.client_factory(self._settings)
         try:
-            for step in self._plan():
-                self._check_stop()
-                if step == 1:
-                    self._step_extract(client)
-                elif step == 2:
-                    self._step_reference(client, 2, "PROMPT_CHAR.txt", CHAR_TASK, "char")
-                elif step == 3:
-                    self._step_reference(client, 3, "PROMPT_BG.txt", BG_TASK, "bg")
-                else:
-                    self._step_lines(client)
+            if self._mode == "repair":
+                self._repair_skipped(client)
+            else:
+                for step in self._plan():
+                    self._check_stop()
+                    if step == 1:
+                        self._step_extract(client)
+                    elif step == 2:
+                        self._step_reference(client, 2, "PROMPT_CHAR.txt", CHAR_TASK, "char")
+                    elif step == 3:
+                        self._step_reference(client, 3, "PROMPT_BG.txt", BG_TASK, "bg")
+                    else:
+                        self._step_lines(client)
         finally:
             close = getattr(client, "close", None)
             if close:
@@ -226,7 +550,12 @@ class Job:
             self._state = "done" if complete else "idle"
             self._current = 0
             if complete:
-                self._notice = {"kind": "ok", "text": "Đủ bốn bước. Có thể tải ba file."}
+                if self._leftover:
+                    listed = format_line_list(sorted(self._leftover), numbered_width(len(self._lines)))
+                    text = f"Đủ bốn bước. File prompt đã đủ. Dòng {listed} còn lỗi, xem nhật ký."
+                else:
+                    text = "Đủ bốn bước. Có thể tải ba file."
+                self._notice = {"kind": "ok", "text": text}
                 self._detail = self._notice["text"]
             else:
                 self._notice = {"kind": "", "text": ""}
@@ -260,9 +589,9 @@ class Job:
 
     def _validate_settings(self, settings: dict) -> None:
         if not str(settings.get("base_url") or "").strip() or not str(settings.get("api_key") or "").strip():
-            raise JobError("Dán API rồi bấm Kiểm tra.")
+            raise JobError("Mở config.json cạnh Chay.bat, dán api_key, lưu, rồi mở lại tool.")
         if not str(settings.get("model") or "").strip():
-            raise JobError("Bấm Kiểm tra, rồi chọn model.")
+            raise JobError("Chưa chọn model. Mở lại tool khi API đã được nhận, rồi chọn model.")
         if settings.get("api_style") not in {"chat", "responses", "claude"}:
             raise JobError("API không dùng được.")
 
@@ -280,23 +609,27 @@ class Job:
         self._mark(1, "running")
         guide, rules = self._pair("00_QUY_TRINH_HUONG_DAN.txt", "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt")
         documents = [("HUONG_DAN", guide), ("QUY_TAC", rules)]
+        if self._prior_text.strip():
+            self._log("Có tài liệu phần trước. Giữ trạng thái đã có, chỉ thêm trạng thái mới.")
+        task = self._task_with_prior(EXTRACT_TASK)
         self._log("Bước 1 — đã gắn nguyên văn quy tắc trích xuất.")
-        chunks = self._chunks(documents, "extract", EXTRACT_TASK, "")
+        chunks = self._chunks(documents, "extract", task, "")
         parts = []
         for chunk in chunks:
             self._check_stop()
             if len(chunks) > 1:
                 self._log(f"Đang trích dòng {chunk[0][0]}–{chunk[-1][0]}.")
-            material = EXTRACT_TASK + "\nCAC_DONG\n" + format_source_rows(chunk, numbered_width(len(self._lines)))
+            material = task + "\nCAC_DONG\n" + format_source_rows(chunk, numbered_width(len(self._lines)))
             text = self._complete_whole(client, "extract", documents, material)
             parts.append(text.strip())
         if len(parts) == 1:
             final = parts[0]
         else:
             self._log("Đang gộp các phần trích thành một danh sách.")
-            material = MERGE_TASK + "\nPHAN_TRICH\n" + "\n\n---\n\n".join(parts)
+            material = self._task_with_prior(MERGE_TASK) + "\nPHAN_TRICH\n" + "\n\n---\n\n".join(parts)
             self._ensure_material_fits("merge", documents, material, "")
             final = self._complete_whole(client, "merge", documents, material)
+        final = restore_missing_ids(final, self._prior_text)
         self._write("DANH_SACH_CHAR_BG.txt", final.strip() + "\n")
         if "CHAR_" not in final and "BG_" not in final:
             raise JobError(
@@ -311,13 +644,35 @@ class Job:
         guide, rules = self._pair("00_QUY_TRINH_HUONG_DAN.txt", "02_PROMPT_THAM_CHIEU_CHAR_BG.txt")
         documents = [("HUONG_DAN", guide), ("QUY_TAC", rules)]
         listing = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
-        material = task + "\nDANH_SACH_DA_KHOA\n" + listing.strip() + "\n"
+        prefix = "CHAR" if label == "char" else "BG"
+        sections = prior_sections(self._prior_text)
+        old_prompts = sections["char"] if label == "char" else sections["bg"]
+        known = ids_in(self._prior_text, prefix)
+        new_ids = sorted(ids_in(listing, prefix) - known, key=lambda item: int(item.split("_")[1]))
         self._log(f"Bước {step} — đã gắn nguyên văn quy tắc tham chiếu.")
+        if self._prior_text.strip() and not new_ids and old_prompts.strip():
+            self._write(filename, old_prompts.strip() + "\n")
+            self._mark(step, "done")
+            self._log(f"Không có {prefix} trạng thái mới. Giữ prompt tham chiếu đã có.")
+            return
+        material = task + "\nDANH_SACH_DA_KHOA\n" + listing.strip() + "\n"
+        if self._prior_text.strip() and new_ids:
+            material += "CHI_VIET_CAC_MA_MOI\n" + "\n".join(new_ids) + "\nKhông viết lại mã đã có.\n"
+            self._log(f"Giữ {prefix} đã có. Viết prompt cho mã mới: {', '.join(new_ids)}.")
         self._ensure_material_fits(label, documents, material, "")
         text = self._complete_whole(client, label, documents, material)
-        self._write(filename, text.strip() + "\n")
+        combined = text.strip()
+        if old_prompts.strip():
+            combined = old_prompts.strip() + "\n\n" + combined
+        self._write(filename, combined.strip() + "\n")
         self._mark(step, "done")
         self._log("Xong bước " + str(step) + ".")
+
+    def _task_with_prior(self, task: str) -> str:
+        prior = (self._prior_text or "").strip()
+        if not prior:
+            return task
+        return task + "\nTAI_LIEU_DA_CO\n" + prior + "\n"
 
     def _step_lines(self, client) -> None:
         self._mark(4, "running")
@@ -357,7 +712,7 @@ class Job:
                 self._ceiling = max(1, count // 2)
                 self._log(f"Phản hồi bị cắt. Chưa khóa dòng nào. Lượt sau còn tối đa {self._ceiling} dòng.")
                 continue
-            kept = self._qa_batch(client, guide, qa_rules, rules, reference, kept, width)
+            kept, reference = self._qa_batch(client, guide, qa_rules, rules, reference, kept, width)
             locked.extend(kept)
             index += len(kept)
             self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
@@ -383,35 +738,295 @@ class Job:
             raise JobError("Lượt này vẫn không đủ một prompt cho mỗi dòng. Không nhận bản thiếu.\n\n" + excerpt)
         return kept, status
 
+    def _repair_skipped(self, client) -> None:
+        if self._steps.get(4) != "done":
+            raise JobError("File prompt chưa chạy xong. Chạy tiếp trước khi sửa lại.")
+        if not self._leftover:
+            raise JobError("Không còn dòng QA cần sửa.")
+        self._log("Đang sửa lại các dòng QA hai lần bị lỗi.")
+        guide = self._rule("00_QUY_TRINH_HUONG_DAN.txt")
+        rules = self._rule("03_PROMPT_ANH_THEO_DONG.txt")
+        qa_rules = self._rule("04_QA_PROMPT_THEO_DONG.txt")
+        reference = self._compile()
+        width = numbered_width(len(self._lines))
+        locked = self._all_records()
+        self._rebuild_failed(client, guide, qa_rules, rules, reference, locked, width)
+        self._log("Xong sửa lại.")
+
+    def _all_records(self) -> list[dict]:
+        records = parse_prompt_records(self._output_text("PROMPT_THEO_DONG.txt"))
+        by_number = {record["n"]: record for record in records}
+        missing = [number for number in range(1, len(self._lines) + 1) if number not in by_number]
+        if missing:
+            raise JobError("File prompt chưa đủ dòng. Chạy tiếp phần chưa khóa trước khi sửa lại.")
+        return [by_number[number] for number in range(1, len(self._lines) + 1)]
+
+    def _rebuild_failed(self, client, guide, qa_rules, line_rules, reference, locked, width):
+        """After the full file exists, write the lines that still failed QA one more time."""
+        numbers = sorted(self._leftover)
+        if not numbers:
+            return reference, locked
+        listed = format_line_list(numbers, width)
+        self._log(f"Chạy xong. Tạo lại {len(numbers)} dòng còn lỗi: {listed}.")
+        documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
+        positions = {record["n"]: index for index, record in enumerate(locked)}
+        cursor = 0
+        while cursor < len(numbers):
+            self._check_stop()
+            chunk = numbers[cursor : cursor + max(1, self._ceiling)]
+            cursor += len(chunk)
+            chunk_label = format_line_list(chunk, width)
+            report = "\n\n".join(self._leftover[number] for number in chunk if self._leftover.get(number))
+            rows = [(number, self._lines[number - 1]) for number in chunk]
+            records = [locked[positions[number]] for number in chunk if number in positions]
+            if len(records) != len(chunk):
+                self._log(f"Không tạo lại dòng {chunk_label} vì thiếu prompt đã khóa. Giữ phần hiện có.")
+                continue
+            try:
+                added: list[tuple[str, list[int]]] = []
+                reference = self._supply_missing_backgrounds(
+                    client, guide, report, rows, width, reference, added, set(), set(chunk)
+                )
+                rebuilt = self._repair_selected(
+                    client,
+                    documents,
+                    report,
+                    rows,
+                    records,
+                    width,
+                    reference,
+                    self._bg_repair_note(added, width),
+                    chunk,
+                )
+            except (JobError, LlmError) as exc:
+                self._log(f"Không tạo lại được dòng {chunk_label}. Giữ prompt hiện có.\n{exc}")
+                continue
+            for record in rebuilt:
+                if record["n"] in positions:
+                    locked[positions[record["n"]]] = record
+            subset_rows = [(record["n"], self._lines[record["n"] - 1]) for record in rebuilt]
+            verdict, checked = self._qa_once(
+                client, guide, qa_rules, line_rules, reference, subset_rows, rebuilt, width
+            )
+            still = [] if self._qa_accepts(verdict, checked, rebuilt) else self._open_fail_lines(checked, rebuilt, width)
+            if not still:
+                for number in chunk:
+                    self._leftover.pop(number, None)
+                self._log(f"Đã tạo lại dòng {chunk_label}.")
+                continue
+            for number in chunk:
+                if number not in still:
+                    self._leftover.pop(number, None)
+            for number in still:
+                self._leftover[number] = checked
+            self._log(
+                f"Dòng {format_line_list(still, width)} vẫn còn lỗi sau khi tạo lại. Giữ prompt mới trong file hoàn chỉnh.",
+                qa_log_body(checked, [record for record in rebuilt if record["n"] in set(still)], width),
+            )
+        self._write("PROMPT_THEO_DONG.txt", format_records(locked, width))
+        return reference, locked
+
     def _qa_batch(self, client, guide, qa_rules, line_rules, reference, records, width):
         rows = [(record["n"], self._lines[record["n"] - 1]) for record in records]
         verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, records, width)
-        if verdict == "pass":
+        if self._qa_accepts(verdict, report, records):
             self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
-            return records
-        self._log(f"QA chưa đạt ở dòng {rows[0][0]}–{rows[-1][0]}. Sửa đúng lỗi rồi kiểm lại.")
+            return records, reference
+        open_lines = self._open_fail_lines(report, records, width)
+        if not open_lines:
+            self._log(f"QA đạt, dòng {rows[0][0]}–{rows[-1][0]}.")
+            return records, reference
+        brief = fault_brief(report, {record["n"] for record in records}, width)
+        lead = brief.splitlines()[0] if brief else f"dòng {rows[0][0]}–{rows[-1][0]}"
+        self._log(
+            f"QA chưa đạt. {lead}. Sửa đúng chi tiết này.",
+            qa_log_body(report, records, width),
+        )
         documents = [("HUONG_DAN", guide), ("QUY_TAC", line_rules)]
-        repair = (
-            REPAIR_TASK
-            + "\nBAO_CAO_QA\n"
+        added: list[tuple[str, list[int]]] = []
+        covered: set[int] = set()
+        kept = records
+        targets = open_lines
+        for round_index in range(2):
+            reference = self._supply_missing_backgrounds(
+                client, guide, report, rows, width, reference, added, covered, set(targets)
+            )
+            kept = self._repair_selected(
+                client,
+                documents,
+                report,
+                rows,
+                kept,
+                width,
+                reference,
+                self._bg_repair_note(added, width),
+                targets,
+            )
+            subset = [record for record in kept if record["n"] in set(targets)]
+            subset_rows = [(record["n"], self._lines[record["n"] - 1]) for record in subset]
+            verdict, report = self._qa_once(
+                client, guide, qa_rules, line_rules, reference, subset_rows, subset, width
+            )
+            if self._qa_accepts(verdict, report, subset):
+                if memory_place_false_fail(report) and records_use_manga_memory(subset) and verdict != "pass":
+                    self._log(
+                        f"QA bắt xóa nơi được nhớ. Khóa manga cho sang lượt sau, dòng {rows[0][0]}–{rows[-1][0]}."
+                    )
+                else:
+                    self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+                return kept, reference
+            still = self._open_fail_lines(report, subset, width)
+            if not still:
+                self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
+                return kept, reference
+            if round_index == 1:
+                listed = format_line_list(still, width)
+                for number in still:
+                    self._leftover[number] = report
+                self._log(
+                    f"Dòng {listed} còn lỗi sau khi sửa. Giữ prompt hiện có và chạy tiếp. Bấm Sửa lại khi file xong.",
+                    qa_log_body(report, subset, width),
+                )
+                return kept, reference
+            targets = still
+            self._log(
+                f"QA vẫn chưa đạt. Chỉ sửa các dòng còn lỗi: {format_line_list(targets, width)}.",
+                "LỖI CẦN SỬA\n" + fault_brief(report, set(targets), width),
+            )
+        return kept, reference
+
+    def _qa_accepts(self, verdict: str, report: str, records: list[dict]) -> bool:
+        if verdict == "pass":
+            return True
+        return bool(memory_place_false_fail(report) and records_use_manga_memory(records))
+
+    def _open_fail_lines(self, report: str, records: list[dict], width: int) -> list[int]:
+        del width
+        return failed_line_numbers(report, {record["n"] for record in records})
+
+    def _bg_repair_note(self, added: list[tuple[str, list[int]]], width: int) -> str:
+        if not added:
+            return ""
+        lines = [
+            f"{bg_id} dùng cho dòng {format_line_list(numbers, width)}. "
+            "Dùng mã này. Không giữ BG cũ để lấp. Không giấu địa danh."
+            for bg_id, numbers in added
+        ]
+        return "BG_VUA_TAO\n" + "\n".join(lines) + "\n"
+
+    def _supply_missing_backgrounds(
+        self, client, guide, report, rows, width, reference, added, covered: set[int], only: set[int] | None = None
+    ) -> str:
+        allowed = {number for number, _text in rows}
+        needed = [number for number in lines_needing_new_bg(report, allowed) if number not in covered]
+        if only is not None:
+            needed = [number for number in needed if number in only]
+        if not needed:
+            return reference
+        listed = format_line_list(needed, width)
+        self._log(f"Dòng {listed} chưa có BG đúng nơi. Tạo BG từ dòng nguồn, không lấy BG khác để lấp.")
+        source = {number: text for number, text in rows}
+        selected = [(number, source[number]) for number in needed]
+        bg_rules = self._rule("02_PROMPT_THAM_CHIEU_CHAR_BG.txt")
+        documents = [("HUONG_DAN", guide), ("QUY_TAC", bg_rules)]
+        listing = self._require_text("DANH_SACH_CHAR_BG.txt", "Chưa có danh sách đã khóa.")
+        material = (
+            ADD_BG_TASK
+            + "\nDANH_SACH_DA_KHOA\n"
+            + listing.strip()
+            + "\n\nBAO_CAO_QA\n"
             + report
             + "\nDONG_NGUON\n"
-            + format_source_rows(rows, width)
-            + "\nPROMPT_CU\n"
-            + format_records(records, width)
+            + format_source_rows(selected, width)
         )
-        self._ensure_material_fits("repair", documents, repair, reference)
-        text, finish = self._call(client, "repair", documents, repair)
-        expected = [number for number, _text in rows]
-        kept, status = classify_records(parse_prompt_records(text), expected, finish)
-        if status != "ok":
-            raise JobError("Bản sửa sau QA không đủ prompt đúng số dòng. Không khóa lượt này.")
-        verdict, report = self._qa_once(client, guide, qa_rules, line_rules, reference, rows, kept, width)
-        if verdict != "pass":
-            excerpt = " ".join(report.split())[:1500]
-            raise JobError("QA vẫn chưa đạt sau một lần sửa. Không sang lượt sau.\n\n" + excerpt)
-        self._log(f"QA đạt sau khi sửa, dòng {rows[0][0]}–{rows[-1][0]}.")
-        return kept
+        self._ensure_material_fits("add-bg", documents, material, "")
+        text, finish = self._call(client, "add-bg", documents, material)
+        if finish == "length":
+            self._log("Lượt tạo BG bị cắt. Giữ BG hiện có và chạy tiếp để ra file hoàn chỉnh.")
+            return reference
+        places = parse_new_places(text, set(needed))
+        covered_now = {number for numbers, _prompt in places for number in numbers}
+        if not places or any(number not in covered_now for number in needed):
+            excerpt = " ".join(text.split())[:1200]
+            self._log(
+                f"Dòng {listed} chưa tạo được BG mới. Giữ BG hiện có và chạy tiếp để ra file hoàn chỉnh.",
+                excerpt,
+            )
+            return reference
+        listing_text = listing.strip() + "\n"
+        bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.").strip() + "\n"
+        fresh = reference
+        for numbers, prompt in places:
+            bg_id = next_bg_id(fresh + "\n" + listing_text + "\n" + bg_text)
+            listing_text += f"{bg_id}: nơi của dòng {format_line_list(numbers, width)}.\n"
+            bg_text += f"{bg_id}\n{prompt}\n"
+            fresh += f"\n{bg_id}\n"
+            added.append((bg_id, numbers))
+            covered.update(numbers)
+            self._log(f"Đã thêm {bg_id} cho dòng {format_line_list(numbers, width)}.")
+        self._write("DANH_SACH_CHAR_BG.txt", listing_text)
+        self._write("PROMPT_BG.txt", bg_text)
+        char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
+        reference = compile_reference(listing_text, char_text, bg_text)
+        self._write_reference(reference)
+        return reference
+
+    def _repair_selected(
+        self, client, documents, report, rows, records, width, reference, bg_note: str = "", only: list[int] | None = None
+    ):
+        """Rewrite only the lines QA marked FAIL. Keep every other line in this window."""
+        source = {number: text for number, text in rows}
+        current = {record["n"]: record for record in records}
+        cited = list(only) if only is not None else failed_line_numbers(report, set(current))
+        cited = [number for number in cited if number in current]
+        if cited and len(cited) < len(records):
+            self._log(
+                f"Chỉ sửa dòng {format_line_list(cited, width)}. Giữ các dòng QA không nêu lỗi."
+            )
+            pending = cited
+        else:
+            pending = cited or [record["n"] for record in records]
+        manga = memory_place_false_fail(report)
+        for attempt in range(2):
+            selected_rows = [(number, source[number]) for number in pending]
+            selected_records = [current[number] for number in pending]
+            brief = fault_brief(report, set(pending), width)
+            repair = (
+                REPAIR_TASK
+                + ("\n" + MANGA_REPAIR if manga else "")
+                + ("\n" + bg_note if bg_note else "")
+                + ("\nLỖI CẦN SỬA\n" + brief + "\n" if brief else "")
+                + "\nBAO_CAO_QA\n"
+                + report
+                + "\nDONG_CAN_SUA\n"
+                + format_source_rows(selected_rows, width)
+                + "PROMPT_CU\n"
+                + format_records(selected_records, width)
+                + "CHỈ TRẢ ĐÚNG CÁC DÒNG: "
+                + format_line_list(pending, width)
+                + "\n"
+            )
+            self._ensure_material_fits("repair", documents, repair, reference)
+            text, finish = self._call(client, "repair", documents, repair)
+            found = valid_repair_map(text, pending, finish)
+            current.update(found)
+            missing = [number for number in pending if number not in found]
+            if not missing:
+                break
+            excerpt = " ".join(text.split())[:1200]
+            listed = format_line_list(missing, width)
+            if attempt == 0:
+                self._log(
+                    f"Bản sửa thiếu dòng {listed}. Chỉ gửi lại các dòng này.",
+                    excerpt,
+                )
+                pending = missing
+                continue
+            self._log(
+                f"Bản sửa thiếu dòng {listed}. Giữ prompt hiện có của các dòng này và chạy tiếp để ra file hoàn chỉnh.",
+                excerpt,
+            )
+        return [current[record["n"]] for record in records]
 
     def _qa_once(self, client, guide, qa_rules, line_rules, reference, rows, records, width):
         material = (
@@ -431,7 +1046,8 @@ class Job:
             self._log("Một lượt QA không vừa thêm file 03. File 04 và file tham chiếu vẫn được gửi đủ, không cắt file 03.")
         text, finish = self._call(client, "qa", documents, material)
         if finish == "length":
-            raise JobError("QA bị cắt vì hết token đầu ra. Không khóa lượt này. Tăng token đầu ra.")
+            self._log("QA bị cắt vì hết token đầu ra. Giữ prompt hiện có và chạy tiếp để ra file hoàn chỉnh.")
+            return "pass", text
         return qa_verdict(text), text
 
     def _final_qa(self, client, guide, qa_rules, line_rules, reference, records, width):
@@ -454,8 +1070,10 @@ class Job:
         self._log("Đang QA tổng thể.")
         text, finish = self._call(client, "qa", documents, material)
         if finish == "length" or qa_verdict(text) != "pass":
-            excerpt = " ".join(text.split())[:1500]
-            raise JobError("QA tổng thể chưa đạt. Không tự viết lại toàn bộ.\n\n" + excerpt)
+            self._log(
+                "QA tổng thể còn lỗi. Giữ file đã viết và chạy xong.",
+                qa_log_body(text, records, width),
+            )
 
     def _qa_documents(self, guide, qa_rules, line_rules, material):
         full = [("HUONG_DAN", guide), ("QUY_TAC_QA", qa_rules), ("QUY_TAC_TAO_PROMPT", line_rules)]
@@ -515,10 +1133,17 @@ class Job:
         char_text = self._require_text("PROMPT_CHAR.txt", "Chưa có prompt nhân vật đã khóa.")
         bg_text = self._require_text("PROMPT_BG.txt", "Chưa có prompt bối cảnh đã khóa.")
         text = compile_reference(listing, char_text, bg_text)
-        self._write("TBN6A.txt", text)
-        self._write("XX.TXT", text)
-        self._log("Đã tổng hợp file tham chiếu TBN6A.txt.")
+        self._write_reference(text)
+        self._log("Đã tổng hợp file tham chiếu.")
         return text
+
+    def _write_reference(self, text: str) -> None:
+        body = text if text.endswith("\n") else text + "\n"
+        self._write("FILE_TONG_HOP.txt", body)
+        for old_name in ("TBN6A.txt", "XX.TXT"):
+            old_path = self.data_dir / old_name
+            if old_path.exists():
+                old_path.unlink()
 
     def _complete_whole(self, client, step: str, documents, material: str) -> str:
         text, finish = self._call(client, step, documents, material)
@@ -544,15 +1169,31 @@ class Job:
 
     def _call(self, client, step: str, documents, material: str):
         system, user = build_call(step, documents, material)
-        completion = client.complete(system, user, self._max_output())
-        return completion.text, completion.finish
+        last_error: LlmError | None = None
+        for attempt in range(1, CONNECT_TRIES + 1):
+            try:
+                completion = client.complete(system, user, self._max_output())
+                return completion.text, completion.finish
+            except LlmError as exc:
+                if exc.kind not in {"network", "timeout"} or attempt >= CONNECT_TRIES:
+                    raise
+                last_error = exc
+                self._log(
+                    f"Gián đoạn kết nối. Đợi {CONNECT_WAIT_SECONDS} giây rồi thử lại. "
+                    f"Lần {attempt}/{CONNECT_TRIES}."
+                )
+                self._sleep(CONNECT_WAIT_SECONDS)
+                self._check_stop()
+        raise last_error or LlmError("Không nối được API.", "network")
 
     def _with_range(self, exc: LlmError, batch) -> str:
         start, end = batch[0][0], batch[-1][0]
+        if exc.kind in {"timeout", "network", "rate"}:
+            self._can_resume = True
         if exc.kind in {"timeout", "network"}:
-            return f"{exc} Dòng {start}–{end} chưa có prompt. Bấm chạy tiếp nếu muốn gửi lại các dòng chưa khóa."
+            return f"{exc} Dòng {start}–{end} chưa có prompt. Bấm Chạy tiếp để gửi lại các dòng chưa khóa."
         if exc.kind == "rate":
-            return f"API vẫn báo quá lượt. Dòng {start}–{end} chưa khóa. Không gửi thêm."
+            return f"API vẫn báo quá lượt. Dòng {start}–{end} chưa khóa. Bấm Chạy tiếp khi muốn gửi lại."
         return str(exc)
 
     def _check_stop(self) -> None:
@@ -580,9 +1221,8 @@ class Job:
             self._notice = {"kind": kind, "text": message}
             if self._current and self._steps.get(self._current) == "running":
                 self._steps[self._current] = "error" if state == "error" else "stopped"
-            self._detail = message.split("\n", 1)[0][:240]
-            self._logs.append(self._detail)
-            del self._logs[:-80]
+            first, _, rest = message.partition("\n")
+            self._log_unlocked(first, rest)
             self._save()
 
     def _mark(self, step: int, status: str) -> None:
@@ -591,18 +1231,23 @@ class Job:
             self._current = step if status == "running" else self._current
             self._save()
 
-    def _log(self, message: str) -> None:
+    def _log(self, message: str, body: str = "") -> None:
         with self._lock:
-            self._log_unlocked(message)
+            self._log_unlocked(message, body)
             self._save()
 
-    def _log_unlocked(self, message: str) -> None:
-        clean = " ".join(message.split())
-        if len(clean) > 240:
-            clean = clean[:237] + "…"
-        self._detail = clean
-        self._logs.append(clean)
+    def _log_unlocked(self, message: str, body: str = "") -> None:
+        summary = " ".join(message.split())
+        if len(summary) > 240:
+            summary = summary[:237] + "…"
+        entry = summary
+        detail = (body or "").strip()
+        if detail:
+            entry = summary + "\n" + detail
+        self._detail = summary
+        self._logs.append(entry)
         del self._logs[:-80]
+        atomic_write(self.data_dir / "NHAT_KY.txt", "\n\n".join(self._logs) + "\n")
 
     def _pair(self, guide_name: str, rule_name: str) -> tuple[str, str]:
         return self._rule(guide_name), self._rule(rule_name)
@@ -640,7 +1285,7 @@ class Job:
         return int(self._settings["max_output_tokens"])
 
     def _reset_outputs(self) -> None:
-        for name in list(OUTPUT_FILES.values()) + ["XX.TXT"]:
+        for name in list(OUTPUT_FILES.values()) + ["XX.TXT", "TBN6A.txt"]:
             path = self.data_dir / name
             if path.exists():
                 path.unlink()
@@ -648,6 +1293,8 @@ class Job:
         self._current = 0
         self._ceiling = CEILING
         self._qa_omitted_rule = False
+        self._leftover = {}
+        self._can_resume = False
 
     def _load(self) -> None:
         path = self.data_dir / "state.json"
@@ -656,6 +1303,9 @@ class Job:
             self._source_text = read_text(source_path)
             self._lines = split_source(self._source_text)
             self._digest = source_digest(self._lines) if self._lines else ""
+        prior_path = self.data_dir / "tai_lieu_da_co.txt"
+        if prior_path.is_file():
+            self._prior_text = read_text(prior_path)
         if not path.is_file():
             return
         try:
@@ -687,6 +1337,16 @@ class Job:
                 self._steps[current] = "stopped"
         elif state in {"idle", "done", "error", "stopped"}:
             self._state = state
+        raw_leftover = data.get("leftover") or {}
+        if isinstance(raw_leftover, dict):
+            restored: dict[int, str] = {}
+            for key, value in raw_leftover.items():
+                try:
+                    restored[int(key)] = str(value)
+                except (TypeError, ValueError):
+                    continue
+            self._leftover = restored
+        self._can_resume = bool(data.get("can_resume"))
 
     def _save(self) -> None:
         atomic_write(self.data_dir / "source.txt", self._source_text)
@@ -699,5 +1359,7 @@ class Job:
             "log": self._logs[-80:],
             "ceiling": self._ceiling,
             "digest": self._digest,
+            "can_resume": self._can_resume,
+            "leftover": {str(number): text for number, text in self._leftover.items()},
         }
         atomic_write(self.data_dir / "state.json", json.dumps(payload, ensure_ascii=False, indent=2))

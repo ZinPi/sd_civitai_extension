@@ -1,10 +1,19 @@
+import re
 import tempfile
 import unittest
 from pathlib import Path
 
 from engine import parse_prompt_records, source_rows
 from llm import Completion, LlmError
-from runner import Job
+from runner import (
+    Job,
+    failed_line_numbers,
+    fault_brief,
+    lines_needing_new_bg,
+    prior_sections,
+    restore_missing_ids,
+    valid_repair_map,
+)
 
 
 def write_rules(directory: Path, body: str = "QUY-TAC-KHONG-DUOC-CAT") -> None:
@@ -94,8 +103,9 @@ class RunnerTests(unittest.TestCase):
         records = parse_prompt_records(prompts)
         self.assertEqual([record["n"] for record in records], [1, 2, 3, 4])
         self.assertTrue(all("BG_" in record["ids"] for record in records))
-        reference = (self.data / "TBN6A.txt").read_text(encoding="utf-8")
-        self.assertEqual(reference, (self.data / "XX.TXT").read_text(encoding="utf-8"))
+        reference = (self.data / "FILE_TONG_HOP.txt").read_text(encoding="utf-8")
+        self.assertFalse((self.data / "TBN6A.txt").exists())
+        self.assertFalse((self.data / "XX.TXT").exists())
         self.assertIn("CHAR_01 cô bé", reference)
         self.assertIn("CHAR_01 front, close, back.", reference)
         joined = "\n".join(user for _step, user in self.script.calls)
@@ -131,13 +141,732 @@ class RunnerTests(unittest.TestCase):
 
     def test_timeout_does_not_raise_a_generic_error(self):
         class Slow(Script):
+            def __init__(self):
+                super().__init__()
+                self.tries = 0
+
             def complete(self, system, user, max_output_tokens):
+                self.tries += 1
                 raise LlmError("Hết giờ chờ. Không tự gửi lại lượt này.", "timeout")
 
-        job = Job(self.rules, self.data, client_factory=lambda _settings: Slow())
+        script = Slow()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script, sleeper=lambda _seconds: None)
         job.begin(self.source, self.settings, "next")
         job._thread.join(10)
-        self.assertIn("Không tự gửi lại", job.snapshot()["notice"]["text"])
+        snapshot = job.snapshot()
+        self.assertIn("Không tự gửi lại", snapshot["notice"]["text"])
+        self.assertTrue(snapshot["can_resume"])
+        self.assertEqual(script.tries, 5)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Đợi 30 giây rồi thử lại. Lần 1/5.", journal)
+        self.assertIn("Lần 4/5.", journal)
+        self.assertNotIn("Lần 5/5.", journal)
+
+    def test_connection_drop_retries_then_continues(self):
+        class Flaky(Script):
+            def __init__(self):
+                super().__init__()
+                self.drops = 0
+
+            def complete(self, system, user, max_output_tokens):
+                if self.drops < 2:
+                    self.drops += 1
+                    raise LlmError("Không nối được API. Không tự gửi lại.", "network")
+                return super().complete(system, user, max_output_tokens)
+
+        script = Flaky()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script, sleeper=lambda _seconds: None)
+        job.begin(self.source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(script.drops, 2)
+        self.assertIn("Lần 2/5.", "\n".join(snapshot["log"]))
+
+    def test_remembered_place_qa_does_not_stop_the_next_turn(self):
+        fail = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION; FUTURE_LEAK "
+            "EVIDENCE: The source describes Hermes remembering that he will soon enter the academy "
+            "while still in the mansion room. "
+            "REQUIRED_FIX: Use the already-created BG_03 and keep Hermes in the mansion room "
+            "without depicting the future academy approach.\n"
+            "TOOL_QA: FAIL"
+        )
+
+        class MemoryQa(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_03 mansion\nBG_04 academy\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front, close, back.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_03 mansion room.\nBG_04 academy.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count <= 2:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                rows = source_rows(user) or [
+                    (int(match.group(1)), match.group(2))
+                    for match in re.finditer(r"(?m)^(\d+)\. (.+)$", user)
+                ]
+                if step == "repair":
+                    text = "\n".join(
+                        f"{number:03d} | CHAR_01.BG_03.BG_04 | IMAGE_PROMPT: "
+                        "Hermes in the mansion, manga inset memory of the academy."
+                        for number, _text in rows
+                    )
+                    return Completion(text, "stop")
+                text = "\n".join(
+                    f"{number:03d} | CHAR_01.BG_04 | IMAGE_PROMPT: Hermes standing on the academy approach."
+                    for number, _text in rows
+                )
+                return Completion(text, "stop")
+
+        script = MemoryQa()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        source = (
+            "Hermes recuerda que pronto entrará a la academia.\n"
+            "El nombre de la institución es inconfundible.\n"
+        )
+        job.begin(source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("manga inset memory", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("KHÓA SỬA MANGA", repair_users[0])
+
+    def test_physical_future_staging_still_stops_the_turn(self):
+        fail = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION; FUTURE_LEAK "
+            "EVIDENCE: Hermes remembering the academy. "
+            "REQUIRED_FIX: keep him in the present mansion room without depicting the academy.\n"
+            "TOOL_QA: FAIL"
+        )
+
+        class StillThere(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_03 mansion\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_03 room.\n", "stop")
+                if step == "qa":
+                    return Completion(fail, "stop")
+                rows = source_rows(user) or [
+                    (int(match.group(1)), match.group(2))
+                    for match in re.finditer(r"(?m)^(\d+)\. (.+)$", user)
+                ]
+                text = "\n".join(
+                    f"{number:03d} | CHAR_01.BG_04 | IMAGE_PROMPT: Hermes standing on the academy approach."
+                    for number, _text in rows
+                )
+                return Completion(text, "stop")
+
+        job = Job(self.rules, self.data, client_factory=lambda _settings: StillThere())
+        job.begin("Hermes recuerda la academia.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("academy approach", prompts)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("còn lỗi sau khi sửa", journal)
+        self.assertIn("chạy tiếp", journal)
+        self.assertIn("WRONG_LOCATION", journal)
+        self.assertIn("BÁO CÁO QA", journal)
+        stored = (self.data / "NHAT_KY.txt").read_text(encoding="utf-8")
+        self.assertIn("BÁO CÁO QA", stored)
+
+    def test_failed_prompt_is_rewritten_after_the_file_is_complete(self):
+        fail = (
+            "001 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "EVIDENCE: The room BG does not match the yard.\n"
+            "REQUIRED_FIX: Use the yard, not the bedroom.\n"
+            "TOOL_QA: FAIL\n"
+        )
+
+        class Rebuild(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+                self.repairs = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_01 phòng\nBG_02 sân\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 bedroom.\nBG_02 yard.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count <= 3:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: Hermes trains in the bedroom, 170 cm.\n"
+                        "002 | CHAR_01.BG_01 | IMAGE_PROMPT: KEEP-LINE-TWO the street stays.\n",
+                        "stop",
+                    )
+                self.repairs += 1
+                if self.repairs < 3:
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: BATCH still in the bedroom, 170 cm.\n",
+                        "stop",
+                    )
+                return Completion(
+                    "001 | CHAR_01.BG_02 | IMAGE_PROMPT: END REBUILD Hermes trains in the yard, 170 cm.\n",
+                    "stop",
+                )
+
+        script = Rebuild()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Hermes tập ở sân.\nCô bé nhìn phố.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(snapshot["repair_lines"], [1])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("BATCH still in the bedroom", prompts)
+        self.assertIn("KEEP-LINE-TWO the street stays", prompts)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bấm Sửa lại khi file xong", journal)
+        job.begin("Hermes tập ở sân.\nCô bé nhìn phố.\n", self.settings, "repair")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(snapshot["repair_lines"], [])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("END REBUILD Hermes trains in the yard", prompts)
+        self.assertIn("KEEP-LINE-TWO the street stays", prompts)
+        self.assertNotIn("BATCH still in the bedroom", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 3)
+        self.assertIn("001. Hermes tập ở sân.", repair_users[2])
+        self.assertNotIn("002. Cô bé nhìn phố.", repair_users[2])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Đã tạo lại dòng 001", journal)
+
+    def test_failed_line_numbers_keep_only_cited_rows(self):
+        report = (
+            "001 | FAIL_H  \n"
+            "ISSUE_TYPE: MISSING_REQUIRED_REFERENCE\n"
+            "008 | FAIL_H  \n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "RECHECK_SCOPE: 008\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(failed_line_numbers(report, set(range(1, 17))), [1, 8])
+        colon = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION\n"
+            "RECHECK_SCOPE: 002\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(failed_line_numbers(colon, {1, 2}), [1, 2])
+        self.assertEqual(failed_line_numbers("đối chiếu xong\nTOOL_QA: FAIL\n", {1, 2}), [])
+
+    def test_length_cut_drops_the_last_repaired_line(self):
+        text = (
+            "001 | CHAR_01.BG_01 | IMAGE_PROMPT: CHAR_01 stands in the street, 174 cm.\n"
+            "002 | CHAR_01.BG_03 | IMAGE_PROMPT: CHAR_01 wakes in the room, 168 cm.\n"
+        )
+        cut = valid_repair_map(text, [1, 2], "length")
+        self.assertEqual(list(cut), [1])
+        whole = valid_repair_map(text, [1, 2], "stop")
+        self.assertEqual(list(whole), [1, 2])
+
+    def test_qa_repair_rewrites_only_the_failed_line(self):
+        fail = (
+            "001 | FAIL_H\n"
+            "ISSUE_TYPE: MISSING_REQUIRED_REFERENCE\n"
+            "REQUIRED_FIX: Add CHAR_01 and the locked size.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        kept = "KEEP-LINE-TWO the patio curtain stays untouched."
+
+        class OneFail(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\nBG_03 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front, close, back.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\nBG_03 room.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "repair":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: "
+                        "CHAR_01 the young man, 174 cm, watches the street.\n",
+                        "stop",
+                    )
+                return Completion(
+                    "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                    f"002 | CHAR_01.BG_01 | IMAGE_PROMPT: {kept}\n",
+                    "stop",
+                )
+
+        script = OneFail()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        source = "Người trẻ đứng nhìn phố.\nCô bé nhìn cánh cửa sân.\n"
+        job.begin(source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("174 cm", prompts)
+        self.assertIn(kept, prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("DONG_CAN_SUA", repair_users[0])
+        self.assertIn("001. Người trẻ đứng nhìn phố.", repair_users[0])
+        self.assertNotIn("002. Cô bé nhìn cánh cửa sân.", repair_users[0])
+        self.assertIn("CHỈ TRẢ ĐÚNG CÁC DÒNG: 001", repair_users[0])
+        self.assertIn("LỖI CẦN SỬA", repair_users[0])
+        self.assertIn("MISSING_REQUIRED_REFERENCE", repair_users[0])
+        self.assertIn("Chỉ đổi đúng chi tiết đó", repair_users[0])
+        qa_users = [user for step, user in script.calls if step == "qa"]
+        self.assertGreaterEqual(len(qa_users), 2)
+        self.assertNotIn("002. Cô bé nhìn cánh cửa sân.", qa_users[1])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Chỉ sửa dòng 001", journal)
+        self.assertIn("Giữ các dòng QA không nêu lỗi", journal)
+
+    def test_short_repair_retries_only_the_missing_line(self):
+        fail = (
+            "001 | FAIL_H\nISSUE_TYPE: MISSING_REQUIRED_REFERENCE\nTOOL_QA: FAIL\n"
+            "002 | FAIL_H\nISSUE_TYPE: WRONG_LOCATION\nTOOL_QA: FAIL\n"
+        )
+
+        class ShortThenRest(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+                self.repairs = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\nBG_03 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\nBG_03 room.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                        "002 | BG_06 | IMAGE_PROMPT: An abstract awakening transition.\n",
+                        "stop",
+                    )
+                self.repairs += 1
+                if self.repairs == 1:
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: CHAR_01, 174 cm, watches the street.\n"
+                        "không đủ dòng còn lại",
+                        "stop",
+                    )
+                return Completion(
+                    "002 | CHAR_01.BG_03 | IMAGE_PROMPT: CHAR_01, 168 cm, wakes in the physical room.\n",
+                    "stop",
+                )
+
+        script = ShortThenRest()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Người trẻ đứng nhìn phố.\nAnh tỉnh dậy trong phòng.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("174 cm", prompts)
+        self.assertIn("168 cm", prompts)
+        self.assertNotIn("abstract awakening", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 2)
+        self.assertIn("001. Người trẻ đứng nhìn phố.", repair_users[0])
+        self.assertIn("002. Anh tỉnh dậy trong phòng.", repair_users[0])
+        self.assertIn("002. Anh tỉnh dậy trong phòng.", repair_users[1])
+        self.assertNotIn("001. Người trẻ đứng nhìn phố.", repair_users[1])
+        self.assertIn("CHỈ TRẢ ĐÚNG CÁC DÒNG: 002", repair_users[1])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bản sửa thiếu dòng 002", journal)
+        self.assertIn("Chỉ gửi lại các dòng này", journal)
+
+    def test_second_short_repair_names_the_missing_line_and_stops(self):
+        fail = "001 | FAIL_H\nISSUE_TYPE: MISSING_REQUIRED_REFERENCE\nTOOL_QA: FAIL\n"
+
+        class AlwaysShort(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 người trẻ\nBG_01 phố\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 street.\n", "stop")
+                if step == "qa":
+                    return Completion(fail, "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | BG_01 | IMAGE_PROMPT: A young man watches the street.\n"
+                        "002 | CHAR_01.BG_01 | IMAGE_PROMPT: KEEP-LINE-TWO stays put.\n",
+                        "stop",
+                    )
+                return Completion("không có prompt", "stop")
+
+        job = Job(self.rules, self.data, client_factory=lambda _settings: AlwaysShort())
+        job.begin("Người trẻ đứng nhìn phố.\nCô bé nhìn cửa.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("A young man watches the street", prompts)
+        self.assertIn("KEEP-LINE-TWO stays put", prompts)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Bản sửa thiếu dòng 001", journal)
+        self.assertIn("chạy tiếp", journal)
+
+
+class MissingBackgroundTests(unittest.TestCase):
+    def setUp(self):
+        RunnerTests.setUp(self)
+
+    def tearDown(self):
+        RunnerTests.tearDown(self)
+
+    def test_missing_place_lines_ignore_a_named_existing_bg(self):
+        report = (
+            "033 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_TIMING_STATE\n"
+            "REQUIRED_FIX: Xóa trạng thái visibly recovered.\n"
+            "036 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "EVIDENCE: chưa có BG đã tạo nào khác.\n"
+            "REQUIRED_FIX: Cần resolve BG đúng nơi upstream; không dùng BG_02.\n"
+            "037 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "REQUIRED_FIX: Resolver y crear upstream los BG físicos. No sustituirlos por BG_01 o BG_02.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(lines_needing_new_bg(report, set(range(33, 38))), [36, 37])
+        named = (
+            "001: RESULT: FAIL_H ISSUE_TYPE: WRONG_LOCATION "
+            "REQUIRED_FIX: Use the already-created BG_03 and keep him in the room.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        self.assertEqual(lines_needing_new_bg(named, {1}), [])
+
+    def test_missing_place_creates_a_bg_before_the_line_repair(self):
+        fail = (
+            "001 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "EVIDENCE: chưa có BG đã tạo nào khác cho buổi tập.\n"
+            "REQUIRED_FIX: Cần resolve BG đúng nơi upstream; không dùng BG_01.\n"
+            "TOOL_QA: FAIL\n"
+        )
+
+        class AddPlace(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_01 phòng ngủ\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_01 aristocratic bedroom.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(fail, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "add-bg":
+                    return Completion(
+                        "DONG: 001\nPROMPT: A quiet training yard beside the house.\n",
+                        "stop",
+                    )
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_01.BG_01 | IMAGE_PROMPT: Hermes trains in the bedroom, 170 cm.\n",
+                        "stop",
+                    )
+                return Completion(
+                    "001 | CHAR_01.BG_02 | IMAGE_PROMPT: Hermes trains in the yard, 170 cm.\n",
+                    "stop",
+                )
+
+        script = AddPlace()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Hermes tập luyện suốt hai tuần.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        reference = (self.data / "FILE_TONG_HOP.txt").read_text(encoding="utf-8")
+        self.assertIn("BG_02", reference)
+        self.assertIn("training yard", reference)
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("CHAR_01.BG_02", prompts)
+        self.assertNotIn("trains in the bedroom", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("BG_VUA_TAO", repair_users[0])
+        self.assertIn("BG_02", repair_users[0])
+        self.assertIn("Không giấu địa danh", repair_users[0])
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("chưa có BG đúng nơi", journal)
+        self.assertIn("Đã thêm BG_02", journal)
+
+    def test_recheck_repairs_only_the_newly_failed_line(self):
+        first = (
+            "001 | FAIL_H\nISSUE_TYPE: WRONG_TIMING_STATE\n"
+            "REQUIRED_FIX: Xóa trạng thái recovered.\nTOOL_QA: FAIL\n"
+        )
+        second = (
+            "002 | FAIL_H\nISSUE_TYPE: WRONG_CURRENT_MOMENT\n"
+            "REQUIRED_FIX: Vẽ lúc bắt đầu muốn ôm, chưa ôm xong.\nTOOL_QA: FAIL\n"
+        )
+
+        class Recheck(Script):
+            def __init__(self):
+                super().__init__()
+                self.qa_count = 0
+
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 Hermes\nBG_02 phòng\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_01 front.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_02 bedroom.\n", "stop")
+                if step == "qa":
+                    self.qa_count += 1
+                    if self.qa_count == 1:
+                        return Completion(first, "stop")
+                    if self.qa_count == 2:
+                        return Completion(second, "stop")
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_01.BG_02 | IMAGE_PROMPT: Hermes visibly recovered, 170 cm.\n"
+                        "002 | CHAR_01.BG_02 | IMAGE_PROMPT: The embrace is already complete.\n",
+                        "stop",
+                    )
+                rows = [
+                    (int(match.group(1)), match.group(2))
+                    for match in re.finditer(r"(?m)^(\d+)\. (.+)$", user)
+                ]
+                bodies = {
+                    1: "Hermes is not yet recovered, 170 cm.",
+                    2: "His mother is only beginning to reach for him.",
+                }
+                text = "\n".join(
+                    f"{number:03d} | CHAR_01.BG_02 | IMAGE_PROMPT: {bodies[number]}"
+                    for number, _text in rows
+                )
+                return Completion(text, "stop")
+
+        script = Recheck()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        job.begin("Hermes chưa hồi phục.\nMẹ muốn ôm Hermes.\n", self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        prompts = (self.data / "PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("not yet recovered", prompts)
+        self.assertIn("already complete", prompts)
+        repair_users = [user for step, user in script.calls if step == "repair"]
+        self.assertEqual(len(repair_users), 1)
+        self.assertIn("001. Hermes chưa hồi phục.", repair_users[0])
+        self.assertNotIn("002. Mẹ muốn ôm Hermes.", repair_users[0])
+        qa_users = [user for step, user in script.calls if step == "qa"]
+        self.assertGreaterEqual(len(qa_users), 2)
+        self.assertNotIn("002. Mẹ muốn ôm Hermes.", qa_users[1])
+        self.assertIn("001. Hermes chưa hồi phục.", qa_users[1])
+
+    def test_fault_brief_names_the_line_the_error_and_the_fix(self):
+        report = (
+            "005 | FAIL_H\n"
+            "ISSUE_TYPE: WRONG_LOCATION\n"
+            "EVIDENCE: Panel one uses the bedroom BG for the game screen.\n"
+            "REQUIRED_FIX: Put the game BG only on the screen and the room BG on the room.\n"
+            "007 | PASS_H\n"
+            "008 | FAIL_H — header does not say which BG belongs to which panel.\n"
+            "TOOL_QA: FAIL\n"
+        )
+        text = fault_brief(report, {5, 7, 8}, 3)
+        self.assertIn("005 | WRONG_LOCATION", text)
+        self.assertIn("chỗ sai: Panel one uses the bedroom BG for the game screen.", text)
+        self.assertIn("sửa: Put the game BG only on the screen and the room BG on the room.", text)
+        self.assertIn("008 | header does not say which BG belongs to which panel.", text)
+        self.assertNotIn("007", text)
+
+
+class PriorReferenceTests(unittest.TestCase):
+    def setUp(self):
+        RunnerTests.setUp(self)
+
+    def tearDown(self):
+        RunnerTests.tearDown(self)
+
+    def test_restore_keeps_an_id_the_extract_dropped(self):
+        prior = "DANH_SACH_CHAR_BG\nCHAR_01 cô bé cũ\nBG_01 sân\n"
+        final = "CHAR_02 cô bé mới\n"
+        merged = restore_missing_ids(final, prior)
+        self.assertIn("CHAR_01", merged)
+        self.assertIn("BG_01", merged)
+        self.assertIn("CHAR_02", merged)
+        self.assertEqual(prior_sections(prior)["list"], "CHAR_01 cô bé cũ\nBG_01 sân")
+
+    def test_next_part_keeps_old_prompts_and_adds_only_the_new_state(self):
+        class Continue(Script):
+            def complete(self, system, user, max_output_tokens):
+                step = "unknown"
+                for line in system.splitlines():
+                    if line.startswith("TOOL_STEP:"):
+                        step = line.split(":", 1)[1].strip()
+                self.calls.append((step, user))
+                if step in {"extract", "merge"}:
+                    return Completion("CHAR_01 cô bé cũ\nCHAR_02 cô bé áo mới\nBG_01 sân\n", "stop")
+                if step == "char":
+                    return Completion("CHAR_02 prompt áo mới.\n", "stop")
+                if step == "bg":
+                    return Completion("BG_09 không được gọi.\n", "stop")
+                if step == "qa":
+                    return Completion("đối chiếu xong\nTOOL_QA: PASS", "stop")
+                if step == "lines":
+                    return Completion(
+                        "001 | CHAR_02.BG_01 | IMAGE_PROMPT: The girl wears the new dress at the yard.\n",
+                        "stop",
+                    )
+                return super().complete(system, user, max_output_tokens)
+
+        script = Continue()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script)
+        prior = (
+            "DANH_SACH_CHAR_BG\n"
+            "CHAR_01 cô bé cũ\n"
+            "BG_01 sân\n\n"
+            "PROMPT_CHAR\n"
+            "CHAR_01 prompt cũ giữ nguyên.\n\n"
+            "PROMPT_BG\n"
+            "BG_01 prompt sân cũ.\n"
+        )
+        job.begin("Cô bé mặc áo mới ở sân.\n", self.settings, "all", prior)
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        listing = (self.data / "DANH_SACH_CHAR_BG.txt").read_text(encoding="utf-8")
+        self.assertIn("CHAR_01", listing)
+        self.assertIn("CHAR_02", listing)
+        chars = (self.data / "PROMPT_CHAR.txt").read_text(encoding="utf-8")
+        self.assertIn("CHAR_01 prompt cũ giữ nguyên.", chars)
+        self.assertIn("CHAR_02 prompt áo mới.", chars)
+        bgs = (self.data / "PROMPT_BG.txt").read_text(encoding="utf-8")
+        self.assertIn("BG_01 prompt sân cũ.", bgs)
+        self.assertNotIn("BG_09", bgs)
+        self.assertNotIn("bg", [step for step, _user in script.calls])
+        extract_users = [user for step, user in script.calls if step == "extract"]
+        self.assertTrue(extract_users)
+        self.assertIn("TAI_LIEU_DA_CO", extract_users[0])
+        self.assertIn("CHAR_01 cô bé cũ", extract_users[0])
+        char_users = [user for step, user in script.calls if step == "char"]
+        self.assertEqual(len(char_users), 1)
+        self.assertIn("CHI_VIET_CAC_MA_MOI", char_users[0])
+        self.assertIn("CHAR_02", char_users[0])
+        self.assertIn("Không viết lại mã đã có.", char_users[0])
+
+
+class RuleLockTests(unittest.TestCase):
+    def test_group_creature_and_machine_locks_are_in_the_tool_rules(self):
+        root = Path(__file__).resolve().parents[1] / "quy-tac-tool"
+        joined = "\n".join(
+            (root / name).read_text(encoding="utf-8")
+            for name in (
+                "00_QUY_TRINH_HUONG_DAN.txt",
+                "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt",
+                "02_PROMPT_THAM_CHIEU_CHAR_BG.txt",
+                "03_PROMPT_ANH_THEO_DONG.txt",
+                "04_QA_PROMPT_THEO_DONG.txt",
+            )
+        )
+        self.assertIn("CHAR nhóm", joined)
+        self.assertIn("không gửi thêm char riêng", joined.lower())
+        self.assertIn("đúng số con", joined)
+        self.assertIn("bộ máy đã lắp", joined)
+        self.assertIn("không viết trên 10", joined)
+        self.assertIn("CHAR_297 (Helga and Lucian, two people)", joined)
+        self.assertIn("exactly three living mice", joined)
+        self.assertIn("Không được chỉ ghi tên", (root / "03_PROMPT_ANH_THEO_DONG.txt").read_text(encoding="utf-8"))
+        self.assertIn(
+            "Hai prompt liên tiếp không được dùng chung một góc camera",
+            (root / "03_PROMPT_ANH_THEO_DONG.txt").read_text(encoding="utf-8"),
+        )
+        qa = (root / "04_QA_PROMPT_THEO_DONG.txt").read_text(encoding="utf-8")
+        self.assertIn("phần chữ prompt chỉ ghi tên", qa)
+        self.assertIn("FAIL khi prompt không có góc camera", qa)
+        self.assertIn("cùng số lượng mã CHAR và cùng số lượng mã BG", qa)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tạo prompt ảnh</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%238f3d1b'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css?v=4">
+  <link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
   <main>
@@ -14,6 +14,7 @@
       <h1>Tạo prompt ảnh</h1>
       <p class="lede">Dán bản audio, mỗi dòng một câu. Năm file quy tắc được đọc nguyên văn theo đúng bước. Xong thì tải ba file chữ.</p>
       <p class="hint stay">Cửa sổ đen sẽ tự tắt. Trang vẫn mở. Muốn tắt hẳn thì bấm đúp Tat.bat, file nằm cạnh Chay.bat.</p>
+      <p class="hint">API dán trong file config.json, cạnh Chay.bat. Trang không có ô nhập API.</p>
       <p id="connection" class="connection">Đang kiểm tra kết nối…</p>
     </header>
 
@@ -32,22 +33,22 @@
       </div>
     </section>
 
-    <details class="sheet settings" id="api" open>
-      <summary>API</summary>
+    <section class="sheet source" id="prior-drop">
+      <div class="sheet-head">
+        <label for="prior">Tài liệu phần trước</label>
+      </div>
+      <textarea id="prior" rows="5" placeholder="Dán danh sách CHAR/BG đã có, hoặc cả file tổng hợp gồm danh sách và prompt CHAR, BG. Để trống nếu đây là phần đầu." spellcheck="false"></textarea>
+      <div class="row">
+        <label class="file-btn">
+          Chọn file TXT
+          <input id="prior-file" type="file" accept=".txt,text/plain">
+        </label>
+        <p class="hint">Đã có cùng trạng thái thì giữ mã cũ. Chỉ tạo CHAR hoặc BG mới khi trạng thái mới chưa có trong tài liệu này.</p>
+      </div>
+    </section>
+
+    <section class="sheet settings" id="api">
       <div class="form">
-        <label>
-          <select id="provider" aria-label="Chỗ dùng API">
-            <option value="teamsoclo" selected>TeamSocLo</option>
-            <option value="tuansu">TuanSu</option>
-            <option value="openai">OpenAI</option>
-            <option value="claude">Claude</option>
-          </select>
-        </label>
-        <label>API
-          <input id="api-key" type="password" autocomplete="off" placeholder="Dán API">
-        </label>
-        <button id="test" type="button">Kiểm tra</button>
-        <p id="test-result" class="hint"></p>
         <label id="model-wrap" hidden>
           <select id="model" aria-label="Chọn model"></select>
         </label>
@@ -64,10 +65,10 @@
               <input id="timeout" type="number" min="30" max="600" step="1" value="180">
             </label>
           </div>
-          <p class="hint">20 dòng chỉ là trần. Tool tự giảm số dòng cho vừa giới hạn, và không cắt file quy tắc. Hết giờ chờ thì không tự gửi lại.</p>
+          <p class="hint">20 dòng chỉ là trần. Tool tự giảm số dòng cho vừa giới hạn, và không cắt file quy tắc. Mất kết nối thì đợi 30 giây và thử lại. Đủ 5 lần liên tiếp mới dừng.</p>
         </details>
       </div>
-    </details>
+    </section>
 
     <section class="layout">
       <section class="sheet work">
@@ -115,15 +116,18 @@
         <div class="actions">
           <button id="run" class="primary" type="button">Chạy cả bốn bước</button>
           <button id="next" type="button">Chỉ bước kế tiếp</button>
+          <button id="repair" type="button" hidden>Sửa lại</button>
           <button id="stop" type="button" hidden>Dừng sau lượt này</button>
           <button id="clear" class="quiet" type="button" hidden>Xóa kết quả</button>
         </div>
         <ul id="log" class="log"></ul>
+        <a id="log-file" class="quiet-link" href="/api/file/nhat-ky" hidden>Tải nhật ký</a>
       </section>
 
       <section class="sheet results">
         <div class="sheet-head">
           <h2>Kết quả</h2>
+          <a id="download-all" class="download" hidden href="/api/file/tat-ca" download="TAT_CA_FILE.zip">Tải tất cả</a>
         </div>
         <div class="tabs" role="tablist">
           <button type="button" role="tab" data-file="danh-sach" aria-selected="true">Danh sách</button>
@@ -134,7 +138,7 @@
         <pre id="preview">Kết quả hiện ở đây sau khi chạy.</pre>
         <p id="preview-note" class="hint" hidden></p>
         <a id="download" class="download" hidden>Tải file này</a>
-        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" hidden>Tải file tham chiếu đã tổng hợp</a>
+        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" download="FILE_TONG_HOP.txt" hidden>Tải file tổng hợp</a>
       </section>
     </section>
 
@@ -145,6 +149,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=10"></script>
 </body>
 </html>

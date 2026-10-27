@@ -4,6 +4,7 @@ title Tao prompt anh
 
 if not exist "%~dp0mo.py" goto thieufile
 if not exist "%~dp0Tat.bat" goto thieufile
+if not exist "%~dp0config.json" copy /y "%~dp0config.example.json" "%~dp0config.json" >nul
 
 set "PY="
 where py >nul 2>&1 && set "PY=py"
@@ -65,7 +66,7 @@ echo Lam lan luot:
 echo.
 echo 1. Mo trinh duyet. Bam vao thanh dia chi o tren cung.
 echo 2. Dan dong nay roi bam Enter:
-echo https://github.com/ZinPi/sd_civitai_extension/archive/refs/heads/cursor/quy-tac-tool-48d3.zip
+echo https://github.com/ZinPi/sd_civitai_extension/archive/refs/heads/cursor/sua-quy-tac-kich-thuoc-bg-4928.zip
 echo 3. Tai xong, bam phai vao file zip. Chon Extract All hoac Giai nen tat ca.
 echo 4. Mo thu muc vua giai nen. Mo tiep thu muc ten tool.
 echo 5. Trong thu muc tool phai thay ca hai file Chay.bat va Tat.bat.

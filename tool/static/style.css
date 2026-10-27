@@ -70,6 +70,11 @@ h2 {
   font-size: 14px;
 }
 
+.connection.bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+
 .sheet {
   background: var(--sheet);
   border: 1px solid var(--line);
@@ -182,7 +187,7 @@ textarea {
   padding: 12px 14px;
   border-radius: 12px;
   white-space: pre-wrap;
-  max-height: 220px;
+  max-height: 480px;
   overflow: auto;
 }
 
@@ -262,10 +267,16 @@ button:disabled {
 .log {
   margin: 12px 0 0;
   padding-left: 18px;
-  color: var(--muted);
+  color: var(--ink);
   font-size: 14px;
-  max-height: 140px;
+  max-height: 480px;
   overflow: auto;
+}
+
+.log li {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .log:empty { display: none; }

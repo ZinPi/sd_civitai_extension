@@ -6,8 +6,10 @@ Mở: http://127.0.0.1:8765
 
 from __future__ import annotations
 
+import io
 import json
 import os
+import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -25,13 +27,13 @@ DEFAULT_RULES = Path(os.environ.get("QUY_TAC_DIR", ROOT.parent / "quy-tac-tool")
 DEFAULT_DATA = Path(os.environ.get("TOOL_DATA_DIR", ROOT / "data"))
 STATIC = ROOT / "static"
 
-NEED_KEY = "Dán API rồi bấm Kiểm tra."
-NEED_MODEL = "Bấm Kiểm tra, rồi chọn model."
+NEED_KEY = "API không hợp lệ"
+NEED_NETWORK = "Không nối được API."
+NEED_MODEL = "Chọn model."
 
 DEFAULT_SETTINGS = {
     "provider": "teamsoclo",
     "base_url": PROVIDERS["teamsoclo"]["base"],
-    "api_key": "",
     "model": "",
     "models": [],
     "api_style": PROVIDERS["teamsoclo"]["style"],
@@ -54,7 +56,38 @@ class SettingsBody(BaseModel):
 
 class JobBody(BaseModel):
     source_text: str = ""
+    prior_text: str = ""
     mode: str = "all"
+
+
+def read_config(path: Path) -> dict:
+    provider = "teamsoclo"
+    api_key = ""
+    if path.is_file():
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+        except json.JSONDecodeError:
+            raw = {}
+        if isinstance(raw, dict):
+            provider = str(raw.get("provider") or provider).strip() or provider
+            api_key = str(raw.get("api_key") or "").strip()
+    if provider not in PROVIDERS:
+        provider = "teamsoclo"
+    spec = PROVIDERS[provider]
+    return {
+        "provider": provider,
+        "base_url": spec["base"],
+        "api_style": spec["style"],
+        "api_key": api_key,
+    }
+
+
+def probe_message(exc: LlmError) -> tuple[str, str]:
+    if exc.kind == "auth":
+        return "invalid", NEED_KEY
+    if exc.kind in {"network", "timeout", "bad", "empty"}:
+        return "network", NEED_NETWORK
+    return "network", NEED_NETWORK
 
 
 def load_settings(path: Path) -> dict:
@@ -80,15 +113,22 @@ def load_settings(path: Path) -> dict:
     return settings
 
 
-def public_settings(settings: dict) -> dict:
-    key = str(settings.get("api_key") or "")
-    visible = {name: value for name, value in settings.items() if name not in {"api_key", "base_url"}}
-    raw_models = visible.get("models")
-    if not isinstance(raw_models, list):
-        raw_models = []
-    visible["models"] = [str(item).strip() for item in raw_models if str(item).strip()]
-    visible["has_key"] = bool(key)
-    visible["key_hint"] = ("••••" + key[-4:]) if len(key) >= 4 else ("••••" if key else "")
+def public_settings(settings: dict, probe: dict) -> dict:
+    visible = {
+        name: value
+        for name, value in settings.items()
+        if name not in {"api_key", "base_url", "provider", "api_style"}
+    }
+    models = probe.get("models") if probe.get("state") == "ok" else []
+    if not isinstance(models, list):
+        models = []
+    visible["models"] = [str(item).strip() for item in models if str(item).strip()]
+    model = str(settings.get("model") or "")
+    if model not in visible["models"]:
+        model = ""
+    visible["model"] = model
+    visible["api_state"] = probe.get("state") or "invalid"
+    visible["message"] = "" if visible["api_state"] == "ok" else str(probe.get("message") or NEED_KEY)
     return visible
 
 
@@ -97,12 +137,18 @@ def valid_base_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc) and " " not in value
 
 
-def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> FastAPI:
+def create_app(
+    rules_dir: Path | None = None,
+    data_dir: Path | None = None,
+    config_path: Path | None = None,
+) -> FastAPI:
     rules_path = Path(rules_dir or DEFAULT_RULES)
     data = Path(data_dir or DEFAULT_DATA)
     data.mkdir(parents=True, exist_ok=True)
     settings_path = data / "settings.json"
+    secret_path = Path(config_path) if config_path is not None else ROOT / "config.json"
     job = Job(rules_path, data)
+    probe = {"state": "invalid", "message": NEED_KEY, "models": []}
     app = FastAPI(title="Tạo prompt ảnh")
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
@@ -116,34 +162,60 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
         except OSError:
             pass
 
-    def merged(body: SettingsBody) -> dict:
+    def ensure_probe() -> dict:
+        secret = read_config(secret_path)
+        if not secret["api_key"]:
+            probe["state"] = "invalid"
+            probe["message"] = NEED_KEY
+            probe["models"] = []
+            return probe
         current = read_saved()
-        provider = body.provider.strip() or str(current.get("provider") or "teamsoclo")
-        if provider not in PROVIDERS:
-            provider = "teamsoclo"
-        spec = PROVIDERS[provider]
-        same = provider == str(current.get("provider") or "teamsoclo")
-        saved_models = current.get("models") if same and isinstance(current.get("models"), list) else []
-        models = [str(item).strip() for item in saved_models if str(item).strip()]
-        model = body.model.strip()
-        if models and model and model not in models:
+        client = HttpLlm({**current, **secret, "model": current.get("model") or "probe"})
+        try:
+            models = client.list_models()
+        except LlmError as exc:
+            state, message = probe_message(exc)
+            probe["state"] = state
+            probe["message"] = message
+            probe["models"] = []
+        else:
+            probe["state"] = "ok"
+            probe["message"] = ""
+            probe["models"] = models
+        finally:
+            client.close()
+        return probe
+
+    def runtime_settings(body: SettingsBody | None = None) -> dict:
+        current = read_saved()
+        secret = read_config(secret_path)
+        checked = ensure_probe()
+        models = list(checked["models"]) if checked["state"] == "ok" else []
+        model = body.model.strip() if body is not None else str(current.get("model") or "")
+        if model not in models:
             model = ""
-        settings = {
-            "provider": provider,
-            "base_url": spec["base"],
-            "api_key": body.api_key.strip() or str(current.get("api_key") or ""),
+        max_input = body.max_input_tokens if body is not None else int(current["max_input_tokens"])
+        max_output = body.max_output_tokens if body is not None else int(current["max_output_tokens"])
+        timeout = body.request_timeout_seconds if body is not None else int(current["request_timeout_seconds"])
+        if not 1024 <= max_input <= 2_000_000:
+            raise HTTPException(status_code=400, detail="Token đầu vào cần từ 1024 đến 2000000.")
+        if not 256 <= max_output <= 200_000:
+            raise HTTPException(status_code=400, detail="Token đầu ra cần từ 256 đến 200000.")
+        return {
+            "provider": secret["provider"],
+            "base_url": secret["base_url"],
+            "api_key": secret["api_key"],
             "model": model,
             "models": models,
-            "api_style": spec["style"],
-            "max_input_tokens": body.max_input_tokens,
-            "max_output_tokens": body.max_output_tokens,
-            "request_timeout_seconds": body.request_timeout_seconds,
+            "api_style": secret["api_style"],
+            "max_input_tokens": max_input,
+            "max_output_tokens": max_output,
+            "request_timeout_seconds": timeout,
         }
-        if not 1024 <= settings["max_input_tokens"] <= 2_000_000:
-            raise HTTPException(status_code=400, detail="Token đầu vào cần từ 1024 đến 2000000.")
-        if not 256 <= settings["max_output_tokens"] <= 200_000:
-            raise HTTPException(status_code=400, detail="Token đầu ra cần từ 256 đến 200000.")
-        return settings
+
+    def store_public(settings: dict) -> None:
+        stored = {key: value for key, value in settings.items() if key != "api_key"}
+        store(stored)
 
     @app.get("/")
     def index():
@@ -166,31 +238,14 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
 
     @app.get("/api/settings")
     def get_settings():
-        return public_settings(read_saved())
+        ensure_probe()
+        return public_settings(read_saved(), probe)
 
     @app.put("/api/settings")
     def put_settings(body: SettingsBody):
-        settings = merged(body)
-        store(settings)
-        return public_settings(settings)
-
-    @app.post("/api/settings/test")
-    def test_settings(body: SettingsBody):
-        settings = merged(body)
-        if not settings["api_key"]:
-            raise HTTPException(status_code=400, detail=NEED_KEY)
-        client = HttpLlm(settings)
-        try:
-            models = client.list_models()
-        except LlmError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        finally:
-            client.close()
-        if settings["model"] not in models:
-            settings["model"] = ""
-        settings["models"] = models
-        store(settings)
-        return {"ok": True, "message": "Chọn model.", "models": models, "model": settings["model"]}
+        settings = runtime_settings(body)
+        store_public(settings)
+        return public_settings(settings, probe)
 
     @app.get("/api/job")
     def get_job(source: int = 0):
@@ -198,13 +253,16 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
 
     @app.post("/api/job")
     def start_job(body: JobBody):
-        settings = read_saved()
-        if not settings.get("api_key") or not valid_base_url(str(settings.get("base_url") or "")):
+        settings = runtime_settings()
+        checked = ensure_probe()
+        if checked["state"] == "network":
+            raise HTTPException(status_code=400, detail=NEED_NETWORK)
+        if checked["state"] != "ok" or not settings.get("api_key"):
             raise HTTPException(status_code=400, detail=NEED_KEY)
         if not settings.get("model"):
             raise HTTPException(status_code=400, detail=NEED_MODEL)
         try:
-            job.begin(body.source_text, settings, body.mode)
+            job.begin(body.source_text, settings, body.mode, body.prior_text)
         except AlreadyRunning as exc:
             raise HTTPException(status_code=409, detail="Đang chạy một lượt.") from exc
         except JobError as exc:
@@ -223,6 +281,30 @@ def create_app(rules_dir: Path | None = None, data_dir: Path | None = None) -> F
         except AlreadyRunning as exc:
             raise HTTPException(status_code=409, detail="Đang chạy một lượt.") from exc
         return job.snapshot(include_source=True)
+
+    @app.get("/api/file/tat-ca")
+    def download_all():
+        names = [
+            "DANH_SACH_CHAR_BG.txt",
+            "PROMPT_CHAR.txt",
+            "PROMPT_BG.txt",
+            "PROMPT_THEO_DONG.txt",
+            "FILE_TONG_HOP.txt",
+            "NHAT_KY.txt",
+        ]
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name in names:
+                path = data / name
+                if path.is_file() and path.stat().st_size > 0:
+                    archive.write(path, name)
+            if not archive.namelist():
+                raise HTTPException(status_code=404, detail="Chưa có file để tải.")
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="TAT_CA_FILE.zip"'},
+        )
 
     @app.get("/api/file/{key}")
     def download(key: str, preview: int = 0):

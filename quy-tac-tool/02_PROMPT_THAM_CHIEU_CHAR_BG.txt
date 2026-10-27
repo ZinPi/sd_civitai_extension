@@ -1,7 +1,17 @@
 truyện isekai nam
 # MASTER CHARACTER DESIGN GUIDE
 
-KHÓA ĐẦU RA B4 TRONG AI FILM STUDIO (VĂN BẢN → VĂN BẢN):
+FILE: 02_PROMPT_THAM_CHIEU_CHAR_BG.txt
+Bước 2 tạo prompt CHAR. Bước 3 tạo prompt BG. Danh sách lấy từ bước 1 đã khóa.
+
+KHÓA BG:
+- Cùng một nơi và cùng trạng thái thì dùng lại BG đã có.
+- Cùng một nơi lúc buổi sáng, qua đoạn khác vào ban đêm, mưa hoặc trạng thái môi trường khác rõ, thì chia thành nhiều trạng thái BG. Mỗi trạng thái một BG.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ những gì tác phẩm cho thấy. Không dừng bằng LOCATION_GAP hay BG_GAP để né việc tạo BG.
+- Prompt ảnh theo dòng không tự đặt mã BG mới. Mỗi prompt dòng có ít nhất một BG đã tạo.
+- Nếu câu phía dưới bảo cùng một nơi luôn chỉ một BG kể cả khi đổi buổi hoặc thời tiết, câu đó không áp dụng.
+
+KHÓA ĐẦU RA TRONG AI FILM STUDIO (VĂN BẢN → VĂN BẢN):
 - B4 dùng tài nguyên CHAR/BG và các khóa đã PASS/LOCK từ B3 để VIẾT PROMPT TXT cho CHAR/BG, không tự render/tạo ảnh.
 - Mỗi câu có từ “tạo ảnh”, “dùng prompt để sinh ảnh” trong tài liệu này chỉ mô tả mục đích sử dụng prompt ở công cụ tạo ảnh riêng về sau; nó KHÔNG mở thêm công đoạn thực thi ảnh trong AI FILM STUDIO.
 - Bộ ba ảnh reference CHAR ở phần dưới là BA PROMPT VĂN BẢN cho ba ảnh chức năng riêng (khi áp dụng), không phải yêu cầu xuất ảnh từ tool này.
@@ -2042,7 +2052,10 @@ A. BỔ SUNG QUY TẮC CHAR REFERENCE-STATE
 A1. MỘT CHAR CANONICAL = MỘT SUBJECT/IDENTITY + MỘT EXACT REFERENCE STATE
 
 - Một CHAR canonical chỉ được khóa đúng một subject/identity ở đúng một reference state.
-- Không gộp nhiều identity khác nhau vào cùng một CHAR canonical.
+- Không gộp nhiều identity khác nhau vào cùng một CHAR canonical của một người.
+- CHAR nhóm là ảnh tham chiếu thêm, không thay CHAR riêng của từng thành viên. Ảnh nhóm chứa đúng các thành viên đã đặt tên. Mỗi người vẫn là một người, đúng số đo đã khóa, hiện một lần. Không dính thành một người.
+- CHAR sinh vật của một ngoại hình được viết một lần. Prompt cảnh sau được dùng ảnh đó cho đúng số con, không tạo thêm bộ ảnh cho từng con.
+- CHAR của bộ máy đã lắp mô tả cả bộ đã nối và các số đo của bộ. Không viết một CHAR cho từng bộ phận của cùng bộ đó.
 - Không gộp nhiều state khác nhau của cùng identity vào cùng một CHAR canonical.
 - Không trộn thường phục + giáp + bị thương + thức tỉnh trong cùng một bộ 3 ảnh reference của một CHAR canonical.
 - Cả 3 ảnh chức năng phải là cùng một identity, cùng một exact state, cùng một physical scale, cùng một outfit và cùng một thiết kế; chỉ khác camera/framing theo đúng chức năng từng ảnh.
@@ -2120,8 +2133,8 @@ Ngoài quy tắc scale rất chi tiết cho CHAR phi nhân loại đã có trong
 - Mọi CHAR, kể cả người/humanoid, phải có SIZE_LOCK.
 - Nếu source có số đo chính xác: dùng đúng số đo source.
 - Nếu source chỉ có tương quan: phải giữ tương quan và khóa một kích thước production hợp lý.
-- Nếu source không nêu: phải phân tích và bổ sung kích thước hợp lý, nhưng bắt buộc ghi đây là DESIGN SUPPLEMENT / SIZE INFERRED.
-- Human/humanoid: ưu tiên chiều cao cụ thể theo cm hoặc khoảng cm đủ hẹp.
+- Nếu source không nêu: phân tích tác phẩm và phân tích nhân vật, sinh vật, công cụ hoặc vũ khí cần tham chiếu, rồi sáng tạo một kích thước hợp lý. Ghi DESIGN SUPPLEMENT / SIZE INFERRED. Số này là khóa hợp lệ, không phải GAP.
+- Human/humanoid: chiều cao cụ thể theo cm.
 - Phi nhân: ưu tiên shoulder height / standing height / body length / wingspan / body diameter phù hợp hình thái, cộng tỷ lệ với adult human khi hữu ích.
 - Không chỉ dùng small / medium / large / huge / gigantic nếu không có số đo hoặc anchor so sánh.
 - SIZE_LOCK đã chốt phải giữ nguyên giữa cả 3 ảnh reference chức năng và tất cả scene của cùng state.
@@ -2419,18 +2432,15 @@ B6. BG REFERENCE KHÓA ENVIRONMENT DESIGN, KHÔNG KHÓA MỘT CAMERA DUY NHẤT
 - Không tạo thêm BG chỉ để có một camera angle khác nếu location/state/layout không đổi.
 - Camera scene sau có thể đổi nhưng vẫn phải tôn trọng topology và landmark relationships đã khóa.
 
-B7. NẾU DÒNG/ĐOẠN KHÔNG NÊU RÕ LOCATION
+B7. TẠO BG THAM CHIẾU
 
-Không tự tạo location mới.
-
-Phải ưu tiên:
-1. đọc context hiện hành;
-2. đọc trước/sau;
-3. kiểm continuity location;
-4. reuse BG canonical đã khóa nếu chưa có transition;
-5. nếu vẫn không đủ bằng chứng → ghi LOCATION_GAP / BG_GAP.
-
-Không invent phòng, tòa nhà, landmark hay environment state chỉ để có BG.
+Tham khảo tác phẩm rồi tạo BG.
+Đọc đoạn đang viết, câu quanh đó và nơi đã xuất hiện trong tác phẩm.
+Cùng một nơi và cùng trạng thái thì dùng lại BG đã có.
+Cùng một nơi nhưng buổi sáng, ban đêm, mưa hoặc trạng thái môi trường khác rõ thì là các trạng thái BG khác nhau. Mỗi trạng thái một BG.
+Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ những gì tác phẩm cho thấy, kèm phần hoàn thiện hợp lý.
+Không dừng bằng LOCATION_GAP hay BG_GAP để né việc tạo BG.
+Prompt ảnh theo dòng gọi BG đã tạo và không tự đặt mã mới.
 
 B8. DYNAMIC BG / ACTION / FORCE CONSISTENCY
 
