@@ -132,15 +132,47 @@ class RunnerTests(unittest.TestCase):
 
     def test_timeout_does_not_raise_a_generic_error(self):
         class Slow(Script):
+            def __init__(self):
+                super().__init__()
+                self.tries = 0
+
             def complete(self, system, user, max_output_tokens):
+                self.tries += 1
                 raise LlmError("Hết giờ chờ. Không tự gửi lại lượt này.", "timeout")
 
-        job = Job(self.rules, self.data, client_factory=lambda _settings: Slow())
+        script = Slow()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script, sleeper=lambda _seconds: None)
         job.begin(self.source, self.settings, "next")
         job._thread.join(10)
         snapshot = job.snapshot()
         self.assertIn("Không tự gửi lại", snapshot["notice"]["text"])
         self.assertTrue(snapshot["can_resume"])
+        self.assertEqual(script.tries, 5)
+        journal = "\n".join(snapshot["log"])
+        self.assertIn("Đợi 30 giây rồi thử lại. Lần 1/5.", journal)
+        self.assertIn("Lần 4/5.", journal)
+        self.assertNotIn("Lần 5/5.", journal)
+
+    def test_connection_drop_retries_then_continues(self):
+        class Flaky(Script):
+            def __init__(self):
+                super().__init__()
+                self.drops = 0
+
+            def complete(self, system, user, max_output_tokens):
+                if self.drops < 2:
+                    self.drops += 1
+                    raise LlmError("Không nối được API. Không tự gửi lại.", "network")
+                return super().complete(system, user, max_output_tokens)
+
+        script = Flaky()
+        job = Job(self.rules, self.data, client_factory=lambda _settings: script, sleeper=lambda _seconds: None)
+        job.begin(self.source, self.settings, "all")
+        job._thread.join(10)
+        snapshot = job.snapshot()
+        self.assertEqual(snapshot["state"], "done", snapshot["notice"])
+        self.assertEqual(script.drops, 2)
+        self.assertIn("Lần 2/5.", "\n".join(snapshot["log"]))
 
     def test_remembered_place_qa_does_not_stop_the_next_turn(self):
         fail = (

@@ -18,7 +18,7 @@ KHÓA SỬA — ẢNH NHÓM, SỐ CON, BỘ MÁY
 - Lần kiểm lại chỉ gồm các dòng vừa sửa. Dòng không sửa giữ kết quả QA trước.
 - Dòng còn lỗi sau khi sửa thì ghi nhật ký, giữ prompt hiện có và chạy tiếp đến hết file. Không dừng giữa chừng.
 - Khi file prompt đã đủ, bấm Sửa lại để tạo lại đúng các dòng QA hai lần vẫn lỗi và đã bỏ qua. Dòng không lỗi không viết lại.
-- Khi API hết giờ, mất mạng hoặc quá lượt, bấm Chạy tiếp để viết các dòng chưa khóa.
+- Khi mất kết nối hoặc hết giờ chờ, đợi 30 giây rồi thử lại. Đủ 5 lần lỗi liên tiếp thì dừng và bấm Chạy tiếp. Gọi thành công thì lần đứt sau được đếm lại từ đầu.
 
 QUY TẮC CHUNG
 - Đọc hướng dẫn này để xác định các công việc theo thứ tự. Khi thực hiện công việc nào, mở và đọc đầy đủ file quy tắc được gọi trong công việc đó.

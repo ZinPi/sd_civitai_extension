@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 from pathlib import Path
 
 from engine import (
@@ -37,6 +38,8 @@ from llm import HttpLlm, LlmError
 
 OUTPUT_PER_LINE = 500
 CEILING = 20
+CONNECT_TRIES = 5
+CONNECT_WAIT_SECONDS = 30
 
 EXTRACT_TASK = """CHỈ LÀM BƯỚC 1.
 Nguồn trong CAC_DONG là bản đã chia dòng, mỗi dòng một câu, số thứ tự giữ nguyên.
@@ -354,11 +357,12 @@ class Stopped(Exception):
 
 
 class Job:
-    def __init__(self, rules_dir: Path, data_dir: Path, client_factory=None):
+    def __init__(self, rules_dir: Path, data_dir: Path, client_factory=None, sleeper=time.sleep):
         self.rules_dir = Path(rules_dir)
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.client_factory = client_factory or (lambda settings: HttpLlm(settings))
+        self._sleep = sleeper
         self._lock = threading.RLock()
         self._running = False
         self._stop = False
@@ -1086,8 +1090,22 @@ class Job:
 
     def _call(self, client, step: str, documents, material: str):
         system, user = build_call(step, documents, material)
-        completion = client.complete(system, user, self._max_output())
-        return completion.text, completion.finish
+        last_error: LlmError | None = None
+        for attempt in range(1, CONNECT_TRIES + 1):
+            try:
+                completion = client.complete(system, user, self._max_output())
+                return completion.text, completion.finish
+            except LlmError as exc:
+                if exc.kind not in {"network", "timeout"} or attempt >= CONNECT_TRIES:
+                    raise
+                last_error = exc
+                self._log(
+                    f"Gián đoạn kết nối. Đợi {CONNECT_WAIT_SECONDS} giây rồi thử lại. "
+                    f"Lần {attempt}/{CONNECT_TRIES}."
+                )
+                self._sleep(CONNECT_WAIT_SECONDS)
+                self._check_stop()
+        raise last_error or LlmError("Không nối được API.", "network")
 
     def _with_range(self, exc: LlmError, batch) -> str:
         start, end = batch[0][0], batch[-1][0]
