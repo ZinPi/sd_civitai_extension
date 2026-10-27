@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tạo prompt ảnh</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%238f3d1b'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/style.css?v=4">
+  <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
   <main>
@@ -14,6 +14,7 @@
       <h1>Tạo prompt ảnh</h1>
       <p class="lede">Dán bản audio, mỗi dòng một câu. Năm file quy tắc được đọc nguyên văn theo đúng bước. Xong thì tải ba file chữ.</p>
       <p class="hint stay">Cửa sổ đen sẽ tự tắt. Trang vẫn mở. Muốn tắt hẳn thì bấm đúp Tat.bat, file nằm cạnh Chay.bat.</p>
+      <p class="hint">API dán trong file config.json, cạnh Chay.bat. Trang không có ô nhập API.</p>
       <p id="connection" class="connection">Đang kiểm tra kết nối…</p>
     </header>
 
@@ -32,22 +33,8 @@
       </div>
     </section>
 
-    <details class="sheet settings" id="api" open>
-      <summary>API</summary>
+    <section class="sheet settings" id="api">
       <div class="form">
-        <label>
-          <select id="provider" aria-label="Chỗ dùng API">
-            <option value="teamsoclo" selected>TeamSocLo</option>
-            <option value="tuansu">TuanSu</option>
-            <option value="openai">OpenAI</option>
-            <option value="claude">Claude</option>
-          </select>
-        </label>
-        <label>API
-          <input id="api-key" type="password" autocomplete="off" placeholder="Dán API">
-        </label>
-        <button id="test" type="button">Kiểm tra</button>
-        <p id="test-result" class="hint"></p>
         <label id="model-wrap" hidden>
           <select id="model" aria-label="Chọn model"></select>
         </label>
@@ -67,7 +54,7 @@
           <p class="hint">20 dòng chỉ là trần. Tool tự giảm số dòng cho vừa giới hạn, và không cắt file quy tắc. Hết giờ chờ thì không tự gửi lại.</p>
         </details>
       </div>
-    </details>
+    </section>
 
     <section class="layout">
       <section class="sheet work">
@@ -145,6 +132,6 @@
       <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
     </details>
   </main>
-  <script src="/static/app.js?v=5"></script>
+  <script src="/static/app.js?v=6"></script>
 </body>
 </html>

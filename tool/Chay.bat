@@ -4,6 +4,7 @@ title Tao prompt anh
 
 if not exist "%~dp0mo.py" goto thieufile
 if not exist "%~dp0Tat.bat" goto thieufile
+if not exist "%~dp0config.json" copy /y "%~dp0config.example.json" "%~dp0config.json" >nul
 
 set "PY="
 where py >nul 2>&1 && set "PY=py"
