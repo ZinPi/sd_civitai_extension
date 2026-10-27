@@ -16,7 +16,7 @@ QUY TẮC CHUNG
 - Mở và đọc toàn bộ quy tắc 01_TRICH_NHAN_VAT_VA_BOI_CANH.txt.
 - Đầu vào: AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE đã khóa.
 - Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
-- Với nhân vật, mỗi câu khác nhau có nhắc đến và có giá trị hình ảnh tính 1 lần; chỉ 1 câu thì không vào danh sách tạo CHAR; từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
+- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ và vũ khí nhân vật cầm được ghi cùng CHAR đó. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
 - Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn. Dòng nào bước 4 sẽ vẽ thì bảng đã có BG đúng trạng thái, và đã có CHAR khi nhân vật đủ điều kiện tạo CHAR. Thiếu mục nào thì bổ sung ở lần này.
 - Lần 3: liệt kê trạng thái chính xác, rồi gán CHAR_XX và BG_XX phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
 - Chỉ LOCK khi bảng đã đồng bộ. Bước 4 dùng đúng bảng này để không còn GAP vì thiếu CHAR hoặc BG.
@@ -41,8 +41,9 @@ QUY TẮC CHUNG
 - Mở và đọc toàn bộ quy tắc 03_PROMPT_ANH_THEO_DONG.txt; dùng file dữ liệu hỗ trợ "TBN6A.txt" theo hướng dẫn gốc.
 - Nguồn văn bản dùng để tạo prompt là "AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE" đã khóa; không dùng bản TTS.
 - Dùng dữ liệu CHAR/BG và các ID đã tạo ở bước 1; tạo prompt theo 03_PROMPT_ANH_THEO_DONG.txt.
-- Prompt dòng chỉ gọi CHAR_XX và BG_XX có trong bảng đã thống kê đồng bộ. Không ghi GAP thay cho prompt. Không tự đặt mã mới. Nếu dòng cần một trạng thái chưa có trong bảng, quay lại bước 1, bổ sung, đồng bộ, gán ID, rồi mới viết prompt.
-- Mỗi prompt dòng phải có ít nhất một BG. Chọn BG đã tạo nào thích hợp với dòng đó và đúng trạng thái. Một prompt được có nhiều BG. Không tự đặt mã BG mới. Giữ đúng số đo đã khóa.
+- Prompt dòng dùng CHAR_XX và BG_XX đã tạo. Mỗi prompt có ít nhất một BG, đúng trạng thái của dòng. Một prompt được có nhiều BG. Không tự đặt mã mới trong prompt dòng. Không ghi GAP thay cho prompt. Giữ đúng số đo đã khóa.
+- Suy nghĩ, hồi tưởng hoặc việc sắp tới có thể là một BG riêng. Có thể dùng BG đó thay cho BG hiện tại, hoặc kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga.
+- CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu.
 - ACTIVE MODE: 1 dòng/câu nguồn = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
 - TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT. Không gộp, tách, bỏ, thêm hoặc đảo dòng/câu.
 - SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại. Chỉ tham khảo câu liền kề nếu câu hiện tại cụt, mơ hồ hoặc phụ thuộc ngữ cảnh, theo 03_PROMPT_ANH_THEO_DONG.txt; không đổi số prompt.

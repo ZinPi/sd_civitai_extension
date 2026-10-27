@@ -321,13 +321,12 @@ Do not copy the reference-sheet pose, action, facial expression, gaze, camera, f
 
 CHAR đơn và CHAR_GROUP đều là CHAR và tuân theo cùng các quy tắc CHAR hiện hành.
 
-CHAR đơn/CHAR_ID đã được xác định ở B3 theo VISUAL_USE_COUNT của CÂU NGUỒN; B5 chỉ DÙNG các ID đã khóa, không được xét lại điều kiện tạo CHAR theo số IMAGE_PROMPT. CHAR_GROUP chỉ là tối ưu tham chiếu trong một IMAGE_PROMPT khi đạt ngưỡng 10 tổng CHAR + BG ở các dòng dưới, không phải tiêu chí cấp CHAR_ID mới.
+CHAR_ID lấy từ bước trích xuất. Prompt dòng không xét lại điều kiện tạo CHAR bằng số IMAGE_PROMPT. CHAR_GROUP chỉ để giữ prompt không quá 10 ảnh tham chiếu, không phải tiêu chí cấp CHAR_ID mới.
 
-CHAR_GROUP chỉ được xét khi tổng số ID tham chiếu CHAR + BG cần cho MỘT IMAGE_PROMPT đạt 10 ID trở lên trước khi tối ưu, ví dụ:
-- 9 CHAR + 1 BG;
-- 8 CHAR + 2 BG;
-- 7 CHAR + 3 BG;
-- hoặc trường hợp tương tự.
+CHAR và BG đều là ảnh tham chiếu.
+Một prompt không viết trên 10 ảnh tham chiếu. Tổng CHAR + BG trong prompt tối đa là 10.
+Khi liệt kê đủ sẽ vượt 10, gom các nhân vật phụ vào CHAR_GROUP để prompt còn không quá 10 ảnh tham chiếu.
+Tổng đã trong mức 10 thì không gom.
 
 Khi đó có thể gom các nhân vật phụ phù hợp vào CHAR_GROUP để giảm số ID CHAR tham chiếu phải liệt kê trong IMAGE_PROMPT.
 
@@ -335,7 +334,7 @@ Không ghép vào CHAR_GROUP bất kỳ nhân vật nào đang diễn chính tro
 
 Nhân vật diễn chính phải tiếp tục dùng CHAR reference riêng.
 
-Nếu tổng số reference CHAR + BG chưa đạt ngưỡng cần dùng CHAR_GROUP thì dùng CHAR đơn bình thường.
+Nếu tổng CHAR + BG không vượt 10 thì dùng CHAR đơn, không gom.
 
 ========================================================================================================================
 6. NHÂN VẬT KHÔNG CÓ CHAR_ID
@@ -608,8 +607,8 @@ Với current OUTPUT_SLOT thuộc hồi tưởng / memory / thought / inner imag
 - Không tự đặt mã BG mới trong prompt dòng.
 - CHAR_XX và BG_XX trong prompt chỉ lấy từ bảng đã thống kê đồng bộ và đã LOCK ở bước trích xuất.
 - Không ghi CHAR_GAP hoặc BG_GAP thay cho prompt.
-- Nếu dòng cần một nhân vật, sinh vật, quái vật, động vật, công cụ, vũ khí hoặc trạng thái BG chưa có trong bảng, quay lại bước trích xuất, bổ sung, đồng bộ, gán ID, rồi mới viết prompt.
-- Không trả báo lỗi thay cho prompt khi bảng đã có ID phù hợp.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG đó từ tác phẩm ở bước trích xuất và bước prompt BG, theo 02_PROMPT_THAM_CHIEU_CHAR_BG.txt. Không dừng bằng GAP để né việc tạo BG.
+- Prompt dòng gọi BG đã tạo. Không tự đặt mã mới trong prompt dòng.
 
 ========================================================================================================================
 14. PHYSICAL BG RECONSTRUCTION
@@ -1092,6 +1091,15 @@ Có thể bỏ hoàn toàn hình nhân vật/cảnh vật lý hiện tại và c
 - không làm sai source;
 - không làm người xem hiểu nhầm reality/timeline.
 
+KHÓA MANGA — SUY NGHĨ, HỒI TƯỞNG, VIỆC SẮP TỚI:
+Suy nghĩ, hồi tưởng hoặc việc sắp tới là một BG khác.
+Được dùng BG hồi tưởng thay cho BG hiện tại.
+Được kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga.
+Cả hai cách đều hợp lệ.
+CHAR và BG trong prompt đó cộng lại không quá 10 ảnh tham chiếu.
+Vẽ BG hồi tưởng hoặc kết hợp hai BG không phải FUTURE_LEAK.
+FUTURE_LEAK chỉ khi prompt biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+
 Không bắt buộc nhân vật đang nghĩ/nói/nghe/đọc phải xuất hiện trong ảnh.
 
 ========================================================================================================================
@@ -1117,7 +1125,8 @@ Khi trực quan hóa nội dung không thuộc physical present, phải xác đ�
 - OTHER CONFIRMED LAYER.
 
 Không được:
-- biến MEMORY thành current physical reality;
+- biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại.
+- Dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp hai BG theo hiệu ứng manga, là cách vẽ hợp lệ.
 - biến FEAR thành sự kiện đã xảy ra;
 - biến HOPE thành kết quả đã đạt được;
 - biến PLAN thành hành động đã thực hiện;
@@ -1809,12 +1818,13 @@ Nếu source có joke/awkward beat:
 27. REFERENCE BUDGET
 ========================================================================================================================
 
-Tổng token reference trong header:
-CHAR + BG <= 9.
+Tổng ảnh tham chiếu trong header:
+CHAR + BG tối đa 10.
+Không viết trên 10 ảnh tham chiếu.
 
 Visual-source CHAR cũng tính vào giới hạn.
 
-Nếu số ID tham chiếu CHAR + BG cần cho MỘT IMAGE_PROMPT đạt 10 ID trở lên trước khi tối ưu:
+Nếu số ID tham chiếu CHAR + BG của một IMAGE_PROMPT vượt 10:
 - được phép dùng CHAR_GROUP theo mục 5.7 để gom các nhân vật phụ phù hợp;
 - không ghép nhân vật đang diễn chính trong IMAGE_PROMPT/cảnh hiện tại vào CHAR_GROUP;
 - nhân vật diễn chính vẫn dùng CHAR_ID tham chiếu riêng;
@@ -1951,7 +1961,7 @@ G. INVENTION
 [ ] không invent plot/prop/landmark/lore/state.
 
 H. TECHNICAL
-[ ] total CHAR+BG <= 9;
+[ ] total CHAR+BG không quá 10 ảnh tham chiếu;
 [ ] English technical prompt;
 [ ] không chép nguyên văn source/thoại;
 [ ] không render reference metadata;
@@ -2062,8 +2072,8 @@ TERMINOLOGY BRIDGE CHỈ DÙNG ĐỂ ÁP DỤNG CÁC BLOCK BUOC_11 NGUYÊN VĂN 
 KNOWN CONFLICTS KHÔNG ĐƯỢC IMPORT VÀO B5:
 - câu cũ cho phép IMAGE_PROMPT không có BG, hoặc giữ BG là tùy trường hợp. Quy tắc hiện hành: mỗi IMAGE_PROMPT phải có ít nhất một exact numbered BG_XX đã tạo, đúng nơi và đúng trạng thái của dòng. Một prompt được có nhiều BG.
 - quota/workflow `1 SMALL_SCENE = 1 IMAGE_PROMPT` và director-chain SMALL_SCENE; B5 hiện hành giữ chế độ theo dòng/câu.
-- rule CHAR_GROUP cũ trigger `>5 reference`; B5 hiện hành giữ `CHAR + BG <= 9` và chỉ xét CHAR_GROUP từ 10 reference trước tối ưu, đồng thời áp latest override cuối BUOC_11.
-- reference budget 10 của BUOC_11 cũ; B5 hiện hành giữ hard budget `CHAR + BG <= 9`.
+- rule CHAR_GROUP cũ trigger `>5 reference`, ngưỡng trên 9 CHAR, và hard budget `CHAR + BG <= 9`. Quy tắc hiện hành: CHAR và BG đều là ảnh tham chiếu; một prompt không viết trên 10 ảnh tham chiếu.
+- reference budget cũ mâu thuẫn với trần 10 ảnh. Quy tắc hiện hành giữ trần 10.
 
 Các block sau đây là NGUYÊN VĂN BUOC_11 và được áp dụng cùng terminology bridge ở trên.
 
@@ -3245,7 +3255,7 @@ Cấm dùng template này để chèn narrative explanation thừa. Mỗi câu p
 
 
 --- BEGIN VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE | SOURCE_LINES 3459-3459 | SHA256 675e822693f711b667f9cf54faa1bd73d7b425305f782b9c33e9cc97c1050f8f ---
-*********CHÚ Ý TUYỆT ĐỐI KHÔNG DÙNG SÁNG TẠO CHAR NHÓM CHO CÁC CHAR ĐÃ CÓ TRỪ KHI 1 CẢNH NHỎ CÓ TRÊN 9 CHAR.(KO NHÓM CHAR_XX,CHAR_YY,CHAR_ZZ THÀNH CHAR NHÓM NẾU CẢNH ĐÓ HAY PROMPT ĐÓ KO QUÁ 9 CHAR VÀ BG)
+CHAR và BG đều là ảnh tham chiếu. Một prompt không viết trên 10 ảnh tham chiếu. Chỉ gom CHAR phụ khi tổng sẽ vượt 10. Tổng đã trong mức 10 thì không gom. Nhân vật diễn chính giữ CHAR riêng.
 --- END VERBATIM BUOC_11 BLOCK: LATEST_CHAR_GROUP_OVERRIDE ---
 
 
@@ -3305,11 +3315,10 @@ Header KHÔNG hợp lệ:
 - Không chọn một BG khác chỉ để lấp chỗ trống khi BG đó không thích hợp với dòng.
 - Không dùng `BG_00` nếu BG đó không phải nơi của dòng.
 
-4. ID LẤY TỪ BẢNG ĐÃ THỐNG KÊ ĐỒNG BỘ.
-- Bảng bước trích xuất đã liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí và từng trạng thái, rồi đã gán CHAR_XX / BG_XX.
-- Prompt gọi đúng ID đó.
-- Khi bảng đã có BG thích hợp, viết prompt và gắn BG đó. Không xuất `BG_GAP` hoặc `CHAR_GAP` thay cho prompt.
-- Khi dòng cần một trạng thái chưa có trong bảng, chưa viết prompt của dòng đó. Quay lại bước trích xuất, bổ sung mục thiếu, thống kê đồng bộ, gán ID, rồi viết prompt.
+4. ID LẤY TỪ BẢNG ĐÃ TẠO.
+- Prompt gọi CHAR_XX và BG_XX đã tạo.
+- Khi đã có BG thích hợp, viết prompt và gắn BG đó. Không xuất `BG_GAP` hoặc `CHAR_GAP` thay cho prompt.
+- Nơi hoặc trạng thái tác phẩm cần vẽ mà chưa có BG thì tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG. Cùng nơi và cùng trạng thái thì dùng lại BG đã có. Buổi sáng, ban đêm, mưa hoặc trạng thái môi trường khác rõ là các BG khác nhau.
 - Không tự đặt mã mới trong prompt dòng.
 
 5. HARD GATE TRƯỚC KHI PASS PROMPT:
@@ -3346,8 +3355,8 @@ Nếu:
 
 8. THỨ TỰ REPAIR KHI THIẾU BG HOẶC BG KHÔNG THÍCH HỢP:
 A. Đọc dòng nguồn.
-B. Chọn BG đã có trong bảng thống kê đồng bộ, đúng nơi và đúng trạng thái của dòng.
-C. Nếu trạng thái đó chưa có trong bảng, quay lại bước trích xuất, bổ sung, đồng bộ, gán BG_XX, rồi mới sửa prompt.
+B. Chọn BG đã tạo, đúng nơi và đúng trạng thái của dòng. Suy nghĩ hoặc hồi tưởng có thể dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp cả hai theo hiệu ứng manga.
+C. Nếu trạng thái đó chưa có BG, tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG, rồi gắn mã đã tạo.
 D. Gắn mã BG đó vào header.
 E. Viết body theo đúng nơi và đúng trạng thái của BG đó.
 F. Giữ nguyên số đo đã khóa.

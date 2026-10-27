@@ -5,7 +5,7 @@ KHÓA THEO QUY TRÌNH HƯỚNG DẪN:
 - Đây là bước 1. Tên bước là `1- TRÍCH XUẤT NHÂN VẬT VÀ BỐI CẢNH`. File quy tắc là `01_TRICH_NHAN_VAT_VA_BOI_CANH.txt`.
 - Đầu vào đã khóa: `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE`. Không dùng bản TTS. Không dùng SRT làm nguồn hiện hành.
 - Lần 1: đọc toàn bộ nguồn và trích thật kỹ. Liệt kê nhân vật, bối cảnh, sinh vật, quái vật, động vật, công cụ, vũ khí, vật phẩm, kể cả trừu tượng, suy nghĩ và quá khứ. Chưa cấp ID CHAR/BG.
-- Với nhân vật, mỗi câu nguồn khác nhau có nhắc đến và có giá trị hình ảnh tính 1. Chỉ 1 câu thì không vào danh sách tạo CHAR. Từ 2 câu khác nhau có giá trị hình ảnh thì đưa vào danh sách tạo CHAR.
+- Nhân vật được gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi nhân vật cầm công cụ, hoặc khi nhân vật cầm vũ khí. Tuổi, trang phục và vết thương là trạng thái của CHAR đó. Công cụ và vũ khí nhân vật cầm được ghi cùng CHAR đó. Số IMAGE_PROMPT không dùng để gán hoặc loại CHAR.
 - Lần 2: thống kê đồng bộ. Gộp cùng một đối tượng dù gọi bằng tên khác. Tách trạng thái khác rõ. Đối chiếu lại toàn bộ nguồn để bảng đủ cho bước 4. Thiếu thì bổ sung ở lần này.
 - Lần 3: liệt kê trạng thái chính xác, rồi gán `CHAR_XX` và `BG_XX` phù hợp với từng trạng thái. Xuất danh sách CHAR và BG.
 - Bảng này là nguồn ID duy nhất của prompt theo dòng. Prompt dòng không được rơi vào GAP vì một CHAR hoặc BG đã phải có từ bước này.
@@ -112,7 +112,7 @@ Có thể tính khi identity được xác định chắc chắn qua:
 - tham chiếu nhóm nếu có thể xác định chắc chắn cá nhân đó đang hiện diện và có giá trị hình ảnh.
 
 Không tính:
-- MENTION_ONLY;
+- dòng không nói đến nhân vật;
 - OFFSCREEN_ONLY;
 - tên chỉ xuất hiện trong lời kể/lore nhưng nhân vật không có giá trị trực quan hóa ở câu đó;
 - UI_ONLY chỉ hiển thị tên/trạng thái mà không trực quan hóa nhân vật;
@@ -121,20 +121,26 @@ Không tính:
 - dòng cụt chỉ nối tiếp câu trước. Dòng đó gắn vào câu mà nó nối và không tăng VISUAL_USE_COUNT.
 
 QUY TẮC ĐẾM:
-- 1 câu có giá trị hình ảnh = 1 VISUAL_USE_COUNT cho nhân vật đó.
-- Cùng một nhân vật được nhắc nhiều lần trong cùng một câu vẫn chỉ = 1.
-- Hai câu nguồn khác nhau cùng có giá trị hình ảnh = 2.
+- Một dòng có nói đến nhân vật tính 1.
+- Cùng một nhân vật được nhắc nhiều lần trong cùng một dòng vẫn chỉ = 1.
+- Từ 2 dòng trở lên là đủ mốc gán CHAR.
 - Phải đếm bằng semantic/coreference, không chỉ search tên hoặc keyword.
 
 QUYẾT ĐỊNH CHAR:
-VISUAL_USE_COUNT = 0 hoặc 1
-→ KHÔNG đưa vào danh sách tạo CHAR/reference riêng.
-→ nếu cần, mô tả trực tiếp trong prompt ảnh của cảnh tương ứng.
+Nhân vật được gán CHAR khi có một trong các điều kiện:
+- được nói đến từ 2 dòng trở lên;
+- có nhiều thay đổi ngoại hình, như tuổi, trang phục, vết thương;
+- nhân vật cầm công cụ;
+- nhân vật cầm vũ khí.
 
-VISUAL_USE_COUNT >= 2
-→ ĐƯA vào CHARACTER_MASTER / danh sách tạo CHAR.
-→ REFERENCE_REQUIRED = YES, trừ khi người dùng có lock riêng khác.
-→ cần continuity giữa các lần xuất hiện.
+Tuổi, trang phục và vết thương liệt kê thành trạng thái của CHAR đó.
+Công cụ và vũ khí nhân vật cầm ghi cùng CHAR đó.
+Một dòng tính một lần. Nguồn một câu một dòng thì một dòng là một câu.
+Số IMAGE_PROMPT không dùng để gán CHAR và không dùng để loại CHAR.
+
+Nhân vật chỉ được nói đến trong 1 dòng, không có nhiều thay đổi ngoại hình, không cầm công cụ và không cầm vũ khí
+→ không gán CHAR.
+→ nếu cần, mô tả trực tiếp trong prompt ảnh.
 
 BẮT BUỘC AUDIT:
 Mỗi record CHARACTER_MASTER phải có:
@@ -151,7 +157,7 @@ VISUAL_USE_COUNT
 
 Đối với CREATURE / ITEM / LOCATION / BG:
 VISUAL_USE_COUNT vẫn giữ nghĩa hiện hành của chính loại resource đó và không bị phần 2A thay đổi.
-Ngưỡng 2 câu của nhân vật không áp dụng cho sinh vật, vũ khí, công cụ, vật phẩm hay BG.
+Điều kiện gán CHAR của nhân vật không áp dụng cho sinh vật, vũ khí, công cụ, vật phẩm hay BG. Nhân vật cầm công cụ hoặc vũ khí vẫn được gán CHAR, và món đó ghi cùng CHAR.
 
 IMAGE_PROMPT THRESHOLD:
 - mọi rule cũ dùng số IMAGE_PROMPT để quyết định CHARACTER được giữ lại bên dưới chỉ để bảo toàn lịch sử tài liệu;
@@ -185,13 +191,10 @@ phải đánh giá xem chúng có thực sự cần tái sử dụng hay không.
 Mặc định:
 
 Đối với NHÂN VẬT — ACTIVE:
-- dùng ACTIVE CHARACTER VISUAL COUNT LOCK tại mục 2A.
-- VISUAL_USE_COUNT = số câu nguồn khác nhau có giá trị hình ảnh.
-- VISUAL_USE_COUNT = 0 hoặc 1:
-  → không đưa vào danh sách tạo CHAR/reference riêng.
-- VISUAL_USE_COUNT >= 2:
-  → đưa vào CHARACTER_MASTER / danh sách tạo CHAR;
-  → REFERENCE_REQUIRED = YES.
+- gán CHAR khi được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi cầm công cụ, hoặc khi cầm vũ khí.
+- tuổi, trang phục và vết thương là trạng thái của CHAR đó.
+- công cụ và vũ khí nhân vật cầm ghi cùng CHAR đó.
+- chỉ 1 dòng, không đổi ngoại hình nhiều, không cầm công cụ và không cầm vũ khí: không gán CHAR.
 - bắt buộc lưu SOURCE_SENTENCE_IDS để audit.
 - không được dùng số IMAGE_PROMPT làm gate quyết định CHARACTER ở bước 1.
 
@@ -713,12 +716,12 @@ BG phải tái sử dụng được.
 
 Đối với NHÂN VẬT — ACTIVE:
 
-VISUAL_USE_COUNT = 0 hoặc 1 CÂU NGUỒN CÓ GIÁ TRỊ HÌNH ẢNH
-→ không đưa vào danh sách tạo CHAR/reference riêng.
-
-VISUAL_USE_COUNT >= 2 CÂU NGUỒN KHÁC NHAU CÓ GIÁ TRỊ HÌNH ẢNH
-→ đưa vào CHARACTER_MASTER / danh sách tạo CHAR.
+Gán CHAR khi nhân vật được nói đến từ 2 dòng trở lên, có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, cầm công cụ, hoặc cầm vũ khí.
+→ đưa vào CHARACTER_MASTER.
 → REFERENCE_REQUIRED = YES.
+
+Chỉ 1 dòng, không có các điều kiện trên
+→ không gán CHAR.
 
 BẮT BUỘC:
 - VISUAL_USE_COUNT là số nguyên chính xác;
@@ -1138,11 +1141,11 @@ NHÂN VẬT:
 TRÍCH MỌI TRẠNG THÁI NGOẠI HÌNH + TRANG PHỤC QUAN TRỌNG.
 KHÔNG TÁCH THEO BIỂU CẢM KHUÔN MẶT.
 ACTIVE COUNT:
-- 1 câu nguồn có giá trị hình ảnh = 1 lần.
-- 0 hoặc 1 lần → không vào danh sách tạo CHAR.
-- từ 2 câu nguồn khác nhau trở lên → vào danh sách tạo CHAR/reference.
-- bắt buộc exact VISUAL_USE_COUNT + SOURCE_SENTENCE_IDS.
-- không dùng IMAGE_PROMPT threshold làm gate CHARACTER ở bước 1.
+- được nói đến từ 2 dòng trở lên → gán CHAR.
+- nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương → gán CHAR và liệt kê thành trạng thái.
+- nhân vật cầm công cụ hoặc cầm vũ khí → gán CHAR, món đó ghi cùng CHAR.
+- chỉ 1 dòng và không có các điều kiện trên → không gán CHAR.
+- không dùng số IMAGE_PROMPT để gán hoặc loại CHAR.
 
 SINH VẬT:
 DÙNG MỤC 7 VÀ MỤC 12.
@@ -1162,15 +1165,15 @@ KHÔNG DÙNG BG_00 LÀ NỀN CẢM XÚC CHUNG.
 ID BG_XX CHỈ CẤP Ở LẦN 3, THEO SEQUENCE HIỆN HÀNH.
 
 CHỈ XUẤT HIỆN 1 LẦN:
-- RIÊNG CHARACTER: hiểu là đúng 1 CÂU NGUỒN có giá trị hình ảnh theo mục 2A.
-  → không vào danh sách tạo CHAR/reference.
+- RIÊNG CHARACTER: đúng 1 dòng, không đổi ngoại hình nhiều, không cầm công cụ và không cầm vũ khí.
+  → không gán CHAR.
 - CREATURE / ITEM / LOCATION / BG:
   → mặc định không cần reference riêng;
   → mô tả trong prompt ảnh là đủ, trừ ngoại lệ phức tạp hoặc then chốt ở mục 12.
 
 XUẤT HIỆN LẶP LẠI:
-- RIÊNG CHARACTER: từ 2 CÂU NGUỒN KHÁC NHAU có giá trị hình ảnh trở lên
-  → đưa vào danh sách tạo CHAR/reference.
+- RIÊNG CHARACTER: từ 2 dòng trở lên, hoặc nhiều thay đổi ngoại hình, hoặc cầm công cụ, hoặc cầm vũ khí
+  → gán CHAR.
 - CREATURE / ITEM / LOCATION / BG:
   → tạo reference khi cần giữ nhất quán theo quy tắc hiện hành của từng loại.
 
@@ -1195,7 +1198,7 @@ REVISION_LOG
 - Bảng đã khóa là nguồn ID của prompt theo dòng, để bước 4 không còn GAP vì thiếu CHAR hoặc BG.
 - Cùng một nơi có thể có nhiều trạng thái BG khi buổi, mưa hoặc trạng thái môi trường khác rõ. Cùng nơi và cùng trạng thái thì một BG.
 - Số đo sáng tạo hợp lý là khóa hợp lệ.
-- Ngưỡng 2 câu chỉ áp dụng cho nhân vật.
+- CHAR gán khi nhân vật được nói đến từ 2 dòng trở lên, khi đổi ngoại hình nhiều, khi cầm công cụ hoặc khi cầm vũ khí.
 - Rule cũ dùng số IMAGE_PROMPT cho nhân vật vẫn là LEGACY / INACTIVE.
 
 ======================================================================

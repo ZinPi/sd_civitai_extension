@@ -375,11 +375,14 @@ Kiểm:
 - token đúng role;
 - token cần thiết không bị bỏ;
 - không token thừa vô căn cứ;
-- CHAR đơn và CHAR_GROUP đều được xử lý như CHAR theo B5;
-- chỉ tạo CHAR/CHAR_GROUP cho nhân vật xuất hiện trong trên 2 IMAGE_PROMPT;
-- nếu tổng reference CHAR + BG cần cho prompt đạt 10 ảnh trở lên trước tối ưu, được dùng CHAR_GROUP để gom các nhân vật phụ phù hợp;
-- không ghép nhân vật đang diễn chính trong prompt/cảnh hiện tại vào CHAR_GROUP;
-- sau tối ưu bằng CHAR_GROUP, tổng reference thực tế gắn vào prompt phải tuân theo giới hạn B5 hiện hành: CHAR + BG <= 9.
+- CHAR đơn và CHAR_GROUP đều được xử lý như CHAR;
+- CHAR được gán khi nhân vật được nói đến từ 2 dòng trở lên, khi có nhiều thay đổi ngoại hình như tuổi, trang phục, vết thương, khi cầm công cụ, hoặc khi cầm vũ khí;
+- số IMAGE_PROMPT không dùng để gán hoặc loại CHAR;
+- CHAR và BG đều là ảnh tham chiếu;
+- một prompt không viết trên 10 ảnh tham chiếu;
+- khi tổng sẽ vượt 10, gom nhân vật phụ vào CHAR_GROUP để còn không quá 10;
+- tổng đã trong mức 10 thì không gom;
+- không ghép nhân vật đang diễn chính trong prompt vào CHAR_GROUP;
 
 Không được bỏ core reference chỉ để né limit.
 
@@ -541,7 +544,9 @@ Kiểm:
 - không invent BG_ID;
 - emotional / abstract / thought / memory / flashback / dream / hypothetical / dynamic BG chỉ được dùng khi B3 có exact numbered BG_XX tương ứng;
 - không dùng BG_00 làm emotional/abstract fallback;
-- prompt thuộc hồi tưởng / memory / thought / inner image / dream / vision / fear / hypothetical / hope / plan / reported event phải bám đúng routing B3;
+- suy nghĩ, hồi tưởng hoặc việc sắp tới được dùng BG riêng thay BG hiện tại, hoặc kết hợp BG hiện tại và BG hồi tưởng theo hiệu ứng manga;
+- cách vẽ đó không phải FUTURE_LEAK; FUTURE_LEAK chỉ khi prompt biến việc chưa xảy ra thành sự kiện đã xảy ra ở hiện tại;
+- tổng CHAR + BG của prompt không quá 10 ảnh tham chiếu;
 - không ép DYNAMIC_BG nếu B3 đã route nội dung đó sang PHYSICAL_BG hoặc PHYSICAL_BG_PLUS_DYNAMIC.
 
 FAIL_H:
@@ -908,7 +913,7 @@ PASS_H khi các mục REQUIRED/CONDITIONAL áp dụng đều đạt:
 [ ] Dòng/câu liền kề trong SEMANTIC_ANALYSIS_WINDOW được dùng đúng; không kéo action/reveal ở ngoài window về sớm.
 [ ] TOTAL_IMAGE_PROMPT/coverage đúng công thức B5.
 [ ] Không future leak/canon invention.
-[ ] Reference list và CHAR_GROUP đúng B5; sau tối ưu CHAR + BG <= 9.
+[ ] Reference list và CHAR_GROUP đúng quy tắc hiện hành; CHAR + BG không quá 10 ảnh tham chiếu.
 [ ] B3/reference role/state/scale đúng.
 [ ] CHAR/CHAR_GROUP declaration đủ theo B5.
 [ ] BG/location/state đúng B3.
@@ -1002,7 +1007,7 @@ BATCH CHECK:
 12. Canvas 16:9 nhất quán.
 13. No-Japanese toàn batch.
 14. No-verbatim-source toàn batch.
-15. Reference budget/CHAR_GROUP đúng B5; sau tối ưu mỗi prompt CHAR + BG <= 9.
+15. Reference budget/CHAR_GROUP đúng quy tắc hiện hành; mỗi prompt CHAR + BG không quá 10 ảnh tham chiếu.
 16. Không pattern copy pose/camera từ reference.
 17. Không pattern BG-as-fixed-stage.
 18. Không semantic-overload hàng loạt.
@@ -1173,7 +1178,7 @@ B. REFERENCE TOKEN SCAN
 - syntax;
 - token existence;
 - CHAR before BG;
-- kiểm CHAR_GROUP theo B5 và total CHAR + BG <= 9 sau tối ưu.
+- kiểm CHAR_GROUP theo quy tắc hiện hành và total CHAR + BG không quá 10 ảnh tham chiếu.
 
 C. JAPANESE SCRIPT SCAN
 - Kanji/CJK;
@@ -1320,7 +1325,8 @@ Nếu prompt có BG nhưng BG không thích hợp với dòng:
 - `RESULT = FAIL_H`
 - `ISSUE_TYPE = WRONG_LOCATION`
 - sửa bằng cách đổi sang BG đã tạo nào thích hợp với dòng.
-- Không yêu cầu tạo mã BG mới.
+- Suy nghĩ hoặc hồi tưởng có thể dùng BG hồi tưởng, hoặc kết hợp với BG hiện tại theo hiệu ứng manga.
+- Trạng thái chưa có BG thì tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG. Prompt dòng không tự đặt mã mới.
 
 C. LEVEL 1 — INPUT / AUTHORITY / RESOURCE LOCK
 Bắt buộc xác nhận:
@@ -1329,8 +1335,8 @@ Bắt buộc xác nhận:
 - cùng một nơi lúc buổi sáng và lúc ban đêm, mưa hoặc trạng thái môi trường khác phải gọi đúng BG_XX của trạng thái đó;
 - không có mã BG tự đặt ngoài danh sách đã tạo.
 Prompt thiếu BG thì FAIL.
-BG đúng trạng thái đã có trong bảng thì gọi BG đó.
-Trạng thái dòng cần chưa có trong bảng thì FAIL vì bảng trích xuất chưa đồng bộ. Quay lại bước trích xuất, bổ sung, gán ID, rồi sửa prompt. Không chọn một BG khác cho đủ token. Không nhận prompt ghi GAP.
+BG đúng trạng thái đã có thì gọi BG đó.
+Trạng thái dòng cần chưa có BG thì tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG, rồi sửa prompt bằng mã đã tạo. Không chọn một BG khác cho đủ token. Không nhận prompt ghi GAP.
 
 D. LEVEL 2 — PROMPT-BY-PROMPT
 Khóa này bổ sung/ghi đè cách hiểu lỏng của QA-01 / QA-08 / QA-17 / QA-36:
@@ -1381,8 +1387,8 @@ Không được dùng evidence PASS cũ để bỏ qua gate này.
 H. REPAIR ORDER
 Khi phát hiện prompt thiếu BG hoặc BG không thích hợp với dòng:
 1. Đọc dòng nguồn.
-2. Chọn BG đã có trong bảng thống kê đồng bộ, đúng nơi và đúng trạng thái.
-3. Nếu trạng thái đó chưa có trong bảng, quay lại bước trích xuất, bổ sung, đồng bộ, gán ID, rồi sửa prompt.
+2. Chọn BG đã tạo, đúng nơi và đúng trạng thái. Suy nghĩ hoặc hồi tưởng có thể dùng BG hồi tưởng thay BG hiện tại, hoặc kết hợp cả hai theo hiệu ứng manga.
+3. Nếu trạng thái đó chưa có BG, tạo BG từ tác phẩm ở bước trích xuất và bước prompt BG, rồi sửa prompt bằng mã đã tạo.
 4. Gắn mã BG đó vào header.
 5. Sửa body cho khớp nơi và trạng thái của BG đó.
 6. Giữ đúng số đo đã khóa.
