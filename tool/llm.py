@@ -214,7 +214,10 @@ class HttpLlm:
                     "timeout",
                 )
             if response.status_code in {401, 403}:
-                raise LlmError(f"{self._label()} từ chối API. Dán lại rồi bấm Kiểm tra.", "auth")
+                raise LlmError(
+                    f"{self._label()} từ chối API. Mở config.json cạnh Chay.bat, dán lại api_key, lưu, rồi mở lại tool.",
+                    "auth",
+                )
             if response.status_code >= 400:
                 if self._is_context_limit(response.text):
                     raise LlmError("Lượt này dài quá giới hạn. Không tự gửi lại nguyên lượt.", "context")
@@ -268,14 +271,17 @@ class HttpLlm:
         try:
             response = self._http().get(self._models_endpoint(), headers=self._headers())
         except httpx.TimeoutException as exc:
-            raise LlmError("Hết giờ chờ. Bấm Kiểm tra lại.", "timeout") from exc
+            raise LlmError("Hết giờ chờ khi lấy danh sách model. Mở lại tool để kiểm tra.", "timeout") from exc
         except httpx.TransportError as exc:
             raise LlmError("Không nối được API.", "network") from exc
         if response.status_code in {401, 403}:
             body = response.text
             if response.status_code == 403 and "1010" in body:
                 raise LlmError("Không nối được API.", "network")
-            raise LlmError(f"{self._label()} từ chối API. Dán lại rồi bấm Kiểm tra.", "auth")
+            raise LlmError(
+                f"{self._label()} từ chối API. Mở config.json cạnh Chay.bat, dán lại api_key, lưu, rồi mở lại tool.",
+                "auth",
+            )
         if response.status_code >= 400:
             raise LlmError(f"Không lấy được danh sách model của {self._label()}.", "bad")
         try:

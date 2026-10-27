@@ -589,9 +589,9 @@ class Job:
 
     def _validate_settings(self, settings: dict) -> None:
         if not str(settings.get("base_url") or "").strip() or not str(settings.get("api_key") or "").strip():
-            raise JobError("Dán API rồi bấm Kiểm tra.")
+            raise JobError("Mở config.json cạnh Chay.bat, dán api_key, lưu, rồi mở lại tool.")
         if not str(settings.get("model") or "").strip():
-            raise JobError("Bấm Kiểm tra, rồi chọn model.")
+            raise JobError("Chưa chọn model. Mở lại tool khi API đã được nhận, rồi chọn model.")
         if settings.get("api_style") not in {"chat", "responses", "claude"}:
             raise JobError("API không dùng được.")
 
