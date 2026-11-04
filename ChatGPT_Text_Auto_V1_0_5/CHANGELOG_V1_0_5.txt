@@ -1,0 +1,19 @@
+ChatGPT Text Auto V1.0.5
+Date: 2026-11-04
+
+THÊM: chế độ Tạo ảnh trên side panel.
+
+- Nút "Tạo ảnh" mở giao diện mới, không thay vòng văn bản lặp cũ.
+- Ô dán / chọn file TXT: mỗi dòng một prompt ảnh.
+- CHAR_XX và BG_XX trong dòng được khớp với file cùng tên trong thư mục ảnh tham chiếu.
+- Không bắt buộc đủ cả CHAR và BG. Thiếu ảnh vẫn gửi dòng đó.
+- Mỗi lượt: gắn ảnh khớp → dán đúng một dòng → bấm dấu cộng → chọn Tạo ảnh → gửi → chờ ảnh xong → tải về → dòng tiếp.
+- Số dòng không trống = số lần chạy, rồi dừng.
+- Tên file tải về: tiền tố người dùng + _1, _2, ...; để trống thì dùng ANH_1.png.
+- DỪNG gửi ABORT vào tab ChatGPT để hủy lượt đang chờ.
+
+Cài đặt:
+1. Gỡ/tắt bản V1.0.4.
+2. Load unpacked thư mục V1.0.5.
+3. Ctrl+R tab ChatGPT.
+4. Bấm icon → Tạo ảnh → chọn thư mục ảnh → dán TXT → TẠO ẢNH.
