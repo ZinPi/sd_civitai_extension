@@ -1,0 +1,10 @@
+ChatGPT Text Auto V1.0.7
+Date: 2026-11-04
+
+Sửa lỗi "Message exceeded maximum allowed size of 64MiB" khi bấm TẠO ẢNH.
+
+- Không gửi cả thư mục ảnh trong một tin nhắn.
+- Mỗi ảnh CHAR/BG được cắt nhỏ ~3.5MB rồi gửi từng phần.
+- Tab ChatGPT tự lấy từng ảnh khi đến dòng tương ứng.
+
+Cài: Reload extension, phải thấy V1.0.7, rồi Ctrl+R tab ChatGPT.

@@ -25,7 +25,8 @@ async function saveNow(){clearTimeout(saveTimer);await chrome.storage.local.set(
 function isChatUrl(u=''){return /^https:\/\/(chatgpt\.com|chat\.openai\.com)(?:\/|$)/i.test(String(u||''));}
 function conversationId(u=''){try{const x=new URL(u);const m=x.pathname.match(/(?:^|\/)c\/([^/?#]+)/i);return m?m[1]:'';}catch(_){return '';}}
 
-const CONTENT_VERSION='1.0.6';
+const CONTENT_VERSION='1.0.7';
+const IMAGE_CHUNK=3500000;
 async function pingContent(tabId){try{return await chrome.tabs.sendMessage(tabId,{type:'PING_TEXT_AUTO'});}catch(_){return null;}}
 async function waitTabComplete(tabId,ms=15000){
   const end=Date.now()+ms;
@@ -168,13 +169,46 @@ async function onTextEvent(tabId,event){
   return {ok:true};
 }
 let imageFileStore={};
+let imageChunkBuf={};
+
+function clearImageFiles(){imageFileStore={};imageChunkBuf={};return {ok:true};}
+function storeImageChunk(msg){
+  const id=String(msg.id||'').toUpperCase();
+  if(!id)return {ok:false,error:'NO_IMAGE_ID'};
+  const total=Math.max(1,Number(msg.total||1));
+  const index=Math.max(0,Number(msg.index||0));
+  imageChunkBuf[id]||={name:msg.name||`${id}.png`,type:msg.mime||'image/png',chunks:[],total};
+  imageChunkBuf[id].name=msg.name||imageChunkBuf[id].name;
+  imageChunkBuf[id].type=msg.mime||imageChunkBuf[id].type;
+  imageChunkBuf[id].total=total;
+  imageChunkBuf[id].chunks[index]=String(msg.data||'');
+  const got=imageChunkBuf[id].chunks.filter(x=>typeof x==='string').length;
+  if(got>=total){
+    imageFileStore[id]={id,name:imageChunkBuf[id].name,type:imageChunkBuf[id].type,data:imageChunkBuf[id].chunks.join('')};
+    delete imageChunkBuf[id];
+    return {ok:true,stored:true,id};
+  }
+  return {ok:true,stored:false,id,got,total};
+}
+function getImageFileMeta(id){
+  const file=imageFileStore[String(id||'').toUpperCase()];
+  if(!file)return {ok:false,error:'FILE_NOT_STORED'};
+  const total=Math.max(1,Math.ceil(String(file.data||'').length/IMAGE_CHUNK));
+  return {ok:true,id:file.id,name:file.name,type:file.type,total};
+}
+function getImageFileChunk(id,index){
+  const file=imageFileStore[String(id||'').toUpperCase()];
+  if(!file)return {ok:false,error:'FILE_NOT_STORED'};
+  const i=Math.max(0,Number(index||0));
+  return {ok:true,id:file.id,index:i,data:String(file.data||'').slice(i*IMAGE_CHUNK,(i+1)*IMAGE_CHUNK)};
+}
 
 function filesForLine(line){
   const ids=imageRefs.parseRefIds(line);
-  return ids.map(id=>imageFileStore[id]).filter(Boolean);
+  return ids.filter(id=>!!imageFileStore[id]);
 }
 
-async function startImageRun(tabId,config,files){
+async function startImageRun(tabId,config){
   if(!imageRefs)return {ok:false,error:'IMAGE_REFS_MISSING: reload extension trên chrome://extensions'};
   if(state.run?.status==='RUNNING')return {ok:false,error:'RUN_ALREADY_RUNNING'};
   tabId=Number(tabId);if(!tabId)return {ok:false,error:'NO_TAB'};
@@ -184,11 +218,6 @@ async function startImageRun(tabId,config,files){
   if(!fromCfg.length)return {ok:false,error:'NO_IMAGE_LINES'};
   const cs=await ensureContent(tabId);if(!cs.ok)return cs;
   await abortTab(tabId);
-  imageFileStore={};
-  for(const file of files||[]){
-    const id=String(file.id||'').toUpperCase();
-    if(id) imageFileStore[id]=file;
-  }
   const prefix=imageRefs.sanitizePrefix(config?.outputPrefix||'');
   state.run={id:uid('img'),kind:'IMAGE',status:'RUNNING',phase:'READY',startedAt:nowIso(),finishedAt:null,targetTabId:tabId,conversationUrl:tab.url||'',conversationId:conversationId(tab.url||''),config:{stableSec:Math.max(2,Math.min(60,Number(config?.stableSec||4))),nextDelaySec:Math.max(0,Math.min(60,Number(config?.nextDelaySec||2))),responseTimeoutMin:Math.max(1,Math.min(360,Number(config?.responseTimeoutMin||15))),cdpFallback:config?.cdpFallback!==false,composerSelector:String(config?.selectors?.composer||''),sendSelector:String(config?.selectors?.send||''),plusSelector:String(config?.selectors?.plus||''),createImageSelector:String(config?.selectors?.createImage||'')},lines:fromCfg,outputPrefix:prefix,projectName:safeName(config?.projectName||'ANH_001'),totalTurns:fromCfg.length,outputs:[],outputMeta:[],savedCount:0,lastSavedName:'',pendingTurn:null,error:'',completionReason:'',lastVerification:''};
   log('INFO','Started image run',{tabId,totalTurns:fromCfg.length,refFiles:Object.keys(imageFileStore).length,prefix:prefix||'ANH'});
@@ -203,13 +232,13 @@ async function pumpImage(){
   const cs=await ensureContent(run.targetTabId);if(!cs.ok)return failRun(cs.error);
   const prompt=run.lines[index];
   const refIds=imageRefs.parseRefIds(prompt);
-  const refFiles=filesForLine(prompt);
-  const turn={id:uid('imgturn'),index,kind:`IMAGE_${index+1}`,prompt,refIds,refFiles,startedAt:nowIso(),sentConfirmed:false,stage:'PREPARE',conversationId:run.conversationId||conversationId(target.tab.url||'')};
+  const turn={id:uid('imgturn'),index,kind:`IMAGE_${index+1}`,prompt,refIds,startedAt:nowIso(),sentConfirmed:false,stage:'PREPARE',conversationId:run.conversationId||conversationId(target.tab.url||'')};
   run.pendingTurn=turn;run.phase='PREPARE_TURN';save();
-  let r=await chrome.tabs.sendMessage(run.targetTabId,{type:'RUN_IMAGE_TURN',turn:{...turn,refFiles},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}}).catch(e=>({ok:false,error:String(e?.message||e)}));
+  const payload={type:'RUN_IMAGE_TURN',turn:{id:turn.id,index:turn.index,kind:turn.kind,prompt,refIds},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}};
+  let r=await chrome.tabs.sendMessage(run.targetTabId,payload).catch(e=>({ok:false,error:String(e?.message||e)}));
   if(!r?.ok&&/UNKNOWN_MESSAGE|Receiving end does not exist/i.test(String(r?.error||''))){
-    const cs=await ensureContent(run.targetTabId);if(!cs.ok)return failRun(cs.error);
-    r=await chrome.tabs.sendMessage(run.targetTabId,{type:'RUN_IMAGE_TURN',turn:{...turn,refFiles},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}}).catch(e=>({ok:false,error:String(e?.message||e)}));
+    const cs2=await ensureContent(run.targetTabId);if(!cs2.ok)return failRun(cs2.error);
+    r=await chrome.tabs.sendMessage(run.targetTabId,payload).catch(e=>({ok:false,error:String(e?.message||e)}));
   }
   if(!r?.ok)return failRun(r?.error||'IMAGE_TURN_START_FAILED');
 }
@@ -271,7 +300,11 @@ chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
   (async()=>{await ready;switch(msg?.type){
     case 'GET_STATE':return {ok:true,state:persistableState()};
     case 'START_RUN':return startRun(msg.tabId,msg.config||{});
-    case 'START_IMAGE_RUN':return startImageRun(msg.tabId,msg.config||{},msg.files||[]);
+    case 'CLEAR_IMAGE_FILES':return clearImageFiles();
+    case 'STORE_IMAGE_CHUNK':return storeImageChunk(msg);
+    case 'GET_IMAGE_FILE_META':return getImageFileMeta(msg.id);
+    case 'GET_IMAGE_FILE_CHUNK':return getImageFileChunk(msg.id,msg.index);
+    case 'START_IMAGE_RUN':return startImageRun(msg.tabId,msg.config||{});
     case 'STOP_RUN':return stopRun();
     case 'RESUME_RUN':return resumeRun(msg.tabId);
     case 'TEXT_EVENT':return onTextEvent(sender.tab?.id,msg.event||{});

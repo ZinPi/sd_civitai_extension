@@ -1,5 +1,5 @@
 (()=>{
-  if(window.__CHATGPT_TEXT_AUTO_VERSION__==='1.0.6')return;window.__CHATGPT_TEXT_AUTO_VERSION__='1.0.6';
+  if(window.__CHATGPT_TEXT_AUTO_VERSION__==='1.0.7')return;window.__CHATGPT_TEXT_AUTO_VERSION__='1.0.7';
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   let activeTurn=null;
   let cancelRequested=false;
@@ -526,6 +526,24 @@
     for(let i=0;i<bytes.length;i+=step) bin+=String.fromCharCode(...bytes.subarray(i,i+step));
     return {data:btoa(bin),mime:blob.type||'image/png',width:img.naturalWidth||0,height:img.naturalHeight||0};
   }
+  async function fetchRefFiles(ids,emit){
+    const out=[];
+    for(const id of ids||[]){
+      throwIfAborted();
+      const meta=await chrome.runtime.sendMessage({type:'GET_IMAGE_FILE_META',id}).catch(()=>null);
+      if(!meta?.ok){await emit({kind:'PROGRESS',phase:'REFS_LOAD',verification:`thiếu ${id}`});continue;}
+      let data='';
+      for(let i=0;i<meta.total;i++){
+        throwIfAborted();
+        const part=await chrome.runtime.sendMessage({type:'GET_IMAGE_FILE_CHUNK',id,index:i}).catch(()=>null);
+        if(!part?.ok)throw new Error(`REF_CHUNK_FAILED_${id}_${i}`);
+        data+=part.data||'';
+      }
+      out.push({id,name:meta.name,type:meta.type,data});
+      await emit({kind:'PROGRESS',phase:'REFS_LOAD',verification:`đã tải ${id}`});
+    }
+    return out;
+  }
   async function runImageTurn(turn,settings){
     const emit=e=>chrome.runtime.sendMessage({type:'IMAGE_EVENT',event:{turnId:turn.id,...e}}).catch(()=>null);
     try{
@@ -538,7 +556,8 @@
       const paste=await pasteVerified(turn.prompt,settings,emit);
       try{await ensureImageMode(settings.selectors||{},emit);}
       catch(e){await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:`warn ${e.message}`});}
-      try{await attachRefs(turn.refFiles||[],settings.selectors||{},emit);}
+      const refFiles=turn.refFiles?.length?turn.refFiles:await fetchRefFiles(turn.refIds||[],emit);
+      try{await attachRefs(refFiles,settings.selectors||{},emit);}
       catch(e){await emit({kind:'PROGRESS',phase:'REFS_ATTACHED',verification:`warn ${e.message}`});}
       if(!composerHasImageMode(findComposer(settings.selectors||{}))){
         try{await ensureImageMode(settings.selectors||{},emit);}catch(e){await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:`retry warn ${e.message}`});}
@@ -559,7 +578,7 @@
   chrome.runtime.onMessage.addListener((msg,_sender,sendResponse)=>{
     (async()=>{
       if(msg?.type==='ABORT_TEXT_AUTO'){cancelRequested=true;activeTurn=null;return {ok:true};}
-      if(msg?.type==='PING_TEXT_AUTO')return {ok:true,version:'1.0.6',activeTurnId:activeTurn?.id||''};
+      if(msg?.type==='PING_TEXT_AUTO')return {ok:true,version:'1.0.7',activeTurnId:activeTurn?.id||''};
       if(msg?.type==='PROBE_TEXT_UI'){
         const selectors=msg.selectors||{};
         const c=findComposer(selectors),s=findSendButton(selectors),plus=findPlus(selectors);

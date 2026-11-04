@@ -1,4 +1,4 @@
-# ChatGPT Text Auto V1.0.6
+# ChatGPT Text Auto V1.0.7
 
 Load unpacked thư mục này trên Chrome / Cốc Cốc (`chrome://extensions` → Developer mode). Sau khi cập nhật: bấm Reload trên `chrome://extensions`, rồi Ctrl+R tab ChatGPT.
 

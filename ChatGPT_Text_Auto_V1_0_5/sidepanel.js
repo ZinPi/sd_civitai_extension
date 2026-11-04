@@ -96,6 +96,23 @@ async function fileToPayload(file,id){
   for(let i=0;i<bytes.length;i+=step) bin+=String.fromCharCode(...bytes.subarray(i,i+step));
   return {id,name:file.name,type:file.type||'image/png',data:btoa(bin)};
 }
+const B64_CHUNK=3500000;
+async function uploadRefFile(file,id){
+  const payload=await fileToPayload(file,id);
+  const total=Math.max(1,Math.ceil(payload.data.length/B64_CHUNK));
+  for(let i=0;i<total;i++){
+    const r=await msg({
+      type:'STORE_IMAGE_CHUNK',
+      id,
+      name:payload.name,
+      mime:payload.type,
+      index:i,
+      total,
+      data:payload.data.slice(i*B64_CHUNK,(i+1)*B64_CHUNK)
+    });
+    if(!r?.ok)throw new Error(r?.error||`Không gửi được ${id} phần ${i+1}/${total}`);
+  }
+}
 
 function collectImagePayloads(lines){
   const index=refs.indexRefFiles(refFiles);
@@ -166,10 +183,14 @@ $('#imageStartBtn').onclick=async()=>{
     setImageStatus(`Đang chuẩn bị ${lines.length} dòng…`);
     const tab=await activeChatTab();if(!tab)return setImageStatus('Hãy bấm vào tab ChatGPT rồi bấm TẠO ẢNH. Tool chỉ điều khiển tab đang mở.',true);
     const pack=collectImagePayloads(lines);
-    const payloads=[];
+    await msg({type:'CLEAR_IMAGE_FILES'});
+    let uploaded=0;
     for(const id of pack.wanted){
       const file=pack.index[id];
-      if(file) payloads.push(await fileToPayload(file,id));
+      if(!file)continue;
+      setImageStatus(`Đang gửi ảnh tham chiếu ${id} (${uploaded+1}/${pack.wanted.length})…`);
+      await uploadRefFile(file,id);
+      uploaded++;
     }
     const ui=readImageUi();
     if(hasChrome()&&chrome.storage?.local)await chrome.storage.local.set({[IMAGE_UI_KEY]:ui});
@@ -185,11 +206,10 @@ $('#imageStartBtn').onclick=async()=>{
         responseTimeoutMin:ui.imageTimeoutMin,
         cdpFallback:ui.imageCdp,
         selectors:selectors()
-      },
-      files:payloads
+      }
     });
     const missing=pack.preview.flatMap(p=>p.missing);
-    setImageStatus(r?.ok?`Đã bắt đầu ${lines.length} dòng • ${payloads.length} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
+    setImageStatus(r?.ok?`Đã bắt đầu ${lines.length} dòng • ${uploaded} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
     refresh();
   }catch(e){setImageStatus(`Lỗi khi bắt đầu: ${e?.message||e}`,true);}
 };
