@@ -1,0 +1,1406 @@
+========================================================================================================================
+B6.TXT — BƯỚC 6 — MASTER QA IMAGE_PROMPT THEO DÒNG/CÂU
+========================================================================================================================
+
+B6_VERSION: B6_LINE_OUTPUT_SLOT_IMAGE_PROMPT_QA_V2
+
+KHÓA PHẠM VI QA:
+- B6 chỉ QA các IMAGE_PROMPT THEO DÒNG/CÂU được tạo ở B5 theo `OUTPUT_SLOT_LINE`, không QA thumbnail của B7 bằng quota/header BG_XX B5.
+- Khóa BG_XX bắt buộc bên dưới áp dụng tuyệt đối TRONG PHẠM VI B5; riêng B7 tuân khóa không dùng BG tham chiếu và phải có mô tả bối cảnh trong chính prompt thumbnail.
+- Không dùng chữ “người dùng” trong tên QA/GATE hay các câu hỏi nội bộ làm căn cứ tự tạo câu hỏi người dùng chọn. B6 kiểm output thật và không được ghi PASS sẵn.
+- B6 chỉ QA thành phẩm VĂN BẢN; không yêu cầu ảnh/video đã render để xác nhận output TXT.
+
+SOURCE QA ĐỂ CHUYỂN ĐỔI:
+- ZIP 14 bước: BUOC_12.txt — MASTER QA RULE / V3 BALANCED APPLICABILITY-FIRST QA.
+- Chỉ giữ QA engine, severity, applicability, continuity, batch, repair, machine-gate và false-pass logic còn phù hợp.
+- KHÔNG giữ pipeline PARENT_SCENE/SMALL_SCENE/SMALL_SCENE_VISUAL_PLAN.
+- ACTIVE MODE của B5 hiện hành: 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+- OUTPUT_SLOT_LINE chỉ dùng để tính quota/số IMAGE_PROMPT.
+- SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại là authority nội dung trực tiếp để QA prompt.
+- Mọi rule QA phải tuân theo B5.txt hiện hành; B6 không được sửa ngược hoặc siết thêm quy tắc tạo prompt của B5.
+
+========================================================================================================================
+QA-0. QUYỀN ƯU TIÊN
+========================================================================================================================
+
+Thứ tự ưu tiên khi QA:
+
+1. Yêu cầu mới nhất của người dùng.
+2. B5.txt hiện hành — Bước 5.
+3. Văn bản nguồn theo dòng/câu hiện hành và SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT đang kiểm.
+4. B3 hiện hành cho CHAR/BG/state/scale/location.
+5. Exact CHAR/BG reference đã được người dùng xác nhận theo đúng vai trò visual authority.
+6. Mapping/reference list hiện hành.
+7. Bộ QA này.
+8. Ví dụ/template.
+
+Nếu QA rule cũ mâu thuẫn Master B5:
+→ Master B5 quyết định cách hiểu.
+
+QA KHÔNG được:
+- biến lại workflow thành SMALL_SCENE;
+- tạo scene/đạo diễn scene để thay OUTPUT_SLOT;
+- ép single-panel mặc định;
+- ép physical BG rule vào close-up/flying case không áp dụng;
+- tự ép hoặc invent dynamic/emotion/abstract/thought/memory/flashback/dream/hypothetical BG ngoài exact BG_XX / BACKGROUND_VISUAL_MODE do B3 khóa;
+- tăng CHAR description thành full model sheet khi exact reference đã khóa;
+- tự đặt reference limit hoặc điều kiện CHAR_GROUP khác với B5 hiện hành.
+
+========================================================================================================================
+QA-1. APPLICABILITY-FIRST — LUÔN CHẠY TRƯỚC MỌI CHECK
+========================================================================================================================
+
+Mỗi tiêu chí phải được gắn một trong ba trạng thái:
+
+REQUIRED
+= source / SEMANTIC_ANALYSIS_WINDOW / B3 / mapping / continuity / project lock đã khóa dữ liệu đó,
+hoặc thiếu dữ liệu đó sẽ khiến generator phải đoán một phần CỐT LÕI và có nguy cơ dựng sai current moment.
+
+CONDITIONAL
+= chỉ kiểm khi SEMANTIC_ANALYSIS_WINDOW thật sự có thành phần tương ứng.
+Ví dụ:
+- weapon;
+- object contact;
+- injury;
+- transformation;
+- magic;
+- derivative entity;
+- multi-panel;
+- crowd/extras;
+- special gear;
+- reflection/projection/illusion;
+- manga motion effect;
+- manga symbolic effect;
+- physical floor contact.
+
+N/A
+= source/B3/upstream không có dữ liệu đó,
+hoặc thành phần không xuất hiện,
+hoặc chi tiết không cần để dựng đúng current moment.
+
+N/A:
+- KHÔNG phải lỗi;
+- KHÔNG được tự bịa dữ liệu để biến thành PASS;
+- KHÔNG được dùng làm lý do kéo prompt dài.
+
+CÂU KHÓA:
+
+QA CHỈ YÊU CẦU NHỮNG GÌ CẦN ĐỂ DỰNG ĐÚNG SEMANTIC_ANALYSIS_WINDOW ĐÃ KHÓA CHO OUTPUT_SLOT HIỆN TẠI
+HOẶC NHỮNG GÌ SOURCE/B3/CONTINUITY ĐÃ KHÓA.
+
+“CHECKLIST CÓ 37 MỤC”
+KHÔNG có nghĩa
+“PROMPT PHẢI CHỨA 37 LOẠI THÔNG TIN”.
+
+========================================================================================================================
+QA-2. PHÂN LOẠI KẾT QUẢ: H / STOP
+========================================================================================================================
+
+A. H — HARD / FAIL_H
+
+Chỉ dùng khi có lỗi khách quan ở một tiêu chí REQUIRED hoặc CONDITIONAL đã kích hoạt.
+
+Ví dụ:
+- sai OUTPUT_SLOT/SEMANTIC_ANALYSIS_WINDOW/current moment;
+- sai coverage/numbering;
+- bỏ/gộp/tách/đảo OUTPUT_SLOT;
+- sai CHAR/BG/resource/reference role;
+- sai state/timeline/scale đã khóa;
+- B3-reference conflict chưa xử lý;
+- tự bịa canon;
+- future leak;
+- continuity break;
+- sai object/gear state khi nó ảnh hưởng beat;
+- vi phạm reference budget/CHAR_GROUP theo B5;
+- copy pose/camera/staging từ reference trái rule;
+- panel sai quy tắc B5;
+- thiếu core information khiến generator buộc phải đoán sai;
+- dùng BG như fixed stage;
+- prompt không self-contained;
+- Japanese/verbatim source khi project lock cấm;
+- text/bubble/reference metadata trái rule.
+
+Có 01 H áp dụng:
+PROMPT RESULT = FAIL_H.
+
+B. STOP / UPSTREAM GAP
+
+
+Chỉ dùng khi thiếu dữ liệu CỐT LÕI bắt buộc và không thể suy ra hợp lệ.
+
+Ví dụ:
+- SOURCE_LINE_GAP;
+- CHAR_GAP;
+- CHAR_STATE_GAP;
+- BG_GAP;
+- BG_STATE_GAP;
+- SCALE_GAP;
+- REFERENCE_GAP;
+- MAPPING_GAP;
+- B3_REFERENCE_CONFLICT_UNRESOLVED.
+
+Không STOP chỉ vì một checklist field không có dữ liệu và field đó không cần cho current moment.
+
+========================================================================================================================
+QA-3. ĐIỀU KIỆN PASS
+========================================================================================================================
+
+PROMPT-LEVEL:
+- tất cả H gate áp dụng = sạch;
+- OUTPUT_SLOT / SEMANTIC_ANALYSIS_WINDOW / coverage đúng theo B5;
+- không unresolved core GAP.
+
+Khi đạt:
+OUTPUT_SLOT_ID | PASS_H
+
+PASS_H của từng prompt KHÔNG tự động có nghĩa toàn batch/final đã PASS.
+
+TARGET / BATCH / FINAL PASS khi:
+- H_OPEN_COUNT = 0 trong scope đã kiểm;
+- coverage đã kiểm đủ theo B5;
+- N/A có căn cứ được chấp nhận;
+- continuity evidence cần thiết còn hiệu lực.
+
+
+========================================================================================================================
+QA-4. KIẾN TRÚC QA 5 TẦNG
+========================================================================================================================
+
+LEVEL 1 — INPUT / AUTHORITY / RESOURCE LOCK
+Chạy khi bắt đầu target hoặc khi source/B3/mapping/reference/rule revision thay đổi.
+
+LEVEL 2 — PROMPT-BY-PROMPT QA
+Kiểm H bắt buộc + CONDITIONAL thực sự áp dụng cho từng OUTPUT_SLOT.
+
+LEVEL 3 — CONTINUITY / SEQUENCE QA
+Kiểm dependency giữa các OUTPUT_SLOT_LINE/dòng-câu liền kề và continuity.
+
+LEVEL 4 — BATCH / MILESTONE QA
+Kiểm coverage/drift/systemic pattern.
+
+LEVEL 5 — FINAL PROJECT QA
+Xác nhận toàn bộ evidence còn hiệu lực và đủ điều kiện export.
+
+Không chạy lại toàn bộ 5 tầng cho mỗi prompt.
+Không recheck một dependency nếu input/revision liên quan chưa thay đổi.
+
+========================================================================================================================
+QA-5. LEVEL 1 — INPUT / AUTHORITY / RESOURCE LOCK
+========================================================================================================================
+
+Phải xác nhận những mục ÁP DỤNG:
+
+1. Văn bản nguồn theo dòng/câu đúng version.
+2. Tổng số dòng/câu nguồn xác định được.
+3. TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT.
+4. ACTIVE MODE = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+5. B5.txt đúng version.
+6. B3 đúng version.
+7. CHAR mapping đúng version.
+8. CHAR state mapping đúng version.
+9. BG mapping đúng version.
+10. BG state đúng version.
+11. SIZE_LOCK hiện hành.
+12. Weapon/tool/gear resource nếu áp dụng.
+13. Reference assignment/mapping hiện hành.
+14. Reference budget/CHAR_GROUP đúng B5 hiện hành.
+15. Style lock hiện hành.
+16. 16:9 landscape lock hiện hành.
+17. Panel/manga lock hiện hành.
+18. Không dùng resource của tác phẩm/project khác.
+19. Không dùng file cũ đã bị thay thế.
+20. Không có GAP CỐT LÕI chưa xử lý.
+
+Nếu authority cốt lõi chưa rõ:
+QA_STATUS = STOP.
+
+Không được chữa GAP bằng cách tự bịa.
+
+========================================================================================================================
+QA-6. LEVEL 2 — PROMPT-BY-PROMPT QA CATALOG
+========================================================================================================================
+
+QA-00 — ACTIVE MODE / LINE SEMANTIC WINDOW CHECK
+
+REQUIRED:
+- ACTIVE MODE = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+- OUTPUT_SLOT_LINE chỉ dùng để tính quota/số prompt.
+- SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT hiện tại là authority nội dung trực tiếp.
+- Mặc định SEMANTIC_ANALYSIS_WINDOW là nội dung của dòng/câu hiện tại.
+- Nếu dòng/câu hiện tại tự nó đã đủ nghĩa tạo hình thì không vay mượn nội dung dòng/câu khác.
+- Nếu dòng/câu hiện tại không đủ nghĩa, bị cụt, mơ hồ hoặc phụ thuộc ngữ cảnh thì được phép mở rộng bằng dòng/câu liền kề trước, sau, hoặc cả trước và sau, kể cả 2–3 dòng/câu liền kề, chỉ để làm rõ nghĩa tạo hình.
+- Dừng mở rộng ngay khi đã đủ nghĩa; việc vay mượn chỉ phục vụ phân tích nội dung và không làm thay đổi prompt count.
+- Action/reveal ở ngoài SEMANTIC_ANALYSIS_WINDOW hoặc ở xa nhiều câu không được kéo về sớm.
+
+FAIL_H:
+- WRONG_ACTIVE_MODE;
+- WRONG_SEMANTIC_ANALYSIS_WINDOW;
+- SOURCE_UNIT_AUTHORITY_ERROR.
+
+
+QA-01 — NUMBERING / HEADER / OUTPUT FORMAT
+
+Kiểm:
+- prompt ID đúng;
+- order đúng;
+- REFERENCE_LIST đúng syntax;
+- IMAGE_PROMPT field có body;
+- CHAR token trước BG token;
+- không internal note/meta note lọt vào output.
+
+FAIL_H:
+- NUMBERING_ERROR;
+- FORMAT_ERROR;
+- MISSING_PROMPT_TEXT;
+- WRONG_EXPORT_ORDER.
+
+
+QA-02 — CURRENT OUTPUT_SLOT / SEMANTIC WINDOW ALIGNMENT
+
+Kiểm:
+- đúng OUTPUT_SLOT_ID;
+- đúng SEMANTIC_ANALYSIS_WINDOW đã khóa cho OUTPUT_SLOT đó;
+- current moment thuộc nội dung của SEMANTIC_ANALYSIS_WINDOW hợp lệ;
+- không minh họa chủ yếu nội dung nằm ngoài SEMANTIC_ANALYSIS_WINDOW;
+- không bỏ ý thị giác bắt buộc;
+- không literal hóa metaphor/so sánh sai;
+- không thêm event làm đổi nghĩa.
+
+Dòng/câu liền kề nằm trong SEMANTIC_ANALYSIS_WINDOW hợp lệ KHÔNG bị xem là borrowed-action error.
+
+FAIL_H:
+- WRONG_OUTPUT_SLOT_ID;
+- WRONG_SEMANTIC_ANALYSIS_WINDOW;
+- WRONG_CURRENT_MOMENT;
+- BORROWED_ACTION_OUTSIDE_SEMANTIC_WINDOW.
+
+
+QA-03 — OUTPUT_SLOT COVERAGE / PROMPT COUNT
+
+Khóa:
+TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT.
+
+Mỗi OUTPUT_SLOT_LINE tương ứng đúng MỘT IMAGE_PROMPT.
+Mỗi dòng/câu nguồn tương ứng đúng MỘT OUTPUT_SLOT_LINE và đúng MỘT IMAGE_PROMPT.
+
+Cấm:
+- bỏ OUTPUT_SLOT;
+- gộp hai OUTPUT_SLOT thành một prompt;
+- tách một OUTPUT_SLOT thành nhiều prompt độc lập;
+- đảo thứ tự OUTPUT_SLOT;
+- extra prompt không có OUTPUT_SLOT nguồn.
+
+Việc mở rộng SEMANTIC_ANALYSIS_WINDOW bằng dòng/câu liền kề chỉ dùng để lấy đủ nghĩa và KHÔNG làm thay đổi prompt count.
+
+MULTI-PANEL:
+- vẫn là MỘT IMAGE_PROMPT của OUTPUT_SLOT đó;
+- không làm tăng prompt count.
+
+FAIL_H:
+- OUTPUT_SLOT_COUNT_MISMATCH;
+- SKIPPED_OUTPUT_SLOT;
+- MERGED_OUTPUT_SLOTS;
+- SPLIT_OUTPUT_SLOT_INTO_MULTIPLE_PROMPTS;
+- REORDERED_OUTPUT_SLOT;
+- EXTRA_PROMPT.
+
+
+QA-04 — CURRENT VISUAL MOMENT / PRIMARY VISUAL BEAT
+
+Kiểm:
+- PRIMARY_VISUAL_BEAT thuộc SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT;
+- static moment đọc được;
+- action phase đúng;
+- subject priority đúng;
+- không overstuff mọi danh từ/action beat.
+
+FAIL_H khi sai moment hoặc beat cốt lõi không đọc được.
+Q khi beat đúng nhưng có thể dựng rõ hơn.
+
+
+QA-05 — FUTURE LEAK / CANON INVENTION
+
+Kiểm:
+- không kéo reveal/result/state nằm ngoài SEMANTIC_ANALYSIS_WINDOW hợp lệ hoặc ở xa nhiều câu về sớm;
+- không cho CHAR biết điều chưa tới;
+- không thêm plot clue/lore/important prop/magic/landmark không basis;
+- neutral completion chỉ hoàn thiện vật lý.
+
+FAIL_H:
+- FUTURE_REVEAL_LEAK;
+- BORROWED_ACTION_OUTSIDE_SEMANTIC_WINDOW;
+- CANON_INVENTION;
+- INVENTED_IMPORTANT_PROP.
+
+
+QA-06 — LANGUAGE / JAPANESE SCRIPT
+
+IMAGE_PROMPT phải là English technical visual instruction theo B5.
+
+Cấm khi không có override:
+- Kanji;
+- Hiragana;
+- Katakana;
+- source-language wording không cần thiết.
+
+Name/title Latin transcription trong CHAR declaration nếu project dùng vẫn được phép.
+
+FAIL_H:
+- WRONG_LANGUAGE_IN_IMAGE_PROMPT;
+- JAPANESE_SCRIPT_IN_IMAGE_PROMPT.
+
+
+QA-07 — NO-VERBATIM-SOURCE
+
+Cấm:
+- copy nguyên văn source line;
+- copy dialogue;
+- copy narration;
+- dùng source sentence thay visual instruction.
+
+Được phép:
+- paraphrase ý thành visual action/staging;
+- token/ID/name/title cần thiết.
+
+FAIL_H:
+- VERBATIM_SOURCE_IN_IMAGE_PROMPT;
+- VERBATIM_DIALOGUE_IN_IMAGE_PROMPT;
+- VERBATIM_NARRATION_IN_IMAGE_PROMPT.
+
+
+QA-08 — REFERENCE LIST / CHAR_GROUP / TOOL LIMIT
+
+Kiểm:
+- token tồn tại;
+- token đúng role;
+- token cần thiết không bị bỏ;
+- không token thừa vô căn cứ;
+- CHAR đơn và CHAR_GROUP đều được xử lý như CHAR theo B5;
+- chỉ tạo CHAR/CHAR_GROUP cho nhân vật xuất hiện trong trên 2 IMAGE_PROMPT;
+- nếu tổng reference CHAR + BG cần cho prompt đạt 10 ảnh trở lên trước tối ưu, được dùng CHAR_GROUP để gom các nhân vật phụ phù hợp;
+- không ghép nhân vật đang diễn chính trong prompt/cảnh hiện tại vào CHAR_GROUP;
+- sau tối ưu bằng CHAR_GROUP, tổng reference thực tế gắn vào prompt phải tuân theo giới hạn B5 hiện hành: CHAR + BG <= 9.
+
+Không được bỏ core reference chỉ để né limit.
+
+FAIL_H:
+- INVALID_REFERENCE_TOKEN;
+- MISSING_REQUIRED_REFERENCE;
+- WRONG_CHAR_GROUP_USE;
+- MAIN_ACTOR_GROUPED_IN_CHAR_GROUP;
+- REFERENCE_LIMIT_CONFLICT.
+
+
+QA-09 — REFERENCE ROLE / B3 ↔ REFERENCE AUTHORITY
+
+Kiểm:
+- B3 dùng cho ID/state/timeline/SIZE_LOCK/location/BG state;
+- exact reference dùng cho visual appearance của exact state;
+- physical actor vs visual-source role đúng;
+- real CHAR không bị duplicate vì derivative;
+- unresolved B3-reference conflict = không được PASS.
+
+FAIL_H:
+- REFERENCE_B3_CONFLICT;
+- PHYSICAL_ACTOR_VISUAL_SOURCE_CONFUSION;
+- DUPLICATED_REFERENCE_CHARACTER;
+- WRONG_REFERENCE_ROLE.
+
+
+QA-10 — MINIMAL CHAR DEFINITION
+
+Có exact CHAR reference:
+chỉ cần tối thiểu:
+CHAR/CHAR_GROUP theo khai báo reference hiện hành + type/sex/entity type + SIZE_LOCK.
+
+KHÔNG FAIL vì không lặp:
+- face;
+- hair;
+- eyes;
+- full outfit;
+- full model sheet.
+
+Chỉ restate trait khi:
+- current state khác;
+- derivative cần;
+- action cần;
+- locked trait dễ sai;
+- user lock yêu cầu.
+
+Full model-sheet repetition không tự là H trừ khi gây conflict/semantic overload.
+
+FAIL_H:
+- CHAR_CORE_DEFINITION_MISSING khi generator không thể xác định subject core;
+- WRONG_CHAR_ID;
+- CHAR_REFERENCE_REDESIGN.
+
+
+QA-11 — IDENTITY / ENTITY CHECK
+
+Kiểm:
+- đúng CHAR token;
+- đúng entity type;
+- exact identity không redesign;
+- nonhuman morphology không bị humanize sai;
+- object/resource không bị biến thành living actor nếu không đúng.
+
+FAIL_H:
+- WRONG_CHAR_ID;
+- IDENTITY_MISMATCH;
+- ENTITY_TYPE_ERROR.
+
+
+QA-12 — STATE / TIMELINE CHECK
+
+Kiểm:
+- exact current state đúng;
+- outfit/injury/wet/dirt/burnt/transformed state đúng;
+- không reset reference default;
+- không state tương lai.
+
+FAIL_H:
+- WRONG_STATE;
+- WRONG_TIMING_STATE;
+- PREVIOUS_STATE_RESET.
+
+
+QA-13 — SCALE CHECK
+
+Kiểm:
+- đúng SIZE_LOCK;
+- relative scale giữa CHAR/objects/BG hợp lý;
+- camera không làm thay đổi physical scale;
+- reference measurement không bị render thành text.
+
+FAIL_H:
+- WRONG_SCALE;
+- SCALE_CONTINUITY_BREAK;
+- INVENTED_MEASUREMENT.
+
+
+QA-14 — OBJECT / WEAPON / TOOL / GEAR CURRENT STATE
+
+Chỉ mở khi áp dụng.
+
+Kiểm:
+- type;
+- owner;
+- held/worn/carried/sheathed/drawn/placed/dropped/broken/open/closed/active/inactive;
+- tay cầm nếu current beat cần;
+- orientation/placement nếu action cần.
+
+FAIL_H nếu state sai làm sai current beat.
+
+
+QA-15 — OBJECT CONTINUITY / PROP TIMELINE
+
+Kiểm:
+- vật chưa nhận không xuất hiện;
+- vật đã rơi không tự về tay;
+- vật đã vỡ không tự nguyên;
+- consumed item không quay lại;
+- door/open-close state không reset;
+- holder/orientation liên tục khi cần.
+
+FAIL_H:
+- OBJECT_CONTINUITY_BREAK;
+- PROP_TIMELINE_BREAK.
+
+
+QA-16 — DERIVATIVE ENTITY
+
+Khi có:
+- clone;
+- statue;
+- projection;
+- reflection;
+- illusion;
+- construct;
+- replica.
+
+Kiểm:
+- source CHAR reference đúng;
+- real CHAR có/không present rõ;
+- material/type/state/scale rõ khi cần;
+- không tạo thêm real CHAR ngoài source.
+
+FAIL_H:
+- DERIVATIVE_SOURCE_ERROR;
+- DUPLICATED_REFERENCE_CHARACTER;
+- PHYSICAL_ACTOR_VISUAL_SOURCE_CONFUSION.
+
+
+QA-17 — B3 BG ID / STATE
+
+Kiểm:
+- exact BG lấy từ B3;
+- đúng location/state/layout;
+- đúng RESOURCE_ROLE / BACKGROUND_VISUAL_MODE / BG_FUNCTION / REALITY_LAYER khi B3 khóa các field đó;
+- không invent BG_ID;
+- emotional / abstract / thought / memory / flashback / dream / hypothetical / dynamic BG chỉ được dùng khi B3 có exact numbered BG_XX tương ứng;
+- không dùng BG_00 làm emotional/abstract fallback;
+- prompt thuộc hồi tưởng / memory / thought / inner image / dream / vision / fear / hypothetical / hope / plan / reported event phải bám đúng routing B3;
+- không ép DYNAMIC_BG nếu B3 đã route nội dung đó sang PHYSICAL_BG hoặc PHYSICAL_BG_PLUS_DYNAMIC.
+
+FAIL_H:
+- INVENTED_BG_ID;
+- INVENTED_EMOTION_BG;
+- DEPRECATED_BG_00;
+- WRONG_BG_VISUAL_MODE;
+- WRONG_BG_STATE;
+- WRONG_LOCATION.
+
+
+QA-18 — BG INTEGRATION / NO FIXED STAGE
+
+Với physical BG:
+- BG = environment design lock, không phải fixed camera image;
+- giữ topology/layout/landmark/material/scale/state;
+- camera/framing có thể tái dựng theo current SEMANTIC_ANALYSIS_WINDOW;
+- CHAR/object phải thật sự thuộc cùng không gian;
+- perspective/depth/occlusion/lighting interaction đúng.
+
+Conditional physical contact:
+- floor contact/contact shadow chỉ bắt buộc khi subject chạm bề mặt và phần đó nằm trong frame;
+- close-up không bị ép lộ chân/sàn;
+- flying/floating subject không bị ép ground contact.
+
+FAIL_H:
+- FIXED_STAGE_BG_COPY;
+- BG_LAYOUT_BREAK;
+- CHARACTER_PASTED_ON_BG;
+- IMPOSSIBLE_PHYSICAL_INTEGRATION.
+
+
+QA-19 — SPATIAL BLOCKING / POSITION
+
+Kiểm khi cần:
+- frame position;
+- environment position;
+- actor-target relation;
+- distance;
+- facing/gaze relation;
+- overlap/occlusion;
+- subject priority.
+
+Không FAIL chỉ vì không ghi mọi tọa độ nếu current beat vẫn rõ.
+
+FAIL_H:
+- AMBIGUOUS_SPATIAL_STAGING khi thiếu làm generator buộc phải đoán core relation.
+
+
+QA-20 — ACTION MECHANICS
+
+Khi có action:
+- actor;
+- target;
+- action phase;
+- direction;
+- contact/impact nếu cốt lõi;
+- force/environment reaction khi cần.
+
+Không bắt exact force vector nếu upstream/source không cần.
+
+FAIL_H khi action đọc sai actor/target/phase hoặc vật lý mâu thuẫn current moment.
+
+
+QA-21 — POSE / EXPRESSION / GAZE / BODY LANGUAGE
+
+Mọi living CHAR có mặt phải có đủ dấu hiệu để đọc current beat ở mức cần thiết.
+
+Có thể là:
+- action;
+- controlled stillness;
+- pose;
+- expression;
+- gaze/focus;
+- body language.
+
+Không bắt máy móc mọi CHAR phải có đủ mọi field nếu role phụ vẫn đọc được.
+
+H khi key actor/reaction không đọc được.
+Q khi đúng nhưng acting có thể mạnh hơn.
+
+
+QA-22 — VISUALIZATION-FIRST / THOUGHT-TO-VISIBLE
+
+Nếu source là:
+- thought;
+- narration;
+- judgment;
+- emotion;
+- metaphorical meaning;
+
+phải chuyển thành visible evidence khi cần:
+- face;
+- eyes;
+- brows;
+- mouth;
+- hands;
+- body tension;
+- spacing;
+- blocking;
+- camera.
+
+Cấm semantic explanation dài không thể nhìn thấy.
+
+FAIL_H:
+- SEMANTIC_EXPLANATION_NOT_VISUALIZED;
+- ACTIONABLE_VISUAL_DETAIL_INSUFFICIENT.
+
+
+QA-23 — HANDS / CONTACT
+
+CONDITIONAL.
+
+Chỉ kiểm mạnh khi:
+- tay cầm object;
+- hand contact là key beat;
+- action phụ thuộc hand placement.
+
+Close-up khác hoặc scene không cần hands:
+N/A.
+
+H khi contact sai làm action sai.
+Q khi anatomy/clarity có thể tối ưu nhưng action vẫn đúng.
+
+
+QA-24 — CAMERA / COMPOSITION / 16:9
+
+Khóa:
+- final canvas = 16:9 landscape;
+- camera phục vụ PRIMARY_VISUAL_BEAT;
+- không copy fixed reference camera;
+- framing phải khả thi với thông tin yêu cầu;
+- scale cue đúng;
+- subject priority rõ.
+
+Không:
+- close-up + yêu cầu full-body/full-BG bất khả thi;
+- wide shot làm mất key reaction nếu reaction là beat chính;
+- composition giống reference sheet/stage.
+
+FAIL_H:
+- CAMERA_DOES_NOT_SUPPORT_KEY_BEAT;
+- IMPOSSIBLE_FRAMING;
+- WRONG_CANVAS_ASPECT_LOCK.
+
+
+QA-25 — REFERENCE POSE / CAMERA / STAGING COPY PREVENTION
+
+Reference khóa identity/design/state/scale, không mặc định khóa scene staging.
+
+FAIL_H nếu:
+- pose/action/expression/gaze/camera/staging bị copy từ sheet và làm sai current SEMANTIC_ANALYSIS_WINDOW.
+
+Code:
+- REFERENCE_POSE_CAMERA_COPY_ERROR.
+
+
+QA-26 — REALITY LAYER
+
+Kiểm:
+- present;
+- flashback;
+- memory;
+- dream;
+- vision;
+- illusion;
+- projection;
+- reflection.
+
+Một panel CÓ THỂ chứa nhiều visual/reality layer nếu source xác nhận chúng đồng thời nhìn thấy trong cùng current moment.
+
+Phải:
+- phân biệt physical actor với representation;
+- đúng age/state/timeline;
+- không biến vision/illusion thành physical reality.
+
+FAIL_H:
+- WRONG_REALITY_LAYER;
+- REALITY_LAYER_CONFUSION.
+
+
+QA-27 — INJURY / DEATH / UNCONSCIOUSNESS / TRANSFORMATION
+
+CONDITIONAL.
+
+Kiểm:
+- persistent injury/damage;
+- consciousness state;
+- transformation stage:
+  PRE / MID / POST;
+- không trộn forms không thể đồng hiện trong cùng panel.
+
+FAIL_H:
+- WRONG_TRANSFORMATION_STAGE;
+- INJURY_STATE_RESET;
+- CONSCIOUSNESS_STATE_ERROR.
+
+
+QA-28 — WORLD EFFECT vs MANGA EFFECT
+
+A. WORLD/PHYSICAL/MAGICAL EFFECT
+Chỉ được có khi source/canon/action basis hỗ trợ.
+
+B. MANGA SYMBOLIC/MOTION EFFECT
+Được dùng khi cảm xúc/chuyển động tương ứng đã được source xác nhận,
+không cần source viết nguyên văn “có anger mark/speed lines”.
+
+Kiểm:
+- anger/stress/red-black facial emphasis đúng emotion;
+- speed/slash/impact lines đúng motion/force;
+- effect direction đúng;
+- không biến symbolic effect thành magic;
+- không effect-over-reality;
+- không dùng effect che staging;
+- không thay canonical BG bằng abstract field nếu B3 không có;
+- không sinh SFX lettering.
+
+FAIL_H:
+- UNSUPPORTED_MAGIC_EFFECT;
+- MANGA_EFFECT_MEANING_MISMATCH;
+- EFFECT_DIRECTION_ERROR;
+- MANGA_EFFECT_REPLACES_REQUIRED_BG;
+- SYMBOLIC_EFFECT_LITERALIZED_AS_MAGIC.
+
+Q:
+- effect hierarchy/cường độ có thể tối ưu hơn.
+
+
+QA-29 — ERA / CULTURE / MATERIAL
+
+Kiểm khi relevant:
+- era;
+- technology;
+- culture;
+- material;
+- costume logic;
+- architecture logic.
+
+FAIL_H:
+- ANACHRONISTIC_OBJECT;
+- ERA_CULTURE_CONFLICT.
+
+
+QA-30 — STYLE LOCK
+
+Kiểm:
+- đúng style project;
+- 2D manga/anime visual language nếu đó là active lock;
+- không photoreal/3D/CGI drift trái lock;
+- manga effects không lấn source.
+
+H khi style sai mode/project rõ rệt.
+Q khi rendering wording có thể tối ưu.
+
+
+QA-31 — PANEL LOGIC
+
+Áp dụng đúng B5 hiện hành:
+
+- phân tích SEMANTIC_ANALYSIS_WINDOW đã khóa cho current OUTPUT_SLOT để xác định số ý cần minh họa;
+- 1 ý cần minh họa = 1 panel;
+- 2 ý cần minh họa = 2 panel;
+- 3 ý cần minh họa = 3 panel;
+- N ý cần minh họa = N panel;
+- không gộp nhiều ý cần minh họa vào một panel;
+- không tách một ý cần minh họa thành nhiều panel;
+- không bỏ ý;
+- không lặp ý;
+- không đảo thứ tự ý;
+- thứ tự panel đúng thứ tự các ý trong SEMANTIC_ANALYSIS_WINDOW;
+- toàn output vẫn là 16:9 landscape;
+- cross-panel isolation;
+- multi-panel vẫn thuộc MỘT IMAGE_PROMPT của OUTPUT_SLOT hiện tại.
+
+FAIL_H:
+- WRONG_PANEL_COUNT;
+- MERGED_MULTIPLE_IDEAS_INTO_ONE_PANEL;
+- SPLIT_ONE_IDEA_INTO_MULTIPLE_PANELS;
+- MISSING_REQUIRED_IDEA_PANEL;
+- DUPLICATED_IDEA_PANEL;
+- REORDERED_IDEA_SEQUENCE;
+- CROSS_PANEL_LEAKAGE.
+
+
+QA-32 — TEXT / BUBBLE / REFERENCE METADATA
+
+Cấm:
+- speech bubble;
+- empty speech bubble;
+- thought bubble;
+- dialogue balloon;
+- caption box;
+- narration box;
+- subtitle;
+- SFX text;
+- readable sound-effect lettering;
+- decorative text;
+- watermark/logo/UI;
+- reference-sheet CHAR/BG ID;
+- measurement/height label;
+- ruler/scale bar/annotation.
+
+FAIL_H:
+- FORBIDDEN_COMIC_TEXT;
+- REFERENCE_METADATA_RENDER_RISK.
+
+
+QA-33 — MINOR / CHILD SAFETY KHI ÁP DỤNG
+
+Với minor:
+- strictly non-sexualized;
+- child-safe;
+- non-suggestive;
+- age-appropriate visual treatment.
+
+H nếu visual wording/pose/camera vi phạm active safety lock.
+
+
+QA-34 — CROWD / EXTRA / DUPLICATION
+
+CONDITIONAL.
+
+Kiểm:
+- crowd có source/context basis;
+- extras đúng era/culture;
+- fixed CHAR không bị generic hóa;
+- không duplicate CHAR;
+- không thêm crowd chỉ để “đẹp”.
+
+FAIL_H khi extra/duplication làm sai source/current beat.
+
+
+QA-35 — SELF-CONTAINED / CLARITY
+
+Generator chỉ thấy:
+- current prompt;
+- references được gắn.
+
+Prompt phải đủ để dựng nội dung đã chọn cho current OUTPUT_SLOT mà không cần memory.
+
+Kiểm:
+- ai có mặt;
+- current role/state;
+- action/reaction;
+- core staging;
+- object/BG cần thiết;
+- continuity lock cần thiết.
+
+Không bắt lặp model sheet nếu exact reference đã xử lý appearance.
+
+FAIL_H:
+- PROMPT_NOT_SELF_CONTAINED;
+- CORE_INFORMATION_REQUIRES_GUESSING.
+
+
+QA-36 — PROMPT PASS GATE
+
+PASS_H khi các mục REQUIRED/CONDITIONAL áp dụng đều đạt:
+
+[ ] ACTIVE MODE = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+[ ] Format/numbering đúng.
+[ ] OUTPUT_SLOT và SEMANTIC_ANALYSIS_WINDOW đúng.
+[ ] SEMANTIC_ANALYSIS_WINDOW đúng dòng/câu hiện tại; chỉ mở rộng dòng/câu liền kề khi cần làm rõ nghĩa theo B5.
+[ ] Dòng/câu liền kề trong SEMANTIC_ANALYSIS_WINDOW được dùng đúng; không kéo action/reveal ở ngoài window về sớm.
+[ ] TOTAL_IMAGE_PROMPT/coverage đúng công thức B5.
+[ ] Không future leak/canon invention.
+[ ] Reference list và CHAR_GROUP đúng B5; sau tối ưu CHAR + BG <= 9.
+[ ] B3/reference role/state/scale đúng.
+[ ] CHAR/CHAR_GROUP declaration đủ theo B5.
+[ ] BG/location/state đúng B3.
+[ ] BG không bị dùng như fixed stage.
+[ ] Object/gear state đúng khi áp dụng.
+[ ] Action/pose/expression/spatial staging đủ để beat đọc được.
+[ ] Camera/composition support beat và giữ 16:9.
+[ ] Panel logic đúng: 1 ý = 1 panel; N ý = N panel.
+[ ] World effect vs manga effect đúng vai trò.
+[ ] Không Japanese/verbatim source.
+[ ] Không copy reference pose/staging/metadata.
+[ ] Không speech/thought bubble/SFX lettering.
+[ ] Prompt self-contained.
+[ ] Không có FAIL_H.
+
+========================================================================================================================
+QA-7. LEVEL 3 — CONTINUITY / SEQUENCE QA
+========================================================================================================================
+
+LEVEL 3 không chấm riêng từng câu chữ prompt.
+LEVEL 3 chấm quan hệ giữa các OUTPUT_SLOT_LINE/dòng-câu có dependency.
+
+Kiểm khi áp dụng:
+
+1. Location/BG continuity.
+2. Time/weather/light continuity.
+3. CHAR presence/absence.
+4. First reveal.
+5. Exit/re-entry.
+6. Outfit/reference state.
+7. Injury/damage.
+8. Wet/dry/dirt/blood/frost/burn/etc.
+9. Object ownership.
+10. Weapon/gear state.
+11. Open/closed/intact/broken/used/dropped/consumed.
+12. SIZE_LOCK/relative scale.
+13. Transformation progression.
+14. Reality-layer transition.
+15. Hair direction/asymmetry nếu B3/reference khóa.
+16. Spatial relation/camera axis nếu continuity thật sự phụ thuộc.
+17. Crowd/extras continuity nếu source khóa.
+18. Manga effect không bị biến thành persistent world effect.
+19. State từ OUTPUT_SLOT_LINE/dòng-câu trước được kế thừa đúng.
+20. Current OUTPUT_SLOT không lấy event/reveal nằm ngoài SEMANTIC_ANALYSIS_WINDOW hợp lệ hoặc ở xa nhiều câu.
+21. Không reset về reference-sheet default.
+22. Không làm mất state đã kế thừa.
+23. Multi-panel current OUTPUT_SLOT không làm leak state sang OUTPUT_SLOT sau.
+
+Không có bước “tự chia scene” trong Level 3.
+Nếu source thật sự đổi location/time/state/reality layer:
+QA chỉ xác nhận transition đúng theo source/context,
+KHÔNG sáng tạo scene boundary mới.
+
+HARD FAIL:
+- CONTINUITY_BREAK;
+- WRONG_BG_CONTINUITY;
+- OUTFIT_CONTINUITY_BREAK;
+- HAIR_DIRECTION_BREAK;
+- OBJECT_CONTINUITY_BREAK;
+- FIRST_REVEAL_BREAK;
+- DISAPPEARANCE_REAPPEARANCE_BREAK;
+- SCALE_CONTINUITY_BREAK;
+- STATE_RESET;
+- FUTURE_LEAK.
+
+========================================================================================================================
+QA-8. LEVEL 4 — BATCH QA
+========================================================================================================================
+
+Sau mỗi PROJECT_QA_BATCH hoặc milestone do project khóa:
+- kiểm H coverage/continuity;
+- kiểm systematic pattern;
+- không tái mở lựa chọn thẩm mỹ đã PASS nếu input/revision không đổi.
+
+KHÔNG kế thừa con số milestone 75 từ ZIP.
+Mốc QA của B5 lấy từ project hiện hành.
+
+BATCH CHECK:
+
+1. ACTIVE MODE = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+2. Numbering liên tục đúng.
+3. Không duplicate prompt ID.
+4. Không missing OUTPUT_SLOT.
+5. Không extra prompt.
+6. Prompt count đúng số OUTPUT_SLOT trong batch.
+7. Không cross-project resource contamination.
+8. CHAR/BG mapping nhất quán.
+9. State/version nhất quán.
+10. Scale nhất quán.
+11. Style nhất quán.
+12. Canvas 16:9 nhất quán.
+13. No-Japanese toàn batch.
+14. No-verbatim-source toàn batch.
+15. Reference budget/CHAR_GROUP đúng B5; sau tối ưu mỗi prompt CHAR + BG <= 9.
+16. Không pattern copy pose/camera từ reference.
+17. Không pattern BG-as-fixed-stage.
+18. Không semantic-overload hàng loạt.
+19. Không future leak hàng loạt.
+20. Object/weapon/gear không reset vô lý.
+21. Không character-pasted-on-BG pattern.
+22. Không speech/thought bubble/SFX instruction.
+23. Không manga-effect overuse hoặc symbolic-effect→magic drift.
+24. Không sai quy tắc 1 ý = 1 panel.
+25. Không gộp/tách/bỏ/lặp/đảo ý khi chia panel.
+26. Output syntax nhất quán.
+27. Không CHAR declaration phình lại thành full model sheet hàng loạt.
+28. Không B3/reference authority drift.
+
+Nếu phát hiện lỗi hệ thống:
+SYSTEMIC_RECHECK_REQUIRED.
+
+Không chỉ sửa prompt hiện tại;
+phải truy đúng phạm vi trước/sau có cùng pattern.
+
+========================================================================================================================
+QA-10. MILESTONE QA
+========================================================================================================================
+
+MILESTONE COUNT:
+dùng giá trị project hiện hành.
+Không hard-code 75 từ ZIP.
+
+Tại milestone:
+- chạy lại Batch QA;
+- continuity span qua ranh giới batch;
+- resource drift;
+- style drift;
+- state drift;
+- scale drift;
+- OUTPUT_SLOT numbering/count;
+- Japanese/verbatim source;
+- reference budget/CHAR_GROUP drift;
+- BG fixed-stage pattern;
+- reference pose-copy pattern;
+- manga-effect drift;
+- panel drift;
+- repeated systemic error.
+
+Nếu pattern hệ thống:
+SYSTEMIC_RECHECK_REQUIRED.
+
+========================================================================================================================
+QA-11. LEVEL 5 — FINAL PROJECT QA
+========================================================================================================================
+
+Trước FULL FINAL:
+
+[ ] Authority đúng version.
+[ ] ACTIVE MODE = 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+[ ] B5.txt đúng version.
+[ ] B3/reference mapping đúng version.
+[ ] Tất cả prompt đã PASS Level 2.
+[ ] Tất cả dependency span cần thiết đã PASS Level 3.
+[ ] Tất cả batch/milestone đã PASS.
+[ ] Không unresolved core GAP.
+[ ] TOTAL PROMPTS = TOTAL_SOURCE_LINE_COUNT.
+[ ] 0 skipped OUTPUT_SLOT.
+[ ] 0 merged OUTPUT_SLOT.
+[ ] 0 split OUTPUT_SLOT into independent prompts.
+[ ] 0 reordered OUTPUT_SLOT.
+[ ] 0 duplicate prompt ID.
+[ ] 0 extra prompt.
+[ ] CHAR/BG/state/scale/reference role nhất quán.
+[ ] Object/gear continuity nhất quán.
+[ ] BG/environment logic nhất quán.
+[ ] CHAR_GROUP/reference budget đúng B5 và sau tối ưu không vượt giới hạn hiện hành.
+[ ] Không copy reference pose/staging sai vai trò.
+[ ] Không BG-as-fixed-stage.
+[ ] Không character-pasted-on-BG.
+[ ] Không Japanese script.
+[ ] Không verbatim source.
+[ ] Không reference metadata render instruction.
+[ ] Không speech/thought bubble/SFX lettering.
+[ ] Không future leak.
+[ ] Không style drift.
+[ ] Panel đúng 1 ý = 1 panel; N ý = N panel, không gộp/tách/bỏ/lặp/đảo ý.
+[ ] Không manga-effect misuse/systemic overuse.
+[ ] Không self-contained failure.
+[ ] Không systematic semantic-overload.
+[ ] H_OPEN_COUNT = 0.
+
+Chỉ khi tất cả điều kiện áp dụng đạt:
+FULL_FINAL_EXPORT = PASS.
+
+========================================================================================================================
+QA-12. FORM BÁO CÁO
+========================================================================================================================
+
+Prompt PASS:
+OUTPUT_SLOT_ID | PASS_H
+
+Không cần xuất checklist dài cho mọi prompt đã PASS.
+
+Khi FAIL_H / STOP:
+
+OUTPUT_SLOT_ID:
+RESULT: PASS_H / FAIL_H / STOP
+ISSUE_TYPE:
+APPLICABILITY: REQUIRED / CONDITIONAL
+EVIDENCE:
+ROOT_CAUSE_LAYER:
+REQUIRED_FIX:
+RECHECK_SCOPE:
+
+Batch report:
+
+BATCH_SCOPE:
+CHECKED_OUTPUT_SLOT_RANGE:
+H_OPEN_COUNT:
+SYSTEMIC_PATTERN:
+UNCHECKED_SCOPE:
+NEXT_ACTION:
+
+Không tạo lỗi để lấp checklist.
+
+========================================================================================================================
+QA-13. REPAIR QA
+========================================================================================================================
+
+Khi FAIL_H:
+
+1. Xác định root cause.
+2. Xác định layer gây lỗi:
+   - source/dòng-câu/OUTPUT_SLOT mapping;
+   - B3;
+   - reference assignment;
+   - state/scale;
+   - prompt wording/staging;
+   - continuity.
+3. Sửa đúng layer.
+4. Nếu lỗi B3/resource/mapping/state:
+   sửa upstream trước.
+5. Re-QA đúng lỗi + dependency có thể bị ảnh hưởng.
+6. Chỉ chạy lại Level 2 toàn prompt nếu prompt thay đổi rộng.
+7. Chỉ chạy lại Level 3 nếu continuity có thể bị ảnh hưởng.
+8. Chỉ chạy lại toàn batch/project khi có bằng chứng systemic pattern.
+
+CẤM khi repair:
+- thêm detail không canon chỉ để thỏa checklist;
+- bịa pose/expression/contact/measurement không cần;
+- sửa một lỗi làm future leak;
+- kéo data từ reference để thay source;
+- đổi mode để né coverage;
+- bỏ core reference để né limit;
+- thêm/bớt panel trái quy tắc 1 ý = 1 panel; N ý = N panel.
+
+========================================================================================================================
+QA-14. MACHINE / SEMI-AUTOMATED GATES
+========================================================================================================================
+
+Nên chạy trước semantic QA:
+
+A. COUNT / NUMBERING SCAN
+- tính TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT;
+- count OUTPUT_SLOT/prompt IDs;
+- detect duplicate;
+- missing;
+- extra;
+- out-of-order.
+
+B. REFERENCE TOKEN SCAN
+- syntax;
+- token existence;
+- CHAR before BG;
+- kiểm CHAR_GROUP theo B5 và total CHAR + BG <= 9 sau tối ưu.
+
+C. JAPANESE SCRIPT SCAN
+- Kanji/CJK;
+- Hiragana;
+- Katakana.
+
+D. VERBATIM SOURCE SCAN
+- exact phrase / long substring match;
+- FLAG để semantic QA xác nhận;
+- không tự PASS chỉ vì không exact match.
+
+E. OUTPUT SYNTAX SCAN
+- delimiter;
+- empty IMAGE_PROMPT;
+- accidental internal/meta note.
+
+F. RESOURCE VERSION SCAN nếu hệ thống có metadata
+- B3/resource/reference version mismatch;
+- cross-project token.
+
+Machine gate:
+- chỉ xử lý lỗi cơ học/flag;
+- KHÔNG thay semantic QA;
+- KHÔNG tự đánh giá acting/camera/current moment bằng string-match đơn giản.
+
+========================================================================================================================
+QA-15. FALSE PASS PREVENTION
+========================================================================================================================
+
+Các suy luận sau đều SAI:
+
+1. “Có CHAR + BG là đủ.”
+2. “Có exact reference nên khỏi cần current state/scale/action.”
+3. “Prompt dài nên chắc đủ.”
+4. “Prompt đẹp nên cho PASS.”
+5. “Manga effect mạnh nên che được staging.”
+6. “Source nói cảm xúc rồi nên khỏi visual hóa.”
+7. “BG reference có góc máy sẵn nên dùng nguyên như sân khấu.”
+8. “Weapon nằm trong reference nên khỏi nói current gear state.”
+9. “Cùng location nên có thể bỏ một vài OUTPUT_SLOT giống hình.”
+10. “Không có Japanese thì được copy nguyên source tiếng khác.”
+11. “Exact reference nghĩa là phải lặp toàn model sheet.”
+12. “Reference sheet có số đo nên được render số đo.”
+13. “Dòng/câu sau ở ngoài SEMANTIC_ANALYSIS_WINDOW giải thích rõ hơn nên kéo reveal về current prompt.”
+14. “Reference nhiều thì bỏ đại một reference thay vì xử lý CHAR_GROUP đúng B5.”
+15. “SINGLE_PANEL là mặc định bất kể số ý cần minh họa.”
+16. “Có hai ý nhưng vẫn có thể ép vào một panel.”
+17. “Close-up vẫn phải thấy chân/sàn/contact shadow.”
+18. “Flying subject phải có floor contact.”
+19. “Manga anger mark/speed lines là magic effect.”
+20. “Manga effect được phép thay canonical BG.”
+21. “Multi-panel được phép tạo nhiều IMAGE_PROMPT cho cùng OUTPUT_SLOT.”
+22. “QA thiếu một field = prompt FAIL dù field đó N/A.”
+
+========================================================================================================================
+QA-16. FULL FINAL EXPORT LOCK
+========================================================================================================================
+
+FULL FINAL chỉ được xuất khi:
+
+- current authority/input đã xác nhận;
+- coverage OUTPUT_SLOT hoàn chỉnh theo TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT;
+- không unresolved core GAP;
+- H_OPEN_COUNT = 0;
+- continuity/batch evidence còn hiệu lực;
+- Japanese/verbatim/reference-budget/future-leak/resource mismatch = 0;
+- không systematic BG fixed-stage;
+- không systematic reference pose-copy;
+- không systematic panel misuse;
+- không systematic manga-effect misuse;
+- không speech/thought bubble/SFX text;
+- không self-contained failure.
+
+Không yêu cầu:
+- mọi prompt chứa mọi field;
+- mọi prompt cùng camera/wording;
+- recheck toàn project chỉ vì một alternative aesthetic choice khác cũng hợp lệ.
+
+========================================================================================================================
+QA-17. CÂU KHÓA CUỐI
+========================================================================================================================
+
+B5 QA KHÔNG CHỈ KIỂM “CÓ ĐÚNG CHAR/BG KHÔNG”.
+
+QA phải chứng minh:
+
+1. Prompt đúng OUTPUT_SLOT hiện tại.
+2. 1 OUTPUT_SLOT_LINE = 1 IMAGE_PROMPT.
+3. TOTAL_IMAGE_PROMPT = TOTAL_SOURCE_LINE_COUNT.
+4. SEMANTIC_ANALYSIS_WINDOW mặc định là dòng/câu hiện tại; chỉ mở rộng khi dòng/câu hiện tại chưa đủ nghĩa tạo hình.
+5. Dòng/câu liền kề trong SEMANTIC_ANALYSIS_WINDOW được phép dùng để hoàn chỉnh ý; không kéo action/reveal ngoài window hoặc ở xa nhiều câu về sớm.
+6. Prompt đúng current visual moment/PRIMARY_VISUAL_BEAT của SEMANTIC_ANALYSIS_WINDOW.
+7. Prompt dùng đúng B3/resource/state/scale/reference role.
+8. CHAR/CHAR_GROUP đúng rule B5; nhân vật diễn chính không bị ghép vào CHAR_GROUP.
+9. Reference budget sau tối ưu đúng B5.
+10. Object/gear/reality layer đúng khi áp dụng.
+11. BG được dựng như không gian của cảnh, không như fixed-stage image.
+12. Close-up/flying case không bị ép floor-contact rule sai.
+13. Prompt visualizes thought/emotion/content theo B5.
+14. Camera/composition support current beat trong canvas 16:9.
+15. Panel đúng: 1 ý cần minh họa = 1 panel; N ý = N panel.
+16. World/magic effect và manga symbolic/motion effect không bị trộn vai.
+17. Manga effect có basis từ emotion/action thật và không thay BG.
+18. Không speech bubble/thought bubble/caption/SFX lettering.
+19. Không copy pose/camera/staging/metadata từ reference.
+20. Không Japanese/verbatim source.
+21. Prompt self-contained.
+22. Toàn sequence/batch/project giữ continuity.
+23. Chỉ FAIL_H khi có vi phạm thật sự ở rule B5 ÁP DỤNG.
+
+N/A = N/A.
+H SẠCH + COVERAGE ĐỦ = PASS.
+
+
+========================================================================================================================
+USER QA LOCK — MANDATORY BG_XX PRESENCE GATE — HIGHEST PRIORITY / ABSOLUTE
+========================================================================================================================
+
+Khóa QA này đồng bộ trực tiếp với USER LOCK trong B5:
+`EVERY_IMAGE_PROMPT_MUST_HAVE_BG_XX = TRUE`.
+
+A. APPLICABILITY
+- BG PRESENCE là REQUIRED cho MỌI IMAGE_PROMPT.
+- Không có trường hợp N/A cho việc header có BG hay không.
+- Mọi OUTPUT_SLOT phải resolve sang ít nhất một exact numbered `BG_XX` trước khi prompt được PASS.
+
+B. MACHINE GATE BẮT BUỘC — CHẠY TRƯỚC SEMANTIC PASS
+Quét TOÀN BỘ prompt trong scope QA:
+1. Parse từng header.
+2. Xác nhận có ít nhất một token khớp exact numbered `BG_XX`.
+3. Xác nhận CHAR token nếu có đứng trước BG token.
+4. Xác nhận BG token tồn tại trong authority hiện hành.
+5. Đếm:
+   `BG_MISSING_COUNT`
+   `BG_INVALID_TOKEN_COUNT`
+   `BG_MAPPING_GAP_COUNT`
+
+Nếu bất kỳ prompt nào không có `BG_XX`:
+- `RESULT = FAIL_H`
+- `ISSUE_TYPE = MISSING_REQUIRED_BG_REFERENCE`
+- nếu upstream chưa có BG phù hợp: thêm `BG_GAP`
+- prompt đó KHÔNG được PASS_H.
+
+C. LEVEL 1 — INPUT / AUTHORITY / RESOURCE LOCK
+Bắt buộc xác nhận:
+- mọi OUTPUT_SLOT có BG mapping;
+- mọi BG mapping resolve sang exact numbered `BG_XX`;
+- BG state/location/reality layer/background function đúng authority hiện hành.
+Nếu thiếu:
+`QA_STATUS = STOP` hoặc `FAIL_H` theo loại gap;
+không được tự invent BG để tiếp tục.
+
+D. LEVEL 2 — PROMPT-BY-PROMPT
+Khóa này bổ sung/ghi đè cách hiểu lỏng của QA-01 / QA-08 / QA-17 / QA-36:
+- Header thiếu `BG_XX` = `FAIL_H` ngay.
+- Body có environment nhưng header không có BG = `FAIL_H`.
+- “neutral field”, “no identifiable background”, “no new BG resource”, “plain/white/abstract field” không thay thế được exact BG token.
+- Exact BG phải đúng B3/current state; có BG sai vẫn FAIL_H.
+
+FAIL_H codes:
+- `MISSING_REQUIRED_BG_REFERENCE`
+- `BG_GAP`
+- `INVALID_BG_TOKEN`
+- `WRONG_BG_STATE`
+- `WRONG_LOCATION`
+- `WRONG_BG_VISUAL_MODE`
+- `BG_MAPPING_ERROR`
+
+E. LEVEL 3 — CONTINUITY / SEQUENCE
+Sau khi repair BG:
+- kiểm continuity location/BG/state/reality layer qua các OUTPUT_SLOT phụ thuộc;
+- không được sửa một prompt bằng BG mới làm đứt continuity trước/sau.
+
+F. LEVEL 4 — BATCH / MILESTONE
+BẮT BUỘC full-scan header của toàn batch/milestone.
+Điều kiện PASS bổ sung:
+`BG_MISSING_COUNT = 0`
+`BG_INVALID_TOKEN_COUNT = 0`
+`BG_MAPPING_GAP_COUNT = 0`
+
+Chỉ cần một trong ba > 0:
+`BATCH/MILESTONE = FAIL_H`
+`SYSTEMIC_RECHECK_REQUIRED = YES` nếu lỗi lặp theo pattern.
+
+G. LEVEL 5 — FINAL PROJECT QA
+Trước `FULL_FINAL_EXPORT = PASS`, bắt buộc chạy full project scan toàn bộ prompt.
+Điều kiện tuyệt đối:
+`FINAL_BG_MISSING_COUNT = 0`
+`FINAL_BG_INVALID_TOKEN_COUNT = 0`
+`FINAL_BG_MAPPING_GAP_COUNT = 0`
+
+Nếu bất kỳ giá trị nào > 0:
+`H_OPEN_COUNT > 0`
+`FULL_FINAL_EXPORT = NOT PASS`
+`FINAL_PROJECT_QA = FAIL_H`
+
+Không được dùng evidence PASS cũ để bỏ qua gate này.
+
+H. REPAIR ORDER
+Khi phát hiện prompt thiếu BG:
+1. Xác định exact OUTPUT_SLOT/source window.
+2. Kiểm B3/upstream mapping.
+3. Nếu upstream thiếu exact BG -> sửa upstream trước.
+4. Gắn exact BG vào header.
+5. Đồng bộ body/staging với BG.
+6. Re-QA Level 2 prompt bị sửa.
+7. Re-QA Level 3 dependency nếu BG/location/reality-layer continuity bị ảnh hưởng.
+8. Chạy lại full BG machine scan cho batch/project.
+9. Chỉ khi các BG count = 0 mới được xét PASS tiếp.
+
+I. FALSE PASS PREVENTION — BG
+Các kết luận sau đều CẤM:
+- “Prompt đúng nội dung nên thiếu BG vẫn PASS.”
+- “Close-up nên không cần BG.”
+- “Không thấy background nhiều nên BG là N/A.”
+- “Body đã mô tả nền nên header không cần BG token.”
+- “Chỉ vài prompt thiếu BG nên final vẫn PASS.”
+- “QA trước đã PASS nên không cần scan lại.”
+
+J. FINAL HARD CONDITION
+`EVERY_IMAGE_PROMPT_MUST_HAVE_BG_XX = TRUE`
+`BG_MISSING_COUNT = 0`
+
+Hai điều kiện trên là bắt buộc trước mọi kết luận PASS ở prompt/batch/milestone/final.
+
+Chỉ user instruction rõ ràng REDEFINE/REPLACE khóa này mới được thay đổi.
+========================================================================================================================
+
+========================================================================================================================
+END B6 — BƯỚC 6
+========================================================================================================================
+

@@ -1,0 +1,2554 @@
+truyện isekai nam
+# MASTER CHARACTER DESIGN GUIDE
+
+KHÓA ĐẦU RA B4 TRONG AI FILM STUDIO (VĂN BẢN → VĂN BẢN):
+- B4 dùng tài nguyên CHAR/BG và các khóa đã PASS/LOCK từ B3 để VIẾT PROMPT TXT cho CHAR/BG, không tự render/tạo ảnh.
+- Mỗi câu có từ “tạo ảnh”, “dùng prompt để sinh ảnh” trong tài liệu này chỉ mô tả mục đích sử dụng prompt ở công cụ tạo ảnh riêng về sau; nó KHÔNG mở thêm công đoạn thực thi ảnh trong AI FILM STUDIO.
+- Bộ ba ảnh reference CHAR ở phần dưới là BA PROMPT VĂN BẢN cho ba ảnh chức năng riêng (khi áp dụng), không phải yêu cầu xuất ảnh từ tool này.
+- Thư viện thiết kế (kiểu tóc, trang phục, phương án phối hình) là lựa chọn AI dựa trên identity/canon; không tạo biểu mẫu hỏi người dùng chỉ vì văn bản dùng từ “chọn”.
+
+USER UPDATE LOCK — CHAR_REFERENCE_3_SEPARATE_IMAGES_V1
+- Quy ước mới này thay thế mọi quy tắc cũ yêu cầu character turnaround 3 mặt front/side/back.
+- Bộ CHAR reference chuẩn hiện hành = 3 ảnh riêng: full-body 3/4 front + close-up head-and-shoulders + full-body back view.
+- Khi có xung đột trong file, USER UPDATE LOCK này được ưu tiên.
+
+
+## HƯỚNG DẪN THIẾT KẾ NHÂN VẬT NAM VÀ NỮ
+*TUÂN THỦ NGHIÊM VIỆC SÁNG TẠO KIỂU TÓC CHO NHÂN VẬT,MỖI NHÂN VẬT LÀ 1 KIỂU TỐC KHÁC NHAU. LẤY RANDOM KHÔNG LẤY THEO THỨ TỰ CÁC MẪU CUNG CẤP. TRỪ KHI ĐÓ LÀ NHÂN VẬT SONG SINH HAY GỐNG NHAU.
+*TUYỆT ĐỐI KHÔNG DÙNG KIỂU TÓC RẺ NGÔI 6:4 7:3 8:2 THUẦN TÚY CHO NHÂN VẬT CHÍNH. CÓ THỂ RẺ NGÔI NHƯNG LÀ BIẾN THỂ SÁNG TẠO.
+*TUÂN THỦ NGHIÊM NGẶT SÁNG TẠO ẢNH NHÂN VẬT VÀ BỐI CẢNH THAM CHIẾU PHONG CÁCH NHÂN VẬT ANIME.
+*TRANG PHỤC NHÂN VẬT ĐƠN GIẢN KHÔNG MÀU MÈ CẦU KỲ NHIỀU PHỤ KIỆN HOA VĂN HỌA TIẾT NHƯ FANTASY*KÍCH THƯỚC QUY CHUẨN LIỆT KÊ RỎ RÀNG.
+*mỗi prompt đúng 1 dòng
+*Ảnh tham chiếu CHAR từ nay dùng BỘ 3 ẢNH CHỨC NĂNG RIÊNG BIỆT, KHÔNG dùng character turnaround 3 mặt cổ điển và KHÔNG dùng front + side + back trên cùng một sheet.
+
+BỘ 3 ẢNH THAM CHIẾU CHAR BẮT BUỘC:
+1. ẢNH 1 — FULL-BODY 3/4 FRONT: toàn thân 3/4 trước, thấy trọn cơ thể từ đầu đến chân và toàn bộ footwear; dùng để khóa silhouette, tỷ lệ cơ thể, vóc dáng và cấu trúc trang phục tổng thể.
+2. ẢNH 2 — CLOSE-UP HEAD AND SHOULDERS: cận mặt đầu và vai; dùng để khóa identity khuôn mặt, mắt, tóc trước, hairline, mái, tóc mai và chi tiết cổ/vai của trang phục.
+3. ẢNH 3 — FULL-BODY BACK VIEW: toàn thân mặt sau; dùng để khóa rear hairstyle, silhouette phía sau, cấu trúc lưng trang phục, phụ kiện phía sau và footwear từ phía sau.
+
+Ba ảnh là BA FILE/ẢNH RIÊNG của CÙNG MỘT CHAR, không phải ba nhân vật trong một ảnh, không phải multi-panel và không phải một turnaround sheet ghép ba góc.
+Ba ảnh phải giữ cùng identity, exact reference state, physical scale, body proportions, hairstyle construction, side orientation/asymmetry, outfit, accessories, footwear, material/color design.
+Không tạo SIDE PROFILE làm ảnh tham chiếu mặc định. Chỉ tạo side profile nếu người dùng yêu cầu riêng ngoài bộ 3 ảnh chuẩn này.
+Mỗi ảnh dùng nền trình bày đơn giản, sạch, không gây nhiễu; không story scene, không environment phức tạp, không chữ/nhãn/ID/số đo/ruler/annotation.
+Prompt CHAR phải mô tả rõ ba output riêng và mục đích của từng ảnh; không dùng wording khiến image generator hiểu thành một sheet 3 góc.
+
+## 1. MỤC TIÊU THIẾT KẾ
+
+Thiết kế mỗi nhân vật như một cá thể riêng biệt, có thể nhận ra ngay cả khi chỉ nhìn:
+
+* Hình dáng tổng thể.
+* Kiểu tóc.
+* Khuôn mặt.
+* Màu mắt.
+* Tỷ lệ cơ thể.
+* Phong cách trang phục.
+* Bảng màu.
+* Phụ kiện.
+* Tư thế và thần thái.
+
+Không được tạo cả dàn nhân vật bằng cách sử dụng cùng một mẫu cơ thể, cùng một kiểu tóc hoặc cùng một kiểu trang phục rồi chỉ thay đổi màu sắc.
+
+Mỗi nhân vật phải có thiết kế riêng phù hợp với:
+
+* Tuổi trưởng thành.
+* Giới tính.
+* Nghề nghiệp.
+* Địa vị.
+* Chủng tộc.
+* tính cách.
+* Năng lực.
+* Bối cảnh sinh sống.
+* Vai trò trong tác phẩm.
+
+Tất cả nhân vật nữ được mô tả trong bộ quy chuẩn này đều phải là **adult female characters**.
+
+---
+
+# 2. QUY TẮC KHÔNG TRÙNG LẶP NHÂN VẬT
+
+Trước khi tạo prompt cho một nhân vật mới, phải kiểm tra toàn bộ những nhân vật đã được thiết kế trước đó.
+
+Hai nhân vật bị xem là trùng thiết kế tóc khi có cùng phần lớn các yếu tố sau:
+
+* Cùng độ dài tóc.
+* Cùng tỷ lệ rẽ ngôi.
+* Cùng cấu trúc mái.
+* Cùng vị trí buộc tóc.
+* Cùng hình dáng phía sau đầu.
+* Cùng cấu trúc bím tóc.
+* Cùng độ phồng trên đỉnh đầu.
+* Cùng đường viền silhouette.
+* Cùng hướng tóc trước trán.
+* Cùng kiểu tóc mai.
+* Cùng phụ kiện tóc ở cùng vị trí.
+
+Chỉ thay đổi màu tóc không được xem là một kiểu tóc mới.
+
+Ví dụ:
+
+* Tóc đuôi ngựa cao màu vàng và tóc đuôi ngựa cao màu đỏ vẫn được xem là trùng kiểu tóc.
+* Tóc dài rẽ ngôi 7:3 màu bạc và tóc dài rẽ ngôi 7:3 màu đen vẫn có thể bị xem là trùng nếu cấu trúc tóc giống nhau.
+* Tóc bob thẳng và tóc bob gợn sóng bất đối xứng được xem là hai cấu trúc khác nhau.
+* Tóc đuôi ngựa cao thông thường và tóc đuôi ngựa phân đoạn dạng bubble ponytail được xem là hai cấu trúc khác nhau.
+
+## Quy tắc bắt buộc
+
+**No two characters may share the same hairstyle construction.**
+
+Mỗi kiểu tóc phải khác nhau về ít nhất ba yếu tố cấu trúc, chẳng hạn:
+
+* Độ dài.
+* Hướng rẽ ngôi.
+* Texture.
+* Kiểu buộc.
+* Hình dáng mái.
+* Độ phồng.
+* Cấu trúc phía sau.
+* Cấu trúc bím.
+* Silhouette tổng thể.
+
+---
+
+# 3. QUY TẮC CẤM TÓC GIỮA TRÁN
+
+Áp dụng cho toàn bộ nhân vật nam và nữ.
+
+Không được tạo một lọn tóc đơn lẻ rơi thẳng từ giữa trán xuống vùng giữa hai mắt.
+
+Phần chính giữa trán và vùng giữa hai lông mày phải hoàn toàn không có lọn tóc nhọn, lọn tóc tam giác hoặc lọn tóc rơi thẳng đứng.
+
+## Negative hairstyle rules
+
+* No central forelock.
+* No single middle bang.
+* No triangular center fringe.
+* No center forehead tuft.
+* No isolated vertical strand at the center of the forehead.
+* No pointed strand falling between the eyebrows.
+* No narrow central lock hanging over the nose bridge.
+* No center-positioned loose strand.
+* No middle forehead hair spike.
+* No central curtain strand.
+* No isolated hair lock covering the exact center of the forehead.
+* No ahoge.
+
+Tóc mái được phép nằm lệch sang trái hoặc phải, nhưng không được kết thúc tại chính giữa hai mắt.
+
+Một lọn tóc rời chỉ được sử dụng khi:
+
+* Nằm rõ ràng ở phía trái hoặc phía phải trán.
+* Không đi qua điểm giữa khuôn mặt.
+* Không chạm vùng giữa hai lông mày.
+* Phù hợp với hướng chảy chung của tóc.
+
+
+## 3A. HARD LOCK — CẤM CHỎM TÓC NHỌN GIỮA TRÁN + CẤM KIỂU TÓC ANIME MẶC ĐỊNH
+
+Áp dụng tuyệt đối cho TOÀN BỘ CHAR nam và nữ.
+
+### A. CẤM TUYỆT ĐỐI CHỎM TÓC NHỌN GIỮA TRÁN
+
+Ngoài toàn bộ Negative hairstyle rules ở trên, khóa thêm:
+
+* Tuyệt đối không tạo một chỏm tóc nhọn, mũi tóc nhọn, tam giác tóc, cụm tóc nhọn hoặc lọn tóc đơn độc nằm đúng giữa trán.
+* Không được để một mũi tóc hướng thẳng xuống giữa hai lông mày, sống mũi hoặc trục giữa khuôn mặt.
+* Không được biến nhiều lọn tóc nhỏ thành một silhouette tổng hợp có đỉnh nhọn nằm chính giữa trán.
+* Không được dùng mái chữ M, mái răng cưa, mái tách lớp hoặc mái anime để lách luật nếu kết quả vẫn tạo một điểm nhọn trung tâm.
+* Không được dùng phụ kiện, kẹp tóc, cài tóc, khăn, dây buộc hoặc headpiece để ép tóc tạo thành chỏm nhọn trung tâm.
+* Front-hair design phải đẩy trọng tâm sang trái, sang phải, mở trán, quét ngược, phân mảng bất đối xứng hoặc dùng cấu trúc khác không tạo central pointed forelock.
+
+HARD NEGATIVE:
+
+* No pointed center forelock.
+* No central V-shaped bang.
+* No central triangular hair point.
+* No center anime spike over the forehead.
+* No middle forehead spear-like strand.
+* No symmetric fringe converging into a center point.
+* No layered bangs forming a central downward arrow.
+
+### B. CẤM TUYỆT ĐỐI “KIỂU TÓC ANIME MẶC ĐỊNH”
+
+Không được dùng một kiểu tóc generic chỉ vì đó là lựa chọn quen thuộc của AI/ChatGPT khi tạo nhân vật anime.
+
+Cấm cách làm:
+
+* chọn kiểu tóc đầu tiên/quen thuộc nhất mà không dựa trên identity nhân vật;
+* dùng cùng một cấu trúc tóc cho nhiều CHAR rồi chỉ đổi màu;
+* mặc định tóc nữ = tóc dài + mái lệch tiêu chuẩn + vài lọn ôm mặt;
+* mặc định tóc nữ = tóc dài thẳng/wavy chung chung với silhouette gần như giống nhau;
+* mặc định tóc nam = tóc ngắn nhiều lớp + mái nhọn anime + side-part nhẹ;
+* mặc định tóc nam = short spiky anime hair hoặc messy layered anime hair lặp lại;
+* dùng một silhouette “AI anime protagonist” chung cho nhiều nhân vật;
+* dùng một silhouette “AI anime heroine” chung cho nhiều nhân vật.
+
+Mỗi CHAR phải có HAIRSTYLE CONSTRUCTION riêng được quyết định từ nhiều biến độc lập:
+
+LENGTH + TEXTURE + FRONT CONSTRUCTION + PARTING/NO-PART + SIDE STRUCTURE + REAR STRUCTURE + VOLUME + TIE/UPDO + ACCESSORY + ASYMMETRY + SILHOUETTE.
+
+Không bắt buộc phải dùng đủ tất cả biến, nhưng phải có đủ khác biệt để thiết kế không rơi về mẫu anime generic mặc định.
+
+Nếu một thiết kế nhìn giống một kiểu tóc anime mặc định phổ biến và không có đặc điểm nhận diện riêng:
+→ REJECT / REDESIGN.
+
+---
+
+# 4. HỆ THỐNG SÁNG TẠO KIỂU TÓC
+
+Danh sách kiểu tóc trong hướng dẫn này chỉ là nguồn tham khảo.
+
+**Không được xem các kiểu tóc được liệt kê là danh sách mặc định hoặc giới hạn bắt buộc.**
+
+Có thể sáng tạo bất kỳ kiểu tóc fantasy-anime nào phù hợp với nhân vật, miễn là:
+
+* Không vi phạm quy tắc tóc giữa trán.
+* Không trùng kiểu tóc với nhân vật khác.
+* Có cấu trúc rõ ràng.
+* Có hướng mọc tóc hợp lý.
+* Có silhouette dễ nhận diện.
+* Phù hợp khuôn mặt và tính cách.
+* Không tạo kiểu tóc ngẫu nhiên thiếu logic.
+
+Khi thiết kế tóc, hãy kết hợp độc lập các thành phần sau.
+
+## A. Độ dài
+
+* Buzz cut fantasy.
+* Very short cropped hair.
+* Short hair.
+* Ear-length hair.
+* Chin-length hair.
+* Jaw-length hair.
+* Shoulder-length hair.
+* Collarbone-length hair.
+* Mid-back hair.
+* Waist-length hair.
+* Hip-length hair.
+* Extra-long flowing hair.
+* Uneven asymmetrical length.
+* Short front with long rear sections.
+* Long front sections with a short rear silhouette.
+
+## B. Texture
+
+* Pin-straight.
+* Silky straight.
+* Coarse straight.
+* Softly wavy.
+* Deep waves.
+* Large flowing waves.
+* Loose curls.
+* Tight controlled curls.
+* Spiral curls.
+* Feathered layers.
+* Razor-cut layers.
+* Fluffy layered texture.
+* Wind-swept texture.
+* Wet-look slick texture.
+* Controlled tousled texture.
+* Dense heavy hair.
+* Fine airy hair.
+* Voluminous fantasy hair.
+* Soft cloud-like curls.
+* Crimped fantasy texture.
+* Alternating straight and curled sections.
+
+## C. Hướng chia tóc
+
+* 8:2 side part.
+* 7:3 side part.
+* 6:4 side part.
+* 5:5 split part.
+* Deep left-side part.
+* Deep right-side part.
+* Diagonal part.
+* Zigzag part.
+* Curved part.
+* Fully swept backward.
+* Front hair integrated into the sides.
+* Completely exposed forehead.
+* Asymmetrical front construction.
+* Radial backward flow.
+* Offset widow’s-peak construction.
+
+Tỷ lệ rẽ ngôi chỉ là một thành phần thiết kế, không phải kiểu tóc hoàn chỉnh.
+
+Không được sử dụng liên tục kiểu 7:3, 6:4 hoặc 5:5 cho phần lớn nhân vật.
+
+## D. Cấu trúc phía sau
+
+* Loose hair.
+* Tapered nape.
+* Layered nape.
+* Rounded rear silhouette.
+* Angular rear silhouette.
+* Low ponytail.
+* High ponytail.
+* Mid-height ponytail.
+* Side ponytail.
+* Loop ponytail.
+* Bubble ponytail.
+* Segmented ponytail.
+* Folded ponytail.
+* Double-loop ponytail.
+* Low bun.
+* High bun.
+* Side bun.
+* Braided bun.
+* Knot bun.
+* Fan-shaped bun.
+* Twin buns.
+* Half-up knot.
+* Half-up ponytail.
+* Half-up loop.
+* Long tied-back hair.
+* Multiple tied sections.
+* Ribbon-bound rear sections.
+* Hair gathered beneath a hood or headpiece.
+
+---
+
+# 5. THƯ VIỆN KIỂU TÓC NAM MỞ RỘNG
+
+Có thể sử dụng hoặc sáng tạo thêm ngoài các kiểu sau:
+
+* Short side-parted layered hair.
+* Short swept-back hair.
+* Slicked-back undercut.
+* Textured crop with side-directed fringe.
+* Angular short wolf cut.
+* Medium-length layered wolf cut.
+* Long masculine wolf cut.
+* Feathered shoulder-length hair.
+* Wind-swept adventurer hair.
+* Short military-inspired fantasy cut.
+* Asymmetrical undercut.
+* One-side shaved fantasy hairstyle.
+* Pompadour-inspired fantasy hair.
+* Brushed-up quiff.
+* Side-directed quiff.
+* Short curly hair with exposed forehead.
+* Medium loose curls.
+* Long wavy hair tied at the nape.
+* Low warrior ponytail.
+* High warrior ponytail.
+* Folded samurai-inspired ponytail.
+* Half-up warrior knot.
+* Long straight hair with side sections secured backward.
+* Layered hair tucked behind one ear.
+* Ear-length pageboy-inspired masculine cut.
+* Mullet-inspired fantasy cut.
+* Short front and long nape.
+* Long back hair with shaved temple sections.
+* Rope-bound ponytail.
+* Braided ponytail.
+* One long braid descending down the back.
+* Several thin vertical braids integrated into loose hair.
+* Thick side braid falling behind one shoulder.
+* Loose shoulder-length hair with a deep diagonal part.
+* Fully exposed forehead with radial backward flow.
+* Uneven chin-length hair with one side tucked backward.
+* Crown-volume hairstyle with tapered sides.
+* Dense curly mane.
+* Lion-like swept-back mane.
+* Elegant nobleman waves.
+* Smooth scholar hairstyle.
+* Rugged ranger layers.
+* Spiky side-directed hair without a central spike.
+* Flat swept-forward hair divided away from the facial center.
+* Fantasy horn-shaped side sections formed entirely from hair.
+* Layered hair secured by metallic clasps.
+* Long hair bound at several vertical points.
+* Short hair with long asymmetrical side sections.
+
+Kiểu tóc nam không được mặc định là tóc ngắn rẽ ngôi hoặc tóc dài buộc thấp. Hãy lựa chọn cấu trúc dựa trên nhân vật.
+
+
+## 5A. BỔ SUNG BIẾN THỂ TÓC NAM — KHÔNG BẮT BUỘC RẼ NGÔI
+
+Tóc nam KHÔNG bắt buộc phải có đường rẽ ngôi rõ ràng. Có thể thiết kế hoàn toàn không rẽ ngôi nếu cấu trúc tóc hợp lý và không vi phạm khóa giữa trán.
+
+Bổ sung các hướng thiết kế nam có thể dùng hoặc sáng tạo tiếp:
+
+* Fully brushed-back short hair with no visible part.
+* Radial swept-back medium hair with no visible part.
+* Textured crop with irregular lateral flow and no center spike.
+* Caesar-inspired fantasy crop with broken horizontal fringe kept away from the exact center point.
+* Short blunt fringe divided into uneven side clusters, leaving the facial center clear.
+* Forward-swept layered hair redirected diagonally before reaching the facial center.
+* Tousled short curls with an open center forehead.
+* Dense short curls with asymmetric temple volume.
+* Coarse wavy crop with irregular side-directed sections.
+* Short layered hair with a lifted side crest, never a central spike.
+* Flat-top fantasy crop with softened textured edges.
+* Tapered nape cut with heavy crown texture.
+* Short disconnected layers with one longer side section.
+* Medium shag with broken side-directed fringe.
+* Medium wolf-shag hybrid with irregular nape lengths.
+* Collar-length rough waves with no visible part.
+* Shoulder-length straight hair swept entirely backward.
+* Shoulder-length loose waves with asymmetric front exposure.
+* Long straight hair with front sections falling beside the cheeks but never joining at center forehead.
+* Long layered hair tied in a low asymmetric tail.
+* Long hair tied to one side behind the shoulder.
+* Double-bound low ponytail with vertical segmentation.
+* High tied warrior knot with loose vertical rear strands.
+* Low compact warrior knot with clean side temples.
+* Short top with long sideburn structures and tapered rear.
+* Temple-faded fantasy cut with longer textured crown.
+* One-side undercut with long opposite-side sweep.
+* Dual-texture hair: cropped on one side, wavy medium length on the other.
+* Angular bowl-cut reinterpretation with asymmetric broken perimeter.
+* Rounded pageboy reinterpretation with exposed or offset forehead.
+* Sculpted wave crest positioned clearly left or right of center.
+* Thick swept-back mane with controlled side volume.
+* Layered noble waves with no fixed part line.
+* Rugged uneven adventurer layers with side-directed clumps.
+* Vertical micro-braids integrated only along one side.
+* One long rear braid beginning below the crown and descending vertically.
+* Several narrow bound sections descending vertically at different heights.
+
+HARD LOCK CHO CHAR NAM:
+
+* Không bắt buộc 6:4, 7:3, 8:2, center part hoặc bất kỳ tỷ lệ rẽ ngôi nào.
+* Nếu không cần rẽ ngôi, thiết kế bằng flow, volume, texture, crop, sweep, undercut, knot, tail, curl, braid hoặc silhouette riêng.
+* Tuyệt đối không dùng chỏm tóc nhọn giữa trán.
+* Tuyệt đối không dùng generic short spiky anime hair như lựa chọn mặc định.
+* Tuyệt đối không dùng generic messy layered protagonist hair lặp lại giữa nhiều CHAR.
+* Nếu hai CHAR nam có cùng overall silhouette, front construction và rear construction dù khác màu tóc thì phải redesign.
+
+---
+
+# 6. THƯ VIỆN KIỂU TÓC NỮ MỞ RỘNG
+
+Có thể sử dụng hoặc sáng tạo thêm ngoài các kiểu sau:
+
+* Sleek pixie cut.
+* Layered pixie cut.
+* Asymmetrical pixie cut.
+* Short curly pixie.
+* Blunt bob.
+* Rounded bob.
+* Angled bob.
+* Inverted bob.
+* Asymmetrical bob.
+* Wavy bob.
+* Curled-under bob.
+* Chin-length pageboy.
+* Shoulder-length lob.
+* Wavy lob.
+* Layered lob.
+* Butterfly-layered hair.
+* Hush cut.
+* Soft wolf cut.
+* Long wolf cut.
+* Jellyfish-inspired layered hair.
+* Octopus-layered hair.
+* Feathered princess layers.
+* Long pin-straight hair.
+* Long hair with blunt ends.
+* Long cascading layers.
+* Large flowing waves.
+* Loose fantasy curls.
+* Defined spiral curls.
+* Dense ringlets.
+* Side-swept curls.
+* Short front layers with a long rear section.
+* Fully swept-back long hair.
+* Long hair tucked behind both ears.
+* One side tucked behind the ear with the opposite side flowing backward.
+* High ponytail.
+* Low ponytail.
+* Mid-height ponytail.
+* Side ponytail.
+* Loop ponytail.
+* Bubble ponytail.
+* Segmented ponytail.
+* Curled ponytail.
+* Straight ribbon-bound ponytail.
+* Folded ponytail.
+* Twin ponytails at unequal heights.
+* Low twin tails.
+* High twin tails with different lengths.
+* Half-up ponytail.
+* Half-up bun.
+* Half-up loop.
+* Half-up knot without horizontal braids.
+* High ornamental bun.
+* Low smooth bun.
+* Loose side bun.
+* Braided bun.
+* Double bun.
+* Fan-shaped ceremonial bun.
+* Vertical looped updo.
+* Coiled rope-style updo.
+* Hair gathered beneath an ornamental headpiece.
+* Long side braid.
+* Long back braid.
+* Fishtail side braid.
+* Rope braid.
+* Braided ponytail.
+* Segmented braided ponytail.
+* Twin vertical braids.
+* Uneven asymmetrical hanging braids.
+* Several thin vertical decorative braids.
+* One thick braid combined with loose hair.
+* One narrow braid descending beside a ponytail.
+* Vertical braids integrated into curled hair.
+* Short hair with a single long braided rear extension.
+* Loose hair with small vertical braids at different heights.
+* Fantasy hair shaped into petal-like loops.
+* Ribbon-woven vertical ponytail.
+* Chain-decorated loose hair.
+* Long hair divided into multiple bound sections.
+* Cloud-like voluminous curls.
+* Flame-shaped layered silhouette.
+* Waterfall-like loose layers without a horizontal waterfall braid.
+* Wing-shaped side layers swept away from the face.
+* Asymmetrical long hair with one shaved or closely cropped side.
+* Short crown volume with long flowing lower sections.
+* Heavy waves gathered over one shoulder.
+* Straight hair gathered entirely behind the shoulders.
+* Long hair with ornamental rings attached vertically along selected strands.
+
+Không được mặc định nhân vật nữ có tóc dài, tóc xoăn, tóc đuôi ngựa hoặc tóc tết. Nhân vật nữ có thể sử dụng mọi độ dài và cấu trúc tóc phù hợp.
+
+
+## 6A. BỔ SUNG HỆ THỐNG PHỤ KIỆN + LỌN XOĂN + BUỘC TÓC RIÊNG CHO CHAR NỮ
+
+Phần này DÀNH RIÊNG cho CHAR nữ và được dùng như thư viện mở để tăng độ đa dạng. Không bắt buộc mọi CHAR nữ phải có phụ kiện tóc.
+
+Mỗi phụ kiện phải phục vụ identity, nghề nghiệp, địa vị, tính cách, trang phục hoặc silhouette. Không gắn phụ kiện ngẫu nhiên chỉ để trang trí.
+
+### A. KẸP TÓC / BARRETTE / CLIP
+
+Có thể thiết kế:
+
+* Single side hair clip.
+* Paired clips đặt bất đối xứng.
+* Slim metallic barrette.
+* Wide decorative barrette.
+* Geometric hair clip.
+* Crescent-moon clip.
+* Star-shaped clip.
+* Leaf-shaped clip.
+* Flower-shaped clip.
+* Wing-shaped clip.
+* Jewel-set clip.
+* Enamel clip.
+* Wood or horn fantasy clip.
+* Shell-inspired clip.
+* Minimal plain clasp.
+* Ornamental noble clasp.
+* Small utility clip for adventurer/scholar designs.
+* Multiple tiny clips arranged vertically on ONE side.
+
+Không mặc định dùng hai kẹp đối xứng hai bên.
+
+### B. CÀI TÓC / TRÂM TÓC / HAIRPIN / HAIR COMB
+
+Có thể thiết kế:
+
+* Straight hairpin.
+* Double hairpin set.
+* Long ornamental pin.
+* Short practical pin.
+* U-shaped hairpin.
+* Forked fantasy hairpin.
+* Decorative hair comb.
+* Side hair comb.
+* Small back comb used locally to secure an updo.
+* Floral hairpin.
+* Gemstone hairpin.
+* Metal filigree pin.
+* Wooden pin.
+* Bone/horn-inspired fantasy pin.
+* Feather-shaped pin.
+* Leaf-shaped pin.
+* Moon/star motif pin.
+
+Cài/trâm/lược tóc không được tạo hoặc che giấu một cấu trúc tóc vòng ngang phía sau đầu bị cấm ở mục 7.
+
+### C. KHĂN / DÂY / RIBBON BUỘC TÓC
+
+Có thể thiết kế:
+
+* Narrow ribbon tying a ponytail.
+* Wide ribbon tying a low or high tail.
+* Cloth strip wrapped locally around one tied section.
+* Small scarf tied around a ponytail base.
+* Headscarf covering part of the crown while leaving the hairstyle structure readable.
+* Kerchief-style hair scarf.
+* Side-tied scarf with ends hanging vertically.
+* Ribbon bow placed at one side.
+* Ribbon bow placed at the ponytail base.
+* Fabric tie integrated into a bun or knot.
+* Multiple short vertical ribbon ties on segmented hair.
+
+Không được dùng khăn/ribbon để tạo một dải tóc hoặc cấu trúc giống hair-band bằng tóc chạy ngang sau đầu.
+
+### D. LỌN TÓC XOĂN / CURL STRUCTURE
+
+Có thể dùng lọn xoăn như một thành phần thiết kế riêng:
+
+* One side spiral curl.
+* Paired unequal side curls.
+* Loose cheek-side curl.
+* Long corkscrew curl falling vertically beside one shoulder.
+* Short curled temple lock positioned clearly away from the facial center.
+* Multiple vertical ringlets at different lengths.
+* Curled ponytail ends.
+* Curled twin-tail ends with unequal lengths.
+* One heavy curled section over one shoulder.
+* Mixed straight-and-curled sections.
+* Soft outward flips at selected layers.
+* Inward face-framing curls that remain left/right of the centerline.
+
+HARD LOCK:
+* Không lọn xoăn nào được kết thúc thành chỏm nhọn giữa trán.
+* Không cho hai lọn xoăn hai bên gặp nhau phía sau đầu để tạo vòng ngang bị cấm.
+
+### E. CỘT TÓC MỘT BÊN / SIDE-TIED HAIR
+
+Có thể thiết kế:
+
+* High side ponytail.
+* Mid-height side ponytail.
+* Low side ponytail.
+* Side ponytail with straight length.
+* Side ponytail with waves.
+* Side ponytail with spiral curls.
+* Side bubble ponytail.
+* Side segmented ponytail.
+* Side braided ponytail descending vertically.
+* Side loop ponytail with vertical/downward silhouette.
+* One-side tied section while the rest remains loose.
+* One-side mini ponytail combined with short or medium loose hair.
+
+Phải khóa bên trái/phải cho từng CHAR và không mirror ngẫu nhiên giữa các ảnh.
+
+### F. CỘT TÓC HAI BÊN / TWIN-TAIL SYSTEM
+
+Có thể thiết kế:
+
+* High twin tails.
+* Mid-height twin tails.
+* Low twin tails.
+* Unequal-height twin tails.
+* Unequal-length twin tails.
+* Straight twin tails.
+* Wavy twin tails.
+* Curled twin tails.
+* Bubble twin tails.
+* Segmented twin tails.
+* Twin vertical braids.
+* One straight tail + one braided tail for intentional asymmetry.
+* One long tail + one short tail.
+* Twin tails with different accessories on each side when identity design requires asymmetry.
+
+Không mặc định twin tails phải đối xứng hoàn toàn.
+Không dùng twin tails như “mẫu nữ anime mặc định”; chỉ dùng khi phù hợp CHAR và phải có cấu trúc riêng.
+
+### G. HARD LOCK — KHÔNG DÙNG GENERIC ANIME HEROINE HAIR
+
+Đối với CHAR nữ, tuyệt đối không tự động chọn:
+
+* tóc dài thẳng + mái lệch chung chung + hai lọn ôm mặt giống nhau;
+* tóc dài wavy + side bangs tiêu chuẩn mà không có cấu trúc riêng;
+* generic princess hair chỉ đổi màu;
+* generic twin tails chỉ đổi màu/phụ kiện;
+* generic side ponytail chỉ đổi màu;
+* generic bob anime với cùng fringe/silhouette;
+* một kiểu tóc “đẹp an toàn” lặp lại cho nhiều CHAR.
+
+Mỗi nữ CHAR phải được thiết kế bằng tổ hợp riêng của:
+
+LENGTH + TEXTURE + FRONT CONSTRUCTION + SIDE LOCKS + REAR STRUCTURE + CURL PATTERN + TIE POSITION + ACCESSORY TYPE + ACCESSORY POSITION + ASYMMETRY + SILHOUETTE.
+
+Không bắt buộc phải dùng phụ kiện. Nhưng nếu dùng, phải khóa rõ:
+
+* loại phụ kiện;
+* vị trí trái/phải/trên/dưới;
+* số lượng;
+* hướng;
+* cách phụ kiện giữ tóc;
+* không được mirror tùy tiện;
+* không được làm xuất hiện cấu trúc tóc bị cấm.
+
+Tuyệt đối không có chỏm tóc nhọn giữa trán, kể cả khi dùng kẹp, trâm, cài, khăn hoặc dây buộc tóc.
+
+---
+
+# 7. QUY TẮC BÍM TÓC NỮ
+
+Bím tóc có thể có hoặc không.
+
+Không bắt buộc nhân vật nữ phải có bím tóc.
+
+Khi sử dụng bím tóc, không được lặp lại cùng một cấu trúc bím trên hai nhân vật khác nhau.
+
+## Các dạng bím được phép
+
+* One long side braid falling vertically over one shoulder.
+* One long braid descending vertically down the back.
+* Fishtail braid.
+* Rope braid.
+* Braided ponytail.
+* Segmented braided ponytail.
+* Twin braids hanging downward.
+* Asymmetrical braids with different lengths.
+* Braided bun.
+* One braid incorporated vertically into a bun.
+* Small decorative braids descending vertically through loose hair.
+* One thick braid combined with several loose sections.
+* A narrow braid positioned beside a ponytail.
+* Multiple hanging braids beginning at different heights.
+* One rear braid decorated with rings, ribbons or beads.
+* A loose braid beginning below ear level and descending vertically.
+* Braided lower section beneath otherwise loose hair.
+
+## Các dạng bím bị cấm
+
+* No braided headband.
+* No halo braid.
+* No crown braid wrapping around the head.
+* No braid beginning at the temple and running horizontally above the ear.
+* No two temple braids connected behind the head.
+* No half-up braided crown.
+* No horizontally wrapped side braid.
+* No ear-level horizontal braid.
+* No symmetrical braids encircling the head.
+* No braid wrapping horizontally around the rear skull.
+* No repeated braid construction across multiple female characters.
+
+Bím tóc phải đi theo hướng dọc, hướng chéo xuống dưới hoặc được gom thành búi rõ ràng. Không tạo bím chạy ngang quanh đầu như một chiếc băng đô.
+
+## QUY TẮC CẤM TUYỆT ĐỐI MỌI LỌN TÓC / CẤU TRÚC TÓC VÒNG NGANG SAU ĐẦU
+
+Áp dụng bắt buộc cho toàn bộ nhân vật nam và nữ, cho mọi độ dài tóc, mọi texture, mọi kiểu buộc, mọi kiểu half-up, mọi kiểu tóc tết hoặc không tết, mọi kiểu tóc fantasy-anime, mọi state, mọi costume variant, mọi ảnh trong bộ 3 ảnh tham chiếu CHAR và mọi scene prompt.
+
+Quy tắc này là quy tắc HÌNH HỌC VÀ HƯỚNG CẤU TRÚC của tóc. Việc một phần tóc có được gọi là “bím tóc” hay không không làm thay đổi quy tắc. Nếu bất kỳ phần tóc nào tạo ra hình dạng chạy ngang, vòng ngang, nối ngang, ôm ngang, bắc cầu ngang, tạo cung ngang hoặc tạo dải ngang qua phần sau đầu thì đều bị xem là vi phạm.
+
+TUYỆT ĐỐI KHÔNG tạo bất kỳ cấu trúc tóc nào chạy từ một bên đầu sang bên còn lại phía sau đầu theo phương ngang hoặc gần ngang.
+
+TUYỆT ĐỐI KHÔNG tạo bất kỳ lọn tóc nào ôm theo đường cong phía sau hộp sọ theo dạng băng đô, vương miện, vòng cung, vòng bán nguyệt, dây tóc, cầu tóc hoặc dải tóc.
+
+TUYỆT ĐỐI KHÔNG cho hai phần tóc xuất phát từ hai bên thái dương, hai bên tai, hai bên đầu hoặc hai bên tóc mai gặp nhau, nối nhau, đan vào nhau, xoắn vào nhau, ghim chung với nhau hoặc tạo thành một đường liên tục phía sau đầu.
+
+TUYỆT ĐỐI KHÔNG được lách quy tắc bằng cách thay bím tóc bằng lọn tóc suông, lọn tóc xoắn, lọn tóc cuộn, lọn tóc gập, lọn tóc ghim, lọn tóc buộc, lọn tóc đan, lọn tóc loop, lọn tóc rope-like, lọn tóc ribbon-like hoặc bất kỳ biến thể nào có silhouette tương đương.
+
+Các dạng bị cấm bao gồm nhưng không giới hạn:
+
+* No braided headband.
+* No halo braid.
+* No crown braid wrapping around the head.
+* No horizontal braid across the rear head.
+* No braid wrapping horizontally around the rear skull.
+* No braid beginning at one temple and traveling horizontally toward the opposite side.
+* No two temple braids connected behind the head.
+* No two side braids joined behind the head.
+* No half-up braided crown.
+* No horizontally wrapped side braid.
+* No ear-level horizontal braid.
+* No symmetrical braids encircling the head.
+* No horizontal waterfall braid across the rear head.
+* No horizontal fishtail section across the rear head.
+* No horizontal rope braid across the rear head.
+* No horizontal twisted braid across the rear head.
+* No braid used as a rear hair band.
+* No braid used as a rear hair bridge.
+* No braid forming a semicircle from one side of the head to the other.
+
+CẤM CẢ NHỮNG CẤU TRÚC KHÔNG PHẢI BÍM:
+
+* No horizontal hair strand across the back of the head.
+* No horizontal lock of hair connecting the left and right sides behind the head.
+* No curved hair strand wrapping around the rear skull.
+* No natural-hair headband formed from loose or unbraided hair.
+* No unbraided hair crown.
+* No twisted hair band around the head.
+* No rope-like horizontal hair section behind the head.
+* No rolled horizontal hair section behind the head.
+* No folded horizontal hair section behind the head.
+* No looped hair arc running from one side of the head to the other.
+* No loose hair arc connecting both sides behind the head.
+* No side locks connected together behind the head.
+* No temple strands joined horizontally at the rear.
+* No ear-level strands joined behind the head.
+* No nape-level strands pulled sideways and connected into a horizontal band.
+* No half-up hairstyle whose gathered hair forms a horizontal band across the rear head.
+* No half-up hairstyle whose side sections visibly travel sideways around the rear skull before meeting.
+* No pinned-back side sections that produce a visible left-to-right hair bridge.
+* No decorative loose strand laid horizontally over the rear hair.
+* No decorative twisted strand laid horizontally over the rear hair.
+* No horizontal arc, bridge, ring, band or semicircle made from hair behind the head.
+* No left-to-right hair connection following the curvature of the rear skull.
+* No hair construction visually resembling a headband made from the character’s own hair.
+* No hair construction visually resembling a crown made from the character’s own hair.
+* No hair construction visually resembling a halo made from the character’s own hair.
+* No hair construction visually resembling a strap or ribbon made from hair across the back of the head.
+* No hair loop that spans horizontally between the left and right rear sides of the head.
+* No hair coil or rolled section positioned as a horizontal bar behind the head.
+* No pair of curled side locks whose ends meet or visually touch behind the head.
+* No pair of twisted side locks whose ends meet or visually touch behind the head.
+* No pair of loose side locks whose ends meet or visually touch behind the head.
+* No pair of tucked-back side sections forming a continuous rear arc.
+* No hair section that crosses horizontally over loose rear hair as a decorative layer.
+* No hair section that crosses horizontally under loose rear hair while remaining visibly readable as a band.
+* No rear hair element whose primary silhouette is a left-to-right line.
+* No rear hair element whose primary silhouette is a horizontal or near-horizontal arc.
+* No rear hair element whose primary purpose is to connect both sides of the hairstyle.
+
+BẤT KỂ cấu trúc đó là:
+
+* braided;
+* unbraided;
+* loose;
+* straight;
+* wavy;
+* curled;
+* twisted;
+* rope-twisted;
+* rolled;
+* coiled;
+* looped;
+* folded;
+* tucked;
+* pinned;
+* woven;
+* wrapped;
+* gathered;
+* interlocked;
+* ribbon-bound;
+* clipped;
+* tied;
+* knotted;
+* ornament-secured;
+* hoặc chỉ là một lọn tóc suông được uốn vòng ngang;
+
+nếu nó tạo thành một đường tóc chạy ngang hoặc vòng ngang phía sau đầu thì đều bị cấm.
+
+Không được sử dụng phụ kiện tóc để hợp thức hóa cấu trúc bị cấm. Nếu một hoặc nhiều lọn tóc được kẹp, ghim, buộc, giữ bằng hoa, nơ, trâm, clasp, bead, ribbon, ring hoặc ornament nhưng kết quả cuối cùng vẫn tạo thành một đường tóc ngang hoặc vòng ngang phía sau đầu thì thiết kế vẫn bị xem là vi phạm.
+
+Không được tạo hai lọn tóc riêng biệt ở hai bên rồi đặt chúng sát nhau phía sau đầu để tạo ảo giác rằng chúng là một dải liên tục. Nếu BACK VIEW khiến người xem đọc silhouette đó như một cầu tóc, vòng tóc, dải tóc hoặc đường ngang nối hai bên thì vẫn bị cấm, kể cả hai lọn không chạm vật lý.
+
+Không được tạo các lọn tóc chạy chéo nhẹ nhưng tổng thể vẫn tạo thành một cung gần ngang bao quanh phía sau đầu. Một cấu trúc không cần nằm ngang tuyệt đối mới bị cấm; nếu hướng tổng thể chủ yếu đi từ trái sang phải quanh hộp sọ thay vì đi xuống thì được xem là cấu trúc ngang và phải loại bỏ.
+
+Không được tạo cấu trúc nhiều đoạn nhằm né quy tắc, ví dụ: một lọn đi từ thái dương trái ra sau, một đoạn ngắn ở giữa sau đầu, rồi một lọn khác tiếp tục đến thái dương phải. Nếu các đoạn kết hợp tạo thành một chuỗi thị giác nối hai bên đầu thì toàn bộ cấu trúc bị cấm.
+
+Không được tạo cấu trúc tóc đối xứng hai bên cùng hướng về một điểm giữa phía sau đầu nếu kết quả tạo ra hình chữ U ngược, vòng cung, bán nguyệt, vương miện hoặc dải ngang rõ ràng.
+
+Không được tạo hairstyle dạng “half-up” bằng cách kéo hai bên tóc vòng quanh sau đầu và nối chúng theo phương ngang. Half-up chỉ được phép khi phần tóc được gom theo một điểm cục bộ rõ ràng và không tạo thành một dải tóc chạy vòng quanh hộp sọ.
+
+Không được tạo hairstyle có phần tóc phía trước hoặc tóc mai được kéo ngược ra sau rồi chạy ngang trên phần tóc xõa. Nếu tóc được kéo ra sau, nó phải kết thúc độc lập, đi xuống, đi chéo xuống hoặc được gom trực tiếp vào một điểm buộc/búi cục bộ mà không tạo đường kết nối ngang.
+
+Không được tạo hairstyle trong đó một lọn tóc dài từ một bên vòng qua phần sau đầu để sang bên đối diện. Một lọn duy nhất cũng bị cấm nếu đường đi của nó tạo thành vòng ngang quanh phía sau hộp sọ.
+
+Không được tạo hairstyle trong đó tóc tạo một “crown effect”, “halo effect”, “headband effect”, “rear band effect”, “hair bridge effect” hoặc “wrapped rear arc effect”, kể cả khi prompt không sử dụng những tên gọi đó.
+
+Quy tắc đánh giá phải dựa vào kết quả hình ảnh cuối cùng, không dựa vào tên kiểu tóc. Nếu hình ảnh nhìn giống bím vòng, băng đô tóc, vòng cung tóc hoặc lọn tóc nối ngang sau đầu thì phải xem là vi phạm ngay cả khi mô tả gọi nó bằng một tên khác.
+
+Hướng tóc phía sau được phép phải ưu tiên một trong các logic sau:
+
+* chảy thẳng xuống dưới;
+* chảy chéo xuống dưới;
+* xõa tự nhiên và từng lọn kết thúc độc lập;
+* gom vào một ponytail cục bộ;
+* gom vào một bun cục bộ;
+* gom vào một knot cục bộ;
+* tạo bím dọc đi xuống;
+* tạo bím chéo đi xuống;
+* tạo các lọn trang trí dọc ở những vị trí khác nhau;
+* được tuck riêng ở một bên mà không nối sang bên còn lại;
+* được ghim cục bộ tại một điểm mà không tạo dải ngang;
+* kết thúc trước khi tiến vào vùng giữa phía sau đầu nếu hướng đi có nguy cơ tạo cầu nối ngang.
+
+Các cấu trúc tóc phía sau được phép phải có cảm giác “downward flow”, “diagonal downward flow”, “localized gathering” hoặc “independent termination”, không được có cảm giác “horizontal wrapping”, “rear bridging”, “side-to-side connection” hoặc “encircling”.
+
+Hai lọn tóc xuất phát từ hai bên đầu KHÔNG ĐƯỢC:
+
+* gặp nhau phía sau đầu;
+* chạm nhau phía sau đầu;
+* nối nhau phía sau đầu;
+* đan nhau phía sau đầu;
+* móc vào nhau phía sau đầu;
+* xoắn vào nhau phía sau đầu;
+* ghim chung thành một đường ngang phía sau đầu;
+* buộc chung theo cách tạo ra dải ngang phía sau đầu;
+* tạo một đường thị giác liên tục phía sau đầu;
+* tạo vòng cung nối trái-phải;
+* tạo hình bán nguyệt quanh hộp sọ;
+* tạo silhouette tương đương băng đô/vương miện/halo bằng tóc.
+
+BACK VIEW là góc kiểm tra bắt buộc.
+
+Trong ẢNH 3 — FULL-BODY BACK VIEW của bộ tham chiếu CHAR, phải kiểm tra rõ mặt sau của đầu. Nếu ở BACK VIEW xuất hiện bất kỳ đường tóc nào có thể đọc như một cấu trúc chạy từ trái sang phải qua phần sau đầu, phải xem thiết kế là FAIL và tạo lại hairstyle.
+
+Nếu ở BACK VIEW có một đường tóc nằm ngang, gần ngang hoặc cong ngang rõ rệt phía trên gáy, ngang tai, ngang chẩm hoặc vùng giữa phía sau đầu thì phải kiểm tra ngay. Nếu đường đó là một lọn tóc có chủ ý, một bím, một lọn xoắn, một dải tóc ghim, hai lọn nối nhau hoặc một phần hair styling tạo cầu nối hai bên thì bị cấm.
+
+Nếu ở ẢNH 1 — FULL-BODY 3/4 FRONT hoặc ẢNH 2 — CLOSE-UP chỉ thấy một lọn tóc chạy ra phía sau mà chưa xác định được nó có vòng ngang hay không, ẢNH 3 — FULL-BODY BACK VIEW phải chứng minh lọn đó đi xuống, kết thúc độc lập hoặc gom vào một điểm cục bộ. Không được để BACK VIEW cho thấy nó tiếp tục vòng sang phía đối diện.
+
+Nếu ẢNH 1 — FULL-BODY 3/4 FRONT hoặc ẢNH 2 — CLOSE-UP không nhìn thấy cấu trúc bị cấm nhưng ẢNH 3 — FULL-BODY BACK VIEW cho thấy cấu trúc ngang sau đầu thì vẫn bị xem là vi phạm. Quy tắc không phụ thuộc góc nhìn nào che khuất cấu trúc.
+
+Khi mô tả hairstyle trong prompt, phải tránh mọi từ/cụm từ có thể khuyến khích model tạo cấu trúc ngang sau đầu nếu không thật sự cần thiết, đặc biệt các cụm như:
+
+* crown braid;
+* halo braid;
+* braided headband;
+* wrapped braid;
+* side braids connected behind the head;
+* braided half-up crown;
+* twisted crown;
+* hair crown;
+* hair headband;
+* wrapped side sections;
+* side sections joined at the back;
+* temple strands connected behind;
+* rear hair band;
+* rear hair bridge;
+* horizontal rear strand;
+* horizontal rear braid;
+* rear skull wrap;
+* encircling braid;
+* semicircular rear hair;
+* horizontal half-up connection.
+
+Negative lock bắt buộc khi cần nhấn mạnh:
+
+ABSOLUTE REAR-HAIR RULE: no hair element of any kind may form a horizontal band, horizontal strand, arc, bridge, ring, semicircle, crown, halo, headband-like structure or left-to-right connection across the back of the head. This prohibition applies to braided, unbraided, twisted, rolled, looped, folded, tucked, pinned, woven, wrapped, gathered, interlocked, tied or loose hair strands. No two side, temple, ear-level or rear-side sections may meet, connect, visually join or form a continuous arc behind the head. Rear hair must flow vertically downward, diagonally downward, remain independently loose, or terminate in a localized ponytail, bun or knot without forming any horizontal wrap around the rear skull.
+
+Negative lock mở rộng:
+
+NO HORIZONTAL REAR-HAIR GEOMETRY. NO REAR HAIR BAND. NO REAR HAIR BRIDGE. NO REAR HAIR ARC. NO REAR HAIR RING. NO REAR HAIR SEMICIRCLE. NO HAIR CROWN. NO HAIR HALO. NO HAIR HEADBAND MADE FROM HAIR. NO LEFT-TO-RIGHT HAIR CONNECTION. NO TWO SIDE LOCKS JOINING BEHIND THE HEAD. NO TEMPLE STRANDS CONNECTING AT THE REAR. NO SIDE SECTIONS WRAPPING AROUND THE REAR SKULL. NO HORIZONTAL OR NEAR-HORIZONTAL DECORATIVE STRAND ACROSS THE BACK OF THE HEAD.
+
+Positive lock bắt buộc để model hiểu hướng thay thế:
+
+Rear hair structure must remain open and non-encircling. Hair must fall vertically downward, diagonally downward, remain naturally loose with independently terminating strands, or gather directly into a localized ponytail, bun or knot. Side sections must remain separate and must never travel around the skull to connect with the opposite side.
+
+Quy tắc ưu tiên xử lý xung đột:
+
+Nếu một kiểu tóc nằm trong danh sách kiểu tóc được phép ở phần khác của tài liệu nhưng cách triển khai cụ thể của kiểu tóc đó tạo ra lọn tóc ngang, dải tóc ngang, bím ngang, vòng cung ngang hoặc kết nối trái-phải phía sau đầu thì QUY TẮC CẤM NÀY ĐƯỢC ƯU TIÊN và biến thể đó không được sử dụng.
+
+Nếu một hairstyle reference, ảnh tham chiếu hoặc mẫu tạo ra có cấu trúc bị cấm, không được sao chép cấu trúc đó chỉ vì reference có sẵn. Phải giữ các đặc điểm hợp lệ khác của hairstyle nhưng loại bỏ hoàn toàn phần tóc vòng ngang sau đầu.
+
+Nếu model sinh sai một cấu trúc bị cấm, không được chỉ đổi tên hairstyle trong prompt rồi giữ nguyên cấu trúc. Phải thay đổi hình học tóc thật sự để không còn bất kỳ đường ngang hoặc vòng ngang nào phía sau đầu.
+
+Tiêu chí PASS:
+
+* Không có bím hoặc lọn tóc chạy ngang sau đầu.
+* Không có lọn tóc vòng ngang quanh hộp sọ.
+* Không có hai phần tóc hai bên nối nhau phía sau.
+* Không có silhouette dạng băng đô, vương miện, halo, cầu tóc hoặc vòng cung bằng tóc.
+* Không có đường tóc trái-phải rõ ràng ở BACK VIEW.
+* Các lọn phía sau chủ yếu đi xuống hoặc chéo xuống.
+* Các phần tóc hai bên kết thúc độc lập hoặc gom trực tiếp vào một điểm cục bộ.
+* Ponytail, bun hoặc knot nếu có phải là cấu trúc cục bộ, không có dải tóc quấn ngang quanh đầu để dẫn vào nó.
+
+Tiêu chí FAIL — chỉ cần một điều sau xuất hiện là phải thiết kế lại:
+
+* Có một lọn tóc chạy từ bên trái sang bên phải phía sau đầu.
+* Có một lọn tóc chạy từ bên phải sang bên trái phía sau đầu.
+* Có hai lọn bên trái-phải gặp nhau ở sau đầu.
+* Có một vòng cung tóc nằm ngang hoặc gần ngang ở sau đầu.
+* Có một dải tóc ôm theo hộp sọ như băng đô.
+* Có bím vòng, bím crown, halo braid hoặc braided headband.
+* Có lọn tóc xoắn/rolled/looped thay thế cho bím nhưng vẫn tạo cùng silhouette.
+* Có half-up section tạo một cầu nối ngang.
+* Có tóc ghim tạo một dải ngang.
+* Có nhiều đoạn tóc rời nhưng tổng thể tạo chuỗi thị giác nối hai bên.
+* BACK VIEW cho thấy một horizontal rear-hair line rõ ràng.
+* Cấu trúc có thể bị người xem nhận diện như một chiếc băng đô/vương miện/vòng tóc được tạo từ chính tóc của nhân vật.
+
+Nếu FAIL, phải tạo lại phần hairstyle phía sau cho đến khi không còn cấu trúc ngang hoặc vòng ngang. Không được chấp nhận với lý do “đó không phải bím tóc”, “đó chỉ là lọn tóc”, “đó là hair twist”, “đó là hair accessory styling” hoặc “đó chỉ là half-up hairstyle”. Quy tắc cấm dựa trên hình dạng thực tế của tóc trong ảnh, không dựa trên tên gọi.
+
+---
+
+# 8. THIẾT KẾ KHUÔN MẶT CHI TIẾT
+
+Không được mặc định mọi nhân vật nam có khuôn mặt oval và mọi nhân vật nữ có khuôn mặt trái tim.
+
+Mỗi nhân vật phải được chọn một cấu trúc khuôn mặt phù hợp.
+
+## Các cấu trúc khuôn mặt có thể sử dụng
+
+* Refined oval face.
+* Long oval face.
+* Round face.
+* Soft round face.
+* Square face.
+* Soft square face.
+* Angular rectangular face.
+* Long rectangular face.
+* Heart-shaped face.
+* Diamond-shaped face.
+* Triangular face.
+* Inverted triangular face.
+* Narrow tapered face.
+* Broad masculine face.
+* High-cheekboned face.
+* Delicate small face.
+* Mature elongated face.
+* Youthful but clearly adult face.
+* Strong heroic face.
+* Elegant aristocratic face.
+* Rugged weathered face.
+* Calm scholarly face.
+* Sharp predatory face.
+* Soft approachable face.
+
+## Các chi tiết khuôn mặt bắt buộc phải mô tả
+
+* Hình dáng tổng thể của khuôn mặt.
+* Chiều rộng trán.
+* Độ cao và hình dạng gò má.
+* Độ đầy của má.
+* Hình dạng quai hàm.
+* Hình dạng cằm.
+* Sống mũi.
+* Đầu mũi.
+* Hình dạng môi.
+* Độ dày môi.
+* Hình dạng lông mày.
+* Khoảng cách giữa hai mắt.
+* Hình dạng hốc mắt.
+* Độ dài lông mi.
+* Màu da.
+* Undertone của da.
+* Đặc điểm nhận dạng như tàn nhang, nốt ruồi, sẹo hoặc dấu ấn phép thuật nếu có.
+
+Không nên sử dụng các mô tả chung chung như:
+
+* beautiful face;
+* handsome face;
+* pretty eyes;
+* perfect body.
+
+Phải mô tả cụ thể những yếu tố khiến nhân vật đẹp, mạnh mẽ hoặc khác biệt.
+
+---
+
+# 9. MÔ TẢ MẮT CHI TIẾT
+
+Mỗi nhân vật phải có màu mắt được mô tả cụ thể.
+
+Không chỉ ghi “blue eyes”, “red eyes” hoặc “green eyes”.
+
+Cần mô tả:
+
+* Màu chính.
+* Màu phụ.
+* Vòng màu quanh đồng tử.
+* Vòng limbal bên ngoài.
+* Cấu trúc iris.
+* Kiểu highlight.
+* Độ trong.
+* Biểu cảm ánh nhìn.
+
+## Ví dụ mô tả màu mắt
+
+* Deep sapphire-blue eyes with a pale cyan inner ring, dark navy limbal rims and crystalline radial iris patterns.
+* Amber-gold eyes with a burnt-orange inner ring, fine sunburst iris lines and warm controlled highlights.
+* Emerald-green eyes with a yellow-green center, dark forest-green outer rims and layered leaf-like iris details.
+* Crimson-red eyes with a dark garnet limbal ring, subtle black radial streaks and narrow reflective highlights.
+* Pale silver-gray eyes with icy blue undertones, dark graphite rims and delicate starburst iris textures.
+* Violet eyes with a magenta inner glow, deep purple outer rings and luminous layered irises.
+* Turquoise eyes with a sea-green inner ring, dark teal edges and rippling iris patterns.
+* Heterochromatic eyes: one golden amber eye and one deep blue eye, both with matching dark limbal rings.
+* Black-brown eyes with warm copper highlights and subtle concentric iris rings.
+* Rose-pink eyes with ruby inner rings, dark wine-colored rims and jewel-like highlights.
+
+Không được cho toàn bộ nhân vật có cùng kiểu mắt hạnh nhân.
+
+Có thể thay đổi:
+
+* Almond-shaped eyes.
+* Narrow eyes.
+* Wide round eyes.
+* Upturned eyes.
+* Downturned eyes.
+* Hooded eyes.
+* Deep-set eyes.
+* Large luminous eyes.
+* Sharp predatory eyes.
+* Calm half-lidded eyes.
+* Soft drooping eyes.
+* Monolid-inspired fantasy eyes.
+* Heavy-lidded mature eyes.
+
+---
+
+# 10. MÔ TẢ BODY NHÂN VẬT NAM
+
+Mỗi nhân vật nam phải có mô tả cơ thể cụ thể.
+
+Không mặc định tất cả nhân vật nam đều cao lớn và cơ bắp giống nhau.
+
+## Các yếu tố bắt buộc
+
+* Chiều cao tương đối.
+* Cấu trúc vai.
+* Độ rộng lồng ngực.
+* Kích thước eo.
+* Tỷ lệ thân trên và chân.
+* Mức độ cơ bắp.
+* Hình dạng cánh tay.
+* Hình dạng chân.
+* Bàn tay.
+* Tư thế.
+* Cách nhân vật phân bổ trọng lượng cơ thể.
+* Dấu hiệu nghề nghiệp trên cơ thể nếu có.
+
+## Các dạng cơ thể nam
+
+* Tall lean build.
+* Slender scholarly build.
+* Compact athletic build.
+* Broad-shouldered warrior build.
+* Heavy muscular build.
+* Dense powerlifter-like build.
+* Long-limbed swordsman build.
+* Agile runner’s build.
+* Flexible dancer-like build.
+* Average balanced build.
+* Stocky blacksmith build.
+* Thick-necked brawler build.
+* Narrow-waisted heroic build.
+* Mature strong build.
+* Rugged weathered build.
+* Elegant aristocratic build.
+* Wiry assassin build.
+* Powerful knight build.
+* Lightly muscular mage build.
+* Large imposing body.
+* Short compact fighter build.
+
+Cơ thể phải phù hợp với nghề nghiệp. Một học giả không nhất thiết có cơ thể chiến binh, và một sát thủ không nhất thiết có cơ bắp đồ sộ.
+
+---
+
+# 11. MÔ TẢ BODY NHÂN VẬT NỮ
+
+Tất cả nhân vật nữ phải là người trưởng thành.
+
+Mỗi prompt nhân vật nữ phải sử dụng chính xác cụm:
+
+**large bust**
+
+Cụm này chỉ nên xuất hiện một lần trong phần mô tả cơ thể của mỗi nhân vật.
+
+Không thay thế bằng:
+
+* very large bust;
+* extremely full bust;
+* prominent bust;
+* voluptuous bust;
+* prominently large chest.
+
+Không ghép nhiều cụm đồng nghĩa trong cùng một prompt.
+
+## Các yếu tố cơ thể nữ bắt buộc
+
+* Chiều cao tương đối.
+* Cấu trúc vai.
+* Chiều dài cổ.
+* Độ rộng lồng ngực.
+* “large bust”.
+* Độ hẹp của eo.
+* Hình dạng hông.
+* Tỷ lệ thân và chân.
+* Độ dài chân.
+* Mức độ cơ bắp.
+* Hình dáng cánh tay.
+* Hình dáng đùi và bắp chân.
+* Tư thế đứng.
+* Khí chất cơ thể.
+* Dáng di chuyển nếu cần.
+
+## Ví dụ body nữ
+
+* Tall, statuesque adult feminine body with straight shoulders, a long neck, large bust, a narrow waist, gently flared hips, long athletic legs and an upright regal posture.
+* Medium-height adult feminine body with soft shoulders, large bust, a defined waist, rounded hips, strong thighs and a balanced adventurer’s build.
+* Petite adult feminine body with a compact frame, narrow shoulders, large bust, a short defined waist, softly rounded hips and agile legs.
+* Tall athletic adult feminine body with broad trained shoulders, large bust, a firm waist, powerful hips, muscular thighs and a confident warrior stance.
+* Slender adult feminine body with delicate shoulders, large bust, a very narrow waist, subtle hips, long fine limbs and an elegant controlled posture.
+* Curvy adult feminine body with rounded shoulders, large bust, a fitted waist, full hips, strong legs and a mature confident stance.
+* Stocky adult feminine body with sturdy shoulders, large bust, a compact waist, broad hips, powerful legs and a grounded blacksmith-like build.
+
+“Large bust” mô tả tỷ lệ cơ thể,bắt buộc trang phục phải để lộ ngực, khoét cổ sâu hoặc bó sát.
+
+---
+
+# 12. QUY TẮC ĐA DẠNG TRANG PHỤC
+
+Mặc định nhân vật nữ có large bust và trang phục hở ngực/khoét cổ sâu đúng khóa ở mục 11; các kiểu áo sau là phương án thiết kế TÙY LOẠI ÁO, không bắt buộc dùng đồng thời:
+
+* Áo trễ vai.(TÙY LOẠI ÁO)
+* Corset.(TÙY LOẠI ÁO)
+* Bustier.(TÙY LOẠI ÁO)
+* Cổ khoét sâu.(TẤT CẢ TRANG PHỤC)
+* Sweetheart neckline.
+* Váy bó ngực.(TÙY LOẠI ÁO)
+* Tay áo nằm dưới vai.(TÙY LOẠI ÁO)
+
+Không được mặc định tất cả nhân vật nam sử dụng:
+
+* Áo choàng dài.
+* Giáp da.
+* Giáp vai.
+* Áo sơ mi mở cổ.
+* Quần bó và ủng cao.
+* Cùng một kiểu áo fantasy đổi màu.
+
+Trang phục phải được thiết kế dựa trên:
+
+* Nghề nghiệp.
+* Địa vị xã hội.
+* Khí hậu.
+* Khu vực.
+* Tình huống.
+* Tính cách.
+* Năng lực chiến đấu.
+* Văn hóa của thế giới.
+* Mức độ giàu nghèo.
+* Mục đích sử dụng.
+
+## Mỗi nhân vật phải khác nhau về
+
+* Silhouette tổng thể.
+* Kiểu cổ áo.
+* Độ dài tay áo.
+* Cấu trúc vai.
+* Loại áo trên.
+* Cấu trúc eo.
+* Loại quần, váy hoặc áo choàng dưới.
+* Chất liệu.
+* Màu chính.
+* Màu phụ.
+* Màu nhấn.
+* Hoa văn.
+* Phụ kiện.
+* Giày.
+* Găng tay.
+* Đai lưng.
+* Trang sức.
+* Áo choàng.
+* Giáp.
+* Cách phân bố kim loại và vải.
+
+---
+
+# 13. PHONG CÁCH TRANG PHỤC NỮ
+
+Nhân vật nữ có thể sử dụng các cấu trúc trang phục sau, nhưng TẤT CẢ mẫu được dùng cho nhân vật nữ đều BẮT BUỘC biến thể để hở ngực, khoét cổ sâu như mục 11–12. Các tên kiểu áo gốc (high-neck/closed/fully covered) chỉ nêu họ trang phục, KHÔNG được giữ phần che kín ngực; kể cả giáp, đồng phục, áo choàng hoặc đồ bảo hộ đều phải để lộ phần ngực theo khóa này:
+
+* Full plate armor.
+* Light knight armor.
+* Armored battle dress.
+* High-neck mage robe with a raised rear collar and deep open front neckline exposing the chest.
+* Priestess robe with a structured outer collar and deep open front neckline exposing the chest.
+* Long-sleeved ceremonial gown.
+* Sleeveless tunic with a raised rear collar and deep open front neckline exposing the chest.
+* Tailored military jacket.
+* Double-breasted officer uniform adapted with a deep open front neckline exposing the chest.
+* Long fitted riding coat.
+* Ranger jerkin with layered belts.
+* Hunter outfit with hooded mantle.
+* Scholar robe with structured sleeves.
+* Alchemist coat with utility pouches.
+* Blacksmith outfit with reinforced apron.
+* Merchant noble ensemble.
+* Royal court gown.
+* Layered kimono-inspired fantasy clothing.
+* Wrapped desert-traveler clothing.
+* Naval officer uniform.
+* Sailor-inspired fantasy coat.
+* Assassin outfit with fitted layered fabric.
+* Monk-inspired robe.
+* Witch dress with structured mantle.
+* Adventurer outfit with trousers.
+* Shorts combined with utility leggings.
+* Wide-leg trousers with a fitted tunic.
+* Split riding skirt.
+* Layered asymmetrical skirt.
+* Floor-length formal gown.
+* High-low ceremonial skirt.
+* Cape dress.
+* Hooded travel robe.
+* Fur-lined northern outfit.
+* Tropical lightweight layered clothing.
+* Mechanic or artificer workwear.
+* Healer uniform.
+* Dancer-inspired fantasy costume.
+* Noblewoman’s coat dress.
+* Sleeveless armored bodysuit with protective panels away from the deep open neckline, exposing the chest.
+* Long tabard over fitted trousers.
+* Layered robe with sash and wide sleeves.
+* Structured vest over a long-sleeved shirt with a deep open front neckline exposing the chest.
+* One-shoulder ceremonial clothing.
+* Battle uniform with protective coverage on other areas and a deep open neckline exposing the chest.
+* Cloak-and-tunic adventurer ensemble.
+* Fantasy maid or attendant uniform when appropriate to the story.
+* Rural working dress.
+* Farm clothing with apron and boots.
+* Traveling merchant clothing.
+* Magical academy uniform.
+* Court magician uniform.
+
+## Các kiểu cổ áo có thể sử dụng (mọi biến thể dành cho nhân vật nữ phải giữ phần cổ khoét sâu/hở ngực, kể cả tên kiểu cổ gốc gợi ý kín cổ)
+
+* High standing rear/side collar with a deep open front neckline exposing the chest.
+* Round collar adapted with a deep open front cutout exposing the chest.
+* Mandarin-inspired rear/side collar framing a deep open front neckline exposing the chest.
+* Square neckline.
+* Shallow V-style outer collar with a deeper central neckline exposing the chest.
+* Deep V-neckline.
+* Scoop neckline.
+* Wide boat-style collar with a deep central opening exposing the chest.
+* Keyhole neckline.
+* Sweetheart neckline.
+* Asymmetrical neckline.
+* One-shoulder neckline.
+* Wrapped crossover neckline.
+* Hooded neckline with a deep open front exposing the chest.
+* Scarf framing the shoulders/neck without covering the deep open chest neckline.
+* Armored gorget at the neck/shoulders with a deep open chest neckline.
+* Fitted breastplate adapted with a deep open neckline exposing the chest.
+* Layered lapel collar.
+* Shirt collar.
+* Wide ceremonial collar.
+
+Không dùng CÙNG MỘT KIỂU sweetheart neckline hoặc áo trễ vai cho toàn bộ nhân vật nữ. Có thể đa dạng cấu trúc trang phục nhưng mọi biến thể bắt buộc giữ ngực hở/cổ khoét sâu theo mục 11–12; không dùng mẫu cổ kín/giáp kín để phủ nhận khóa này.
+
+---
+
+# 14. PHONG CÁCH TRANG PHỤC NAM
+
+Nhân vật nam có thể sử dụng:
+
+* Full knight armor.
+* Light swordsman armor.
+* Ranger clothing.
+* Hunter outfit.
+* Long mage robe.
+* Short battle mage coat.
+* Scholar robe.
+* Alchemist coat.
+* Priest vestments.
+* Monk robe.
+* Royal military uniform.
+* Nobleman’s formal coat.
+* Merchant clothing.
+* Blacksmith workwear.
+* Farmer clothing.
+* Sailor outfit.
+* Naval officer coat.
+* Desert traveler wraps.
+* Northern fur-lined clothing.
+* Assassin clothing.
+* Thief outfit.
+* Scout uniform.
+* Mercenary armor.
+* Tribal-inspired fantasy warrior clothing.
+* Ceremonial eastern-inspired robe.
+* Long fitted riding coat.
+* Short adventurer jacket.
+* Sleeveless martial tunic.
+* Layered leather armor.
+* Reinforced fabric armor.
+* Artificer workwear.
+* Healer uniform.
+* Butler or attendant uniform.
+* Magical academy uniform.
+* Court magician uniform.
+* Royal ceremonial robe.
+* Traveling cloak and tunic.
+* Gladiator-inspired armor.
+* Beast-tamer clothing.
+* Bard clothing.
+* Explorer clothing.
+* Archaeologist-inspired fantasy outfit.
+
+Trang phục nam cũng phải thay đổi cổ áo, tay áo, giáp, áo khoác, quần, giày và silhouette, không chỉ thay màu.
+
+---
+
+# 15. CHẤT LIỆU VÀ CHI TIẾT TRANG PHỤC
+
+Có thể sử dụng:
+
+* Matte cotton.
+* Heavy linen.
+* Fine silk.
+* Layered chiffon.
+* Velvet.
+* Brocade.
+* Satin.
+* Woven wool.
+* Fur.
+* Soft leather.
+* Hardened leather.
+* Suede.
+* Chainmail.
+* Polished steel.
+* Darkened steel.
+* Bronze.
+* Brass.
+* Silver.
+* Gold trim.
+* Enamel armor.
+* Lacquered armor.
+* Dragon-scale material.
+* Monster hide.
+* Magical translucent fabric.
+* Rune-embroidered cloth.
+* Crystal ornaments.
+* Feather decorations.
+* Bone ornaments.
+* Wooden accessories.
+* Ceramic beads.
+* Gemstone jewelry.
+
+Mỗi trang phục nên chọn từ hai đến bốn chất liệu chính. Không gắn mọi loại kim loại, đá quý, ren, ruy băng và hoa văn lên cùng một nhân vật.
+
+Chi tiết trang trí phải có chủ đề rõ ràng, chẳng hạn:
+
+* Floral motif.
+* Star motif.
+* Sun motif.
+* Moon motif.
+* Wave motif.
+* Flame motif.
+* Vine motif.
+* Feather motif.
+* Dragon motif.
+* Wolf motif.
+* Geometric motif.
+* Religious motif.
+* Royal heraldry.
+* Alchemical symbols.
+* Magical runes.
+* Agricultural motif.
+* Mechanical motif.
+
+---
+
+# 16. MÀU SẮC NHÂN VẬT
+
+Mỗi nhân vật nên có:
+
+* Một màu chính.
+* Một màu phụ.
+* Một màu nhấn.
+* Một màu kim loại nếu cần.
+
+Không nên sử dụng quá nhiều màu có độ bão hòa cao trên cùng một nhân vật.
+
+Có thể sử dụng mọi màu tóc tự nhiên hoặc fantasy:
+
+* Black.
+* Brown.
+* Chestnut.
+* Auburn.
+* Copper.
+* Red.
+* Orange.
+* Golden blonde.
+* Platinum blonde.
+* Ash blonde.
+* Silver.
+* White.
+* Gray.
+* Blue-black.
+* Navy.
+* Cobalt.
+* Cyan.
+* Turquoise.
+* Green.
+* Emerald.
+* Olive.
+* Violet.
+* Purple.
+* Lavender.
+* Magenta.
+* Pink.
+* Rose gold.
+* Two-tone hair.
+* Gradient hair.
+* Colored inner layers.
+* Differently colored tips.
+* Magical glowing streaks.
+
+Không bắt buộc mọi nhân vật có màu tóc khác nhau, nhưng nên ưu tiên bảng màu đa dạng. Dù màu tóc có trùng, cấu trúc kiểu tóc vẫn bắt buộc phải khác.
+
+---
+
+# 17. MẪU PROMPT THIẾT KẾ NHÂN VẬT NAM
+
+[Japanese character name], adult male character, [age appearance], [height and complete body build], [posture and physical presence].
+
+He has a [specific face shape] with [forehead structure], [cheekbone structure], [jawline], [chin shape], [nose bridge and nose tip], [lip shape], [eyebrow structure], [skin color and undertone], and [unique facial feature if applicable].
+
+His [specific eye shape] eyes are [detailed primary eye color] with [inner iris color], [outer limbal ring], [iris pattern], [highlight structure], and a [specific emotional quality] gaze.
+
+He has [hair color] hair with [exact length], [texture], [parting or root direction], [front structure], [side structure], [rear structure], [nape construction], [volume distribution], and [hair accessory if applicable]. The hairstyle has a distinctive silhouette that is not shared by any other character. All front strands are directed away from the exact center of the forehead. The area between the eyebrows remains completely free of hair. No central forelock, no single middle bang, no triangular center fringe, no center forehead tuft, no pointed strand between the eyebrows, no center-positioned loose strand and no ahoge.
+
+He wears [specific outfit archetype] featuring [upper garment], [collar], [sleeve structure], [waist construction], [lower garment], [footwear], [armor or protective elements], [materials], [primary color], [secondary color], [accent color], [decorative motif], and [unique accessories]. His outfit must have a visibly different silhouette, garment construction and accessory arrangement from every other character.
+
+High-detail Japanese fantasy-isekai character design, precise facial anatomy, clean crisp dark lineart, hard-edged cel shading, controlled highlights, detailed fabric construction, detailed strand separation, consistent hair direction, strong character continuity, digital art style, intricate hyper-detailing, ornate fantasy detailing where appropriate, ethereal rim lighting, soft volumetric glow, cinematic finish, polished surface rendering, sharp focus, masterwork aesthetic, high-contrast values, professional concept art finish, no photorealism, no live action, no 3D, no CGI, no watermark, no logo, no text.
+
+---
+
+# 18. MẪU PROMPT THIẾT KẾ NHÂN VẬT NỮ
+
+[Japanese character name], adult female character, [age appearance], [height], [specific adult feminine body construction], [shoulder structure], large bust, [waist structure], [hip structure], [leg proportions], [muscle definition], and [posture or physical presence].
+
+She has a [specific face shape] with [forehead structure], [cheekbone structure], [jawline], [chin shape], [nose bridge and nose tip], [lip shape], [eyebrow structure], [skin color and undertone], [eyelash structure], and [unique facial feature if applicable].
+
+Her [specific eye shape] eyes are [detailed primary eye color] with [inner iris color], [outer limbal ring], [iris pattern], [highlight structure], and a [specific emotional quality] gaze.
+
+She has [hair color] hair with [exact length], [texture], [parting or root direction], [front structure], [side structure], [rear structure], [nape construction], [volume distribution], [braid structure if present], and [hair accessory if applicable]. The hairstyle must have a unique construction and silhouette not shared by any other character. Braids are optional and must not reuse a braid construction already assigned to another female character. All front strands are directed away from the exact center of the forehead. The area between the eyebrows remains completely free of hair. No central forelock, no single middle bang, no triangular center fringe, no center forehead tuft, no pointed strand between the eyebrows, no center-positioned loose strand, no braided headband, no halo braid, no horizontal temple braid and no ahoge.
+
+She wears [specific outfit archetype] featuring [upper garment], [neckline or collar], [shoulder coverage], [sleeve structure], [waist construction], [lower garment], [footwear], [armor or protective elements], [materials], [primary color], [secondary color], [accent color], [decorative motif], and [unique accessories]. CLOTHING THAT REVEALS THE UPPER CHEST, with a clearly open or low-cut neckline in accordance with the mandatory female clothing rules; the garment may otherwise be armored, ceremonial, practical or elegant as appropriate to the character. Vary the construction (off-shoulder, corset, bustier, sweetheart neckline or other appropriate cut) rather than forcing the same garment design on every female character. Her costume must have a visibly different silhouette, neckline, sleeve construction, lower garment and accessory arrangement from every other female character.
+
+High-detail Japanese fantasy-isekai character design, precise facial anatomy, clean crisp dark lineart, hard-edged cel shading, controlled highlights, detailed fabric construction, detailed strand separation, consistent hair direction, strong character continuity, digital art style, intricate hyper-detailing, ornate fantasy detailing where appropriate, ethereal rim lighting, soft volumetric glow, cinematic finish, polished surface rendering, sharp focus, masterwork aesthetic, high-contrast values, professional concept art finish, no photorealism, no live action, no 3D, no CGI, no watermark, no logo, no text.
+
+---
+
+# 19. QUY TRÌNH TẠO NHIỀU NHÂN VẬT
+
+Khi tạo một dàn nhân vật, phải thực hiện theo thứ tự sau:
+
+## Bước 1: Lập hồ sơ nhân vật
+
+Xác định:
+
+* Tên.
+* Giới tính.
+* Tuổi trưởng thành.
+* Vai trò.
+* Nghề nghiệp.
+* Tính cách.
+* Địa vị.
+* Chủng tộc.
+* Năng lực.
+* Môi trường sống.
+
+## Bước 2: Chọn khuôn mặt
+
+Chọn riêng:
+
+* Face shape.
+* Jaw.
+* Chin.
+* Cheekbones.
+* Nose.
+* Lips.
+* Eyebrows.
+* Skin.
+* Unique facial detail.
+
+## Bước 3: Chọn mắt
+
+Chọn riêng:
+
+* Eye shape.
+* Primary color.
+* Secondary color.
+* Limbal ring.
+* Iris pattern.
+* Highlight.
+* Gaze.
+
+## Bước 4: Chọn body
+
+Không dùng cùng một mô tả body cho nhiều nhân vật.
+
+Đối với nhân vật nữ, chèn chính xác cụm **large bust** một lần.
+
+## Bước 5: Tạo kiểu tóc mới
+
+Kiểm tra kiểu tóc của tất cả nhân vật trước đó.
+
+Nếu kiểu tóc mới có silhouette hoặc cấu trúc gần giống một nhân vật cũ, phải thay đổi ít nhất ba thành phần.
+
+Không giới hạn việc lựa chọn trong danh sách ví dụ của tài liệu.
+
+## Bước 6: Tạo trang phục
+
+Chọn một archetype phù hợp với nhân vật.
+
+Không chọn trang phục chỉ dựa trên giới tính. Nhân vật nữ chiến binh có thể mặc giáp hở; nhân vật nam quý tộc có thể mặc trang phục nhiều lớp và trang sức tinh xảo.
+
+## Bước 7: Kiểm tra trùng lặp
+
+So sánh:
+
+* Tóc.
+* Mặt.
+* Mắt.
+* Body.
+* Silhouette.
+* Trang phục.
+* Bảng màu.
+* Phụ kiện.
+
+Nếu hai nhân vật có thể bị nhầm lẫn khi chuyển thành hình silhouette đen trắng, phải chỉnh sửa thiết kế.
+
+---
+ 
+# 20. FINAL VALIDATION CHECKLIST
+
+Trước khi xuất prompt, phải xác nhận:
+
+* Nhân vật là người trưởng thành.
+* Khuôn mặt được mô tả cụ thể.
+* Màu mắt có nhiều lớp màu và chi tiết iris.
+* Body được mô tả cụ thể.
+* Nhân vật nữ có chính xác cụm “large bust”.
+* Không sử dụng các cụm thay thế cho “large bust”.
+* Không có lọn tóc đơn ở chính giữa trán.
+* Không có tóc rơi giữa hai mắt.
+* Không có ahoge.
+* Kiểu tóc không trùng bất kỳ nhân vật nào trước đó.
+* Kiểu tóc không bị giới hạn trong danh sách ví dụ.
+* Bím tóc nữ là tùy chọn.
+* Nếu có bím, cấu trúc bím không trùng nhân vật nữ khác.
+* Không có bím tóc chạy ngang quanh đầu.
+* Trang phục phù hợp vai trò nhân vật.
+* Không bắt mọi nhân vật nữ mặc CÙNG MỘT KIỂU áo trễ vai/corset; vẫn BẮT BUỘC giữ large bust và trang phục hở ngực/khoét cổ sâu theo mục 11–12, lựa chọn kiểu áo phù hợp từng nhân vật.
+* Không mặc định nam phải mặc giáp da hoặc áo choàng.
+* Mỗi trang phục có silhouette khác nhau.
+* Mỗi nhân vật có bảng màu và phụ kiện dễ nhận diện.
+* Không chỉ thay màu để tạo nhân vật mới.
+* Không photorealism.
+* Không live action.
+* Không 3D.
+* Không CGI.
+* Không watermark.
+* Không logo.
+* Không text.
+=======================================================================================
+Hãy đóng vai trò là AI chuyên tạo prompt background minh họa cho tác phẩm; trong tool này chỉ xuất prompt văn bản để công cụ tạo ảnh bên ngoài sử dụng.
+
+NHIỆM VỤ:
+1. Phân tích nội dung bối cảnh tôi cung cấp.
+2. Với mỗi bối cảnh, hãy viết ra đúng 1 dòng prompt theo định dạng:
+BG_XX|nội dung
+3. Sau khi viết prompt xong, xuất các prompt BG dạng văn bản; KHÔNG gọi công cụ tạo ảnh trong công đoạn này.
+
+YÊU CẦU ĐỊNH DẠNG:
+- Mỗi dòng chỉ gồm đúng 1 prompt.
+- Đúng định dạng: BG_01|...
+- Không thêm giải thích, không thêm tiêu đề, không thêm ghi chú.
+- Giữ số thứ tự liên tục: BG_01, BG_02, BG_03...
+- Nội dung sau dấu | phải là prompt mô tả trực tiếp để tạo ảnh background.
+
+QUY TẮC TẠO PROMPT BG:
+- Chỉ tạo background, không có nhân vật.
+- Background phải rõ địa điểm, không mơ hồ.
+- Phải mô tả cụ thể cấu trúc không gian, vật thể chính, chất liệu, ánh sáng, thời gian, mùa hoặc thời tiết nếu cần.
+- Ưu tiên góc nhìn rộng, dễ dùng làm ảnh tham chiếu.
+- Có chiều sâu rõ: foreground, midground, background nếu phù hợp.
+- Không có chữ, logo, watermark, UI, bảng hiệu đọc được.
+- Không mô tả hành động của nhân vật.
+- Không dùng kiểu prompt quá ngắn, chung chung như “beautiful fantasy background”.
+- Prompt phải phù hợp để làm ảnh tham chiếu ổn định cho nhiều cảnh sau này.
+- Phong cách hình ảnh: polished 2D anime background illustration.
+- Khung hình: 16:9.
+- Hình ảnh sạch, rõ, không motion blur mạnh, không DOF quá nặng.
+- Ánh sáng nên tự nhiên hoặc điện ảnh nhẹ, nhưng vẫn giữ rõ cấu trúc địa điểm.
+- Nếu là địa điểm xuất hiện nhiều lần, phải nhấn mạnh các landmark cố định để dễ giữ đồng nhất.
+
+CẤU TRÚC NÊN CÓ TRONG MỖI PROMPT:
+- loại địa điểm
+- phong cách / thế giới quan
+- bố cục không gian
+- vật thể hoặc kiến trúc nổi bật
+- tiền cảnh / trung cảnh / hậu cảnh
+- ánh sáng / thời gian
+- mood phù hợp
+- chất lượng minh họa
+
+MẪU PHONG CÁCH VIẾT:
+BG_01|Create a clean and detailed fantasy anime background, 16:9, no characters, wide establishing shot of a medieval adventurer guild interior, wooden floor, long reception counter, request board on the wall, tables and chairs arranged in the hall, staircase leading to the upper floor, warm lantern lighting, clear foreground-midground-background separation, polished 2D anime background illustration, no text, no logo, no watermark
+
+KHI TÔI GỬI DANH SÁCH BỐI CẢNH:
+- Hãy tạo đầy đủ các dòng BG theo đúng format.
+- Trong AI FILM STUDIO chỉ xuất prompt BG dạng TXT để công cụ bên ngoài có thể tạo ảnh sau này; không yêu cầu tạo ảnh ngay.
+- Không tự thêm nhân vật vào background.
+- Không bỏ số thứ tự.
+- Không đổi format.
+
+DANH SÁCH BỐI CẢNH:
+[dán danh sách bối cảnh vào đây]
+
+QUY TẮC BỔ SUNG
+KHÓA KÍCH THƯỚC CHAR PHI NHÂN LOẠI TRONG PROMPT CHAR VÀ PROMPT ẢNH
+1. MỤC ĐÍCH
+Với mọi CHAR không phải nhân loại như:
+thú
+yêu thú
+linh thú
+quái vật
+ma thú
+sinh vật đặc biệt
+Bắt buộc phải ghi rõ kích thước vật lý/cảm giác kích thước trong prompt.
+Mục đích:
+giữ continuity kích thước giữa các ảnh
+tránh việc cùng một CHAR có lúc nhỏ như thú cưng, lúc lại lớn như mãnh thú
+giúp AI tạo ảnh đúng tỷ lệ với con người, đồ vật và bối cảnh
+2. QUY TẮC ÁP DỤNG
+
+Quy tắc này áp dụng bắt buộc cho:
+
+A. Prompt tạo CHAR
+Khi viết prompt thiết kế cho CHAR_XX, nếu CHAR đó là sinh vật phi nhân loại thì prompt phải ghi rõ:
+nó là loài gì
+kích thước tuyệt đối hoặc tương đối
+cảm giác quy mô
+tỷ lệ so với người trưởng thành
+B. Prompt tạo ảnh scene
+Khi dùng CHAR_XX trong prompt ảnh, nếu đó là sinh vật phi nhân loại thì trong IMAGE_PROMPT phải nhắc lại rõ:
+CHAR_XX là con gì / sinh vật gì
+kích thước của nó là bao nhiêu
+tỷ lệ so với nhân vật người trong ảnh
+Không được chỉ ghi chung chung kiểu:
+“một con cáo”
+“một con sói lớn”
+“một con quái vật”
+Mà phải ghi kiểu:
+“một con cáo khổng lồ to ngang thân xe”
+“một con sói cao gần bằng vai người trưởng thành”
+“một linh thú dài hơn chiều cao một người trưởng thành”
+3. NGUYÊN TẮC GHI KÍCH THƯỚC
+
+Khi mô tả kích thước, ưu tiên ghi theo 3 lớp cùng lúc nếu có thể:
+
+Lớp 1 — Bản chất loài
+
+Ví dụ:
+
+cáo khổng lồ
+sói cỡ lớn
+chim săn mồi khổng lồ
+rắn khổng lồ
+yêu thú dạng hổ
+linh thú giống hồ ly
+Lớp 2 — Kích thước trực quan
+
+Ví dụ:
+
+cao đến ngang ngực người trưởng thành
+cao ngang vai người trưởng thành
+dài bằng một chiếc ô tô nhỏ
+thân hình lớn như bò mộng
+đầu to gần bằng thân người
+to hơn chó lớn bình thường gấp 3 lần
+nằm xuống vẫn chiếm gần hết một góc phòng
+khi ngồi vẫn cao hơn hông người trưởng thành
+khi đứng bốn chân, lưng cao ngang eo/ngực/vai người
+Lớp 3 — Tỷ lệ trong khung hình
+
+Ví dụ:
+
+lớn hơn nhân vật nữ chính rõ rệt
+một người trưởng thành đứng cạnh chỉ cao đến vai nó
+đầu nhân vật chính chỉ ngang cổ nó
+bàn chân/đầu/mõm có kích thước rất lớn so với cơ thể người
+xuất hiện với cảm giác áp đảo về quy mô
+4. CÁCH CHUẨN HÓA MỨC KÍCH THƯỚC
+
+Để tránh mỗi prompt mô tả một kiểu, cần khóa theo nhóm sau:
+
+SIZE_BEAST_S
+nhỏ hơn chó nhà
+cỡ mèo / thỏ / chim nhỏ
+dùng cho thú nhỏ, linh vật nhỏ
+SIZE_BEAST_M
+cỡ chó lớn / cáo lớn / dê
+cao khoảng đến đầu gối hoặc đùi người trưởng thành
+SIZE_BEAST_L
+cỡ sói lớn / hươu / lợn rừng lớn
+lưng cao ngang eo người trưởng thành
+SIZE_BEAST_XL
+cỡ hổ / bò mộng / gấu lớn
+lưng cao ngang ngực hoặc vai người trưởng thành
+có cảm giác rất lớn khi đứng cạnh người
+SIZE_BEAST_GIANT
+khổng lồ
+lớn hơn thú thực tế rất nhiều
+thân dài hoặc cao vượt xa người trưởng thành
+có thể to như ngựa, ô tô nhỏ, hoặc lớn hơn tùy nguyên tác
+dùng cho các thần thú, yêu thú lớn, linh thú cỡ đại
+
+Khi đã khóa CHAR nào thuộc size nào thì mọi prompt về sau phải giữ nguyên level đó, trừ khi nguyên tác có nói nó thay đổi kích thước.
+
+5. QUY TẮC CONTINUITY KÍCH THƯỚC
+Một CHAR phi nhân loại sau khi đã xác định kích thước thì phải:
+giữ nguyên trong mọi prompt sau
+không được tự đổi nhỏ/lớn tùy ảnh
+Nếu ảnh có cả người và sinh vật:
+bắt buộc mô tả tương quan kích thước giữa hai bên
+Nếu ảnh chỉ có sinh vật:
+vẫn phải nhắc lại kích thước bằng mô tả nội tại
+Nếu là cận cảnh:
+prompt vẫn phải nhắc đó là sinh vật kích thước lớn/khổng lồ, để AI không vô thức thu nhỏ scale
+Nếu là multi-panel:
+các panel phải giữ cùng một scale logic, không được panel trái khổng lồ panel phải lại nhỏ như thú cưng nếu không có lý do nội dung
+6. CÁCH VIẾT TRONG PROMPT TẠO CHAR
+
+Với CHAR phi nhân loại, prompt CHAR phải có đủ:
+
+loài / dạng sinh vật
+kích thước chuẩn
+tỷ lệ so với người
+vóc dáng tổng thể
+cảm giác quy mô
+Mẫu bắt buộc:
+
+CHAR_XX: [loài/sinh vật], [màu sắc/đặc điểm nhận diện], kích thước [mô tả rõ], tỷ lệ [so với người], vóc dáng [to khỏe/thon dài/vạm vỡ...], giữ cố định quy mô này trong mọi ảnh sau.
+
+Ví dụ:
+
+CHAR_05: một con hồ ly khổng lồ, lông vàng nhạt, mắt thông minh, một đuôi lớn, kích thước cỡ SIZE_BEAST_GIANT, khi đứng bốn chân có lưng cao ngang ngực người trưởng thành, đầu và thân rất lớn, một người trưởng thành đứng cạnh chỉ nhỏ bằng một phần cơ thể nó, giữ cố định quy mô khổng lồ này trong mọi ảnh sau.
+
+Hoặc viết mạnh hơn:
+
+CHAR_05: giant fox spirit, very large natural fox proportions, body much larger than a normal fox, overall size comparable to a small horse, when seated it still looks imposing next to an adult human, when standing on four legs its back reaches around chest height of an adult, preserve this large scale consistently in all later images.
+
+7. CÁCH VIẾT TRONG PROMPT ẢNH SCENE
+
+Khi scene có CHAR phi nhân loại, IMAGE_PROMPT phải nhắc rõ:
+
+CHAR_XX là sinh vật gì
+kích thước của nó
+nó lớn đến mức nào so với người
+Mẫu bắt buộc:
+
+Use CHAR_XX as the exact locked visual reference for a [loài/sinh vật] with [kích thước chuẩn], preserving that it is [tỷ lệ so với người].
+
+Ví dụ đúng:
+Use CHAR_05 as the exact locked visual reference for a giant fox spirit with very large natural fox proportions, much larger than a normal fox, with a body size comparable to a small horse. Preserve that when standing on four legs, its back reaches around the chest of an adult human.
+CHAR_05 là một hồ ly khổng lồ, không phải cáo cỡ thường; giữ đúng cảm giác quy mô rất lớn, một người trưởng thành đứng cạnh chỉ cao đến khoảng ngực/lưng của nó.
+CHAR_08 là một cự lang cỡ SIZE_BEAST_XL, thân hình to như mãnh thú săn mồi cỡ cực lớn, cao ngang vai người trưởng thành khi đứng bốn chân.
+Ví dụ sai:
+CHAR_05 là một con cáo
+CHAR_08 là sói lớn
+một con thú to
+
+Vì các câu này không khóa được scale.
+
+8. KHI NÀO PHẢI NHẮC LẠI KÍCH THƯỚC TRONG IMAGE_PROMPT
+
+Bắt buộc nhắc lại khi:
+
+sinh vật xuất hiện chung với người
+sinh vật là chủ thể chính
+sinh vật chỉ lộ một phần cơ thể nhưng quy mô rất quan trọng
+cảnh có cảm giác áp đảo, uy nghi, bảo hộ, đe dọa
+sinh vật xuất hiện sau nhiều ảnh vắng mặt, để tránh AI quên scale
+
+Có thể nhắc ngắn hơn khi:
+
+nhiều ảnh liên tiếp cùng một CHAR phi nhân loại trong cùng scene
+nhưng vẫn nên giữ ít nhất 1 cụm khóa như:
+preserve its giant scale
+keep the beast much larger than a normal animal
+maintain the same large body size relative to the human character
+9. QUY TẮC ƯU TIÊN DIỄN ĐẠT KÍCH THƯỚC
+
+Ưu tiên cách nói theo thứ tự:
+
+so với người
+so với động vật thật
+so với đồ vật quen thuộc
+cảm giác thị giác trong khung hình
+
+Ví dụ mạnh:
+
+“to gấp nhiều lần cáo thường”
+“lưng cao ngang ngực người trưởng thành”
+“đầu to gần bằng phần thân trên của một người”
+“chiếm diện tích rất lớn trong khung hình”
+
+Cách này tốt hơn chỉ ghi:
+
+“rất to”
+“to lớn”
+“khổng lồ”
+
+vì những từ đó quá mơ hồ.
+
+10. QUY TẮC KHÔNG ĐƯỢC VI PHẠM
+Không được để cùng một CHAR phi nhân loại:
+lúc cỡ chó
+lúc cỡ ngựa
+lúc cỡ thú cưng
+nếu nguyên tác không nói nó biến hình/thay đổi kích thước
+Không được chỉ dựa vào ảnh tham chiếu mà không viết kích thước trong prompt
+Không được dùng mô tả mơ hồ nếu kích thước là yếu tố quan trọng
+Không được bỏ thông tin scale trong prompt scene nếu scene cần thể hiện chênh lệch kích thước với con người
+DÒNG TÍCH HỢP NGẮN GỌN ĐỂ CHÈN THẲNG VÀO QUY TẮC CŨ
+Bổ sung vào phần tạo prompt CHAR:
+
+- Với mọi CHAR là thú, yêu thú, linh thú, quái vật hoặc sinh vật phi nhân loại, prompt phải ghi rõ loài, kích thước chuẩn, tỷ lệ so với người trưởng thành và cảm giác quy mô; nếu là sinh vật cỡ lớn thì phải nói rõ mức lớn như cao ngang eo/ngực/vai người, dài cỡ nào, lớn hơn động vật thật bao nhiêu, và phải giữ cố định scale đó trong toàn bộ ảnh về sau.
+
+Bổ sung vào phần tạo prompt ảnh:
+
+- Nếu prompt có dùng CHAR phi nhân loại, trong IMAGE_PROMPT bắt buộc phải nhắc lại CHAR đó là sinh vật gì và có kích thước bao nhiêu, đặc biệt phải mô tả rõ tương quan kích thước với nhân vật người hoặc môi trường xung quanh, để AI giữ đúng scale continuity; không được chỉ ghi mơ hồ như “con cáo”, “con sói lớn”, “quái vật lớn”.
+
+MẪU LỆNH CHO AI TẠO PROMPT TỪ NAY
+
+Bạn có thể dùng nguyên văn đoạn này:
+
+Khi tạo prompt CHAR và prompt ảnh, bắt buộc với mọi CHAR là thú, yêu thú, linh thú, quái vật hoặc sinh vật phi nhân loại phải ghi rõ kích thước. Ở prompt CHAR phải ghi rõ loài, kích thước chuẩn, tỷ lệ so với người trưởng thành và giữ cố định continuity kích thước. Ở prompt ảnh phải nhắc rõ CHAR_XX là con gì/sinh vật gì và có kích thước bao nhiêu, ví dụ cao ngang eo/ngực/vai người, to cỡ chó lớn/hổ/ngựa/ô tô nhỏ..., để ảnh tạo ra đồng đều về scale, không bị lúc to lúc nhỏ.
+
+Muốn đồng bộ 100% thì phải khóa thêm 3 tầng:
+
+1) Khóa bên lệch cố định
+
+Phải ghi rõ:
+
+luôn lệch về cùng một bên
+không được đảo trái/phải giữa các ảnh
+không được mirror hairstyle
+
+Ví dụ nên viết kiểu:
+
+front hair always sweeps to the character’s right side
+character-right consistently; do not infer the locked side from viewer-left/viewer-right because Image 1 is a 3/4-front view
+never flipped to the opposite side
+all versions and states must preserve the same hair direction
+2) Khóa cấu trúc bất biến
+
+Không chỉ nói “tóc lệch”, mà phải khóa luôn:
+
+ngôi tóc nằm ở đâu
+mái chính đổ sang đâu
+bên nặng tóc là bên nào
+bên hở trán hơn là bên nào
+sideburn / temple strand bên nào dày hơn
+crown volume nghiêng bên nào
+
+Nếu không khóa mấy cái này, model vẫn có thể “hiểu là tóc bất đối xứng” nhưng mỗi ảnh bất đối xứng theo một kiểu khác nhau.
+
+3) Khóa continuity giữa các state
+
+Mỗi prompt state phải có câu kiểu:
+
+preserve the exact same hairstyle construction and same side orientation as the base design
+same asymmetrical sweep, same part direction, same heavier side, same exposed side
+do not reverse left/right hair flow in any state
+
+Nếu không, model sẽ xem mỗi state là 1 lần thiết kế mới.
+
+Cách ghi đúng để tránh lệch trái/phải
+Nên dùng cả 2 mốc:
+character-left / character-right
+và chỉ dùng viewer-left / viewer-right như chú thích camera nếu thật sự cần; character-left / character-right mới là authority cố định vì Ảnh 1 là góc 3/4 trước
+
+Vì nếu chỉ ghi “left/right” thì model đôi khi hiểu theo góc nhìn người xem, đôi khi hiểu theo phía cơ thể nhân vật.
+
+Ví dụ chuẩn hơn:
+
+Hair is permanently asymmetrical. The main front sweep goes to the character’s right side. Character-relative left/right is authoritative across all three reference images; viewer-left/viewer-right may change with the 3/4-front camera and must never be used to mirror the hairstyle. The hairstyle must never flip to the opposite side in any version, state, costume variant, or scene prompt.
+
+Với rule “cấm chỏm tóc giữa trán”, nên nâng thành bộ lock đầy đủ
+Bộ lock nên có:
+no central forelock
+no single middle bang
+no triangular center fringe
+no centered split bangs
+no symmetrical front framing
+front hair must stay asymmetrical
+main sweep always to character-right; viewer-side appearance depends on the 3/4-front camera and must never override character-right
+never mirrored across images
+preserve same side dominance in all states
+Vì sao vẫn bị lệch dù prompt tưởng như đã rõ?
+
+Có 4 nguyên nhân chính:
+
+1) Prompt chỉ khóa negative, chưa khóa positive
+
+Ví dụ:
+
+“không có tóc giữa trán”
+nhưng không nói rõ tóc phải lệch sang đâu.
+
+=> AI tránh center bang, nhưng tự chọn trái hoặc phải.
+
+2) Từng ảnh được tạo độc lập
+
+Nếu mỗi ảnh state sinh riêng hoàn toàn, model có xu hướng random hóa nhẹ.
+
+3) Mô tả state dài quá, phần tóc bị loãng trọng số
+
+Khi prompt dồn quá nhiều outfit, emotion, action, magic effect... thì hair direction dễ bị model xem nhẹ.
+
+4) Không có anchor/reference
+
+Nếu không dùng cùng bộ 3 ảnh reference chuẩn của CHAR làm mốc, continuity sẽ yếu hơn.
+
+Cách sửa ở cấp hệ thống cho dự án
+
+Nếu anh muốn khóa cho toàn bộ pipeline CHAR → IMAGE_PROMPT → VIDEO_PROMPT, thì nên áp dụng rule này:
+
+A. Trong CHAR MASTER
+
+Mỗi nhân vật người / bán nhân loại phải có mục riêng:
+
+HAIR DIRECTION LOCK
+HAIR FRONT STRUCTURE LOCK
+HAIR ASYMMETRY LOCK
+HAIR CONTINUITY LOCK
+B. Trong CHAR STATE MASTER
+
+Mỗi state phải kế thừa nguyên xi phần tóc nền:
+
+same exact hair construction as base form; preserve identical side orientation and asymmetrical front sweep; no left-right reversal.
+
+C. Trong IMAGE_PROMPT
+
+Mỗi prompt có nhân vật đó phải nhắc:
+
+preserve exact hairstyle and side orientation from character master.
+
+D. Khi tạo ảnh reference
+
+Nên dùng:
+
+1 bộ chuẩn gồm 3 ảnh reference chức năng riêng: full-body 3/4 front + close-up head-and-shoulders + full-body back view
+rồi các ảnh state sau bám theo ảnh chuẩn đó
+Mẫu câu khóa tóc mạnh
+
+
+=======================================================================================
+PHẦN BỔ SUNG TỪ BỘ QUY TẮC ZIP — CHAR / BG REFERENCE
+CHỈ BỔ SUNG, KHÔNG THAY THẾ, KHÔNG RÚT GỌN, KHÔNG SỬA BẤT KỲ QUY TẮC GỐC NÀO Ở PHÍA TRÊN
+=======================================================================================
+
+0. KHÓA KẾ THỪA VĂN BẢN GỐC
+
+- Toàn bộ nội dung phía trên của file này giữ nguyên 100%.
+- Phần bổ sung này chỉ thêm các khóa chuyên môn còn thiếu hoặc chưa khóa đủ chặt từ bộ quy tắc ZIP.
+- Nếu phần bổ sung này có điểm xung đột với một USER LOCK đã có trong văn bản gốc hoặc quy ước hiện hành của dự án, USER LOCK/VĂN BẢN GỐC được ưu tiên.
+- Không dùng phần bổ sung để xóa, đổi nghĩa, hạ mức hoặc viết lại bất kỳ quy tắc cũ nào.
+- Không áp dụng một quy tắc đánh số của ZIP nếu nó xung đột với ID/CHAR/BG convention đã được dự án hiện hành khóa trước đó.
+
+=======================================================================================
+A. BỔ SUNG QUY TẮC CHAR REFERENCE-STATE
+=======================================================================================
+
+A1. MỘT CHAR CANONICAL = MỘT SUBJECT/IDENTITY + MỘT EXACT REFERENCE STATE
+
+- Một CHAR canonical chỉ được khóa đúng một subject/identity ở đúng một reference state.
+- Không gộp nhiều identity khác nhau vào cùng một CHAR canonical.
+- Không gộp nhiều state khác nhau của cùng identity vào cùng một CHAR canonical.
+- Không trộn thường phục + giáp + bị thương + thức tỉnh trong cùng một bộ 3 ảnh reference của một CHAR canonical.
+- Cả 3 ảnh chức năng phải là cùng một identity, cùng một exact state, cùng một physical scale, cùng một outfit và cùng một thiết kế; chỉ khác camera/framing theo đúng chức năng từng ảnh.
+- Hai nhân vật sinh đôi vẫn là hai CHAR riêng nếu cả hai cần reference độc lập.
+- Người cưỡi và thú cưỡi có nhận diện riêng phải là hai CHAR riêng nếu cần tái sử dụng độc lập; scale của người và thú phải khóa riêng.
+
+A2. KHI NÀO CÙNG MỘT IDENTITY PHẢI TẠO CHAR MỚI
+
+Cấp CHAR_ID mới khi thay đổi đủ lớn làm ảnh reference cũ không còn khóa đúng tạo hình, bao gồm nhưng không giới hạn:
+
+- child → teen → adult → elder;
+- thường phục → giáp chiến đấu;
+- lễ phục / váy cưới / đồng phục / cải trang / tù nhân / thân phận mới;
+- quần áo rách nặng kéo dài;
+- thương tích nặng kéo dài;
+- mất tay/chân hoặc damage lớn làm đổi silhouette;
+- phủ bùn / cháy xém / ướt sũng nếu trở thành state kéo dài cần continuity;
+- cắt tóc / đổi tóc lâu dài;
+- dạng người → spirit/ghost form;
+- transformation / awakening / evolution;
+- world-form khác;
+- thay đổi kích thước vật lý thật sự;
+- bất kỳ thay đổi body/silhouette/identity-state nào khiến ảnh reference cũ không còn đủ.
+
+KHÔNG tạo CHAR mới chỉ vì:
+
+- vui / buồn / khóc / cười / giận / sợ / shock / nghi ngờ;
+- pose khác;
+- action khác;
+- gaze khác;
+- body language khác;
+- đứng / ngồi / chạy / nằm;
+- camera / framing / shot size khác;
+- áo/tóc bay do gió;
+- ánh sáng khác;
+- bụi nhẹ;
+- vết xước nhỏ chỉ tồn tại trong một beat;
+- cầm một vật tạm thời.
+
+Các yếu tố trên thuộc scene performance, không phải reference-state mới.
+
+A3. METADATA QUAN HỆ GIỮA CÁC CHAR STATE
+
+Khi một identity có nhiều CHAR state, phải ghi quan hệ trong metadata/mapping, không nhét state vào ID.
+
+Khuyến nghị:
+
+CHAR_ID:
+ENTITY_IDENTITY:
+SAME_ENTITY_AS:
+REFERENCE_STATE:
+STATE_START:
+STATE_END:
+SIZE_LOCK:
+SOURCE_SIZE:
+SIZE_EVIDENCE:
+SIZE_ORIGIN:
+CONTINUITY_NOTES:
+
+Ví dụ logic:
+CHAR_03
+SAME_ENTITY_AS: CHAR_01
+REFERENCE_STATE: wounded / torn-clothing
+STATE_START: [LINE/SCENE bắt đầu]
+STATE_END: [LINE/SCENE kết thúc nếu xác định được]
+SIZE_LOCK: giữ cùng physical size với identity gốc nếu canon không đổi kích thước.
+
+- Không dùng CHAR_01_A / CHAR_01_WOUNDED / CHAR_01_V2 chỉ để biểu diễn state nếu project production ID hiện hành đang dùng CHAR_XX tuần tự.
+- State nằm trong metadata, không được âm thầm tái định nghĩa một CHAR_ID cũ sang hình khác.
+
+A4. KÍCH THƯỚC LÀ THUỘC TÍNH BẮT BUỘC CHO MỌI CHAR
+
+Ngoài quy tắc scale rất chi tiết cho CHAR phi nhân loại đã có trong văn bản gốc, bổ sung khóa chung:
+
+- Mọi CHAR, kể cả người/humanoid, phải có SIZE_LOCK.
+- Nếu source có số đo chính xác: dùng đúng số đo source.
+- Nếu source chỉ có tương quan: phải giữ tương quan và khóa một kích thước production hợp lý.
+- Nếu source không nêu: phải phân tích và bổ sung kích thước hợp lý, nhưng bắt buộc ghi đây là DESIGN SUPPLEMENT / SIZE INFERRED.
+- Human/humanoid: ưu tiên chiều cao cụ thể theo cm hoặc khoảng cm đủ hẹp.
+- Phi nhân: ưu tiên shoulder height / standing height / body length / wingspan / body diameter phù hợp hình thái, cộng tỷ lệ với adult human khi hữu ích.
+- Không chỉ dùng small / medium / large / huge / gigantic nếu không có số đo hoặc anchor so sánh.
+- SIZE_LOCK đã chốt phải giữ nguyên giữa cả 3 ảnh reference chức năng và tất cả scene của cùng state.
+
+Định dạng nội bộ khuyến nghị:
+
+SOURCE_SIZE:
+SIZE_EVIDENCE:
+SIZE_LOCK:
+SIZE_ORIGIN: CANON / INFERRED_DESIGN / USER_LOCK
+
+A5. PHỤ KIỆN / VŨ KHÍ / CÔNG CỤ CỐ ĐỊNH PHẢI TÍCH HỢP VÀO CHAR
+
+Khi một vật là đặc điểm cố định hoặc continuity quan trọng của exact CHAR state, phải tích hợp trực tiếp vào reference CHAR:
+
+- trang sức;
+- huy hiệu;
+- túi;
+- dây đeo;
+- bao kiếm;
+- signature weapon;
+- staff;
+- công cụ nghề nghiệp;
+- item nhiệm vụ được mang cố định;
+- yên / dây cương / giáp thú / phụ kiện cơ thể của thú.
+
+Không tách thành resource phụ chỉ để rồi ghép lại nếu bản thân vật đó không cần identity/reference độc lập.
+
+Nếu một object thật sự có identity độc lập, cần giữ đúng shape/scale/state qua nhiều scene và cần tái sử dụng độc lập, mới được cân nhắc cấp resource riêng.
+
+A6. KHÓA ĐỒNG NHẤT BỘ 3 ẢNH THAM CHIẾU CHAR CHỨC NĂNG
+
+KHÔNG dùng character turnaround 3 mặt cổ điển. KHÔNG xuất front + side + back trong cùng một sheet. KHÔNG mặc định tạo side profile.
+
+Bộ reference chuẩn phải tạo chính xác BA ẢNH RIÊNG của CÙNG MỘT CHAR và CÙNG MỘT EXACT REFERENCE STATE:
+
+ẢNH 1 — FULL-BODY 3/4 FRONT
+- một nhân vật duy nhất;
+- toàn thân từ đầu đến chân, không crop footwear;
+- góc 3/4 trước tự nhiên, đủ đọc rõ mặt và cấu trúc cơ thể;
+- neutral relaxed upright reference pose;
+- dùng để khóa overall silhouette, body proportions, height/scale, front-visible hair logic, outfit construction, accessories và footwear;
+- không biến thành exact straight-front turnaround view trừ khi người dùng yêu cầu riêng.
+
+ẢNH 2 — CLOSE-UP HEAD AND SHOULDERS
+- cùng identity và exact state với Ảnh 1;
+- crop đầu và vai;
+- ưu tiên readability của face structure, eyes, brows, nose, mouth, skin, hairline, bangs/front hair, temple/side hair, ears nếu design cho phép nhìn thấy, neck/collar/shoulder details;
+- expression neutral hoặc softly natural, không dùng scene acting mạnh nếu không có user lock;
+- không thay đổi hairstyle, outfit color/material, accessories hoặc age chỉ vì camera gần hơn.
+
+ẢNH 3 — FULL-BODY BACK VIEW
+- cùng identity và exact state với Ảnh 1 và Ảnh 2;
+- toàn thân mặt sau từ đầu đến chân, không crop footwear;
+- đứng trung tính, không quay đầu làm mất rear-hair readability;
+- dùng để khóa rear hairstyle geometry, back silhouette, back-side garment construction, rear accessories và footwear phía sau;
+- BACK VIEW là góc kiểm tra bắt buộc cho mọi rear-hair rule.
+
+CẢ 3 ẢNH PHẢI GIỮ TUYỆT ĐỐI:
+- same exact locked physical size;
+- same height;
+- same body proportions;
+- same face identity/structure;
+- same eye design/colors;
+- same nose and mouth design;
+- same hairstyle construction;
+- same hairline;
+- same hair volume distribution;
+- same character-left / character-right side orientation and asymmetry;
+- same clothing layers;
+- same fabric/material construction;
+- same accessories;
+- same footwear;
+- same canonical colors;
+- same age;
+- same exact reference state.
+
+OUTPUT LOCK:
+- exactly 3 separate images/files;
+- not one combined sheet;
+- not a multi-panel composition;
+- not three copies of the character in one image;
+- no side-profile image by default;
+- clean simple neutral presentation background for each image;
+- no environment;
+- no story scene;
+- no furniture unless it is a fixed canonical accessibility/support requirement explicitly requested;
+- no decorative text;
+- no character name text;
+- no CHAR_ID;
+- no image-number labels;
+- no measurement text;
+- no cm/m label;
+- no ruler or scale bar;
+- no technical annotation.
+
+PROMPT STRUCTURE LOCK:
+Prompt CHAR phải mô tả ba image outputs trong cùng một prompt resource nhưng nói rõ chúng là THREE SEPARATE REFERENCE IMAGES. Nếu công cụ chỉ sinh một ảnh mỗi lần, dùng cùng canonical CHAR prompt và chạy ba output riêng theo IMAGE 1 / IMAGE 2 / IMAGE 3; không thay đổi design giữa các lần.
+
+Mẫu khóa bắt buộc có thể dùng:
+Create exactly THREE SEPARATE reference images of the SAME character and SAME exact reference state, not a turnaround sheet, not a multi-panel image, and not three characters in one image. Image 1: full-body 3/4 front view from head to toe. Image 2: close-up head-and-shoulders portrait. Image 3: full-body back view from head to toe, clearly showing rear hair and back-side outfit construction. Preserve identical identity, physical scale, proportions, hairstyle construction and side orientation, outfit, accessories, footwear, materials and colors across all three images. Do not create a side-profile reference unless explicitly requested.
+
+A7. NEGATIVE REFERENCE-ARTIFACT LOCK — CHAR
+
+Số đo và metadata chỉ là hidden design constraints, KHÔNG phải chữ cần render lên ảnh.
+
+Bắt buộc tránh:
+- character name text;
+- CHAR_ID text;
+- filename;
+- số thứ tự;
+- chiều cao viết cạnh người;
+- measurement number;
+- cm/m label;
+- ruler;
+- scale bar;
+- dimension line;
+- dimension arrow;
+- technical annotation;
+- callout;
+- note;
+- caption;
+- watermark;
+- logo;
+- UI;
+- readable text.
+
+Câu khóa có thể dùng:
+
+Use all measurements and reference annotations only as hidden design constraints. Do not render any measurement number, height label, dimension text, ruler, scale bar, measurement line, arrow, technical annotation, character ID, filename, caption, note, watermark, logo, UI, or any readable text into the generated character reference image.
+
+A8. THIẾT KẾ BỔ SUNG KHI SOURCE THIẾU
+
+Trước khi tự thiết kế phải giữ toàn bộ chi tiết source đã có.
+
+Chi tiết thiếu chỉ được bổ sung dựa trên:
+- tuổi;
+- giới tính/race khi phù hợp;
+- vai trò;
+- nghề nghiệp;
+- khí hậu;
+- thời đại;
+- địa vị;
+- điều kiện sống;
+- môi trường;
+- thể loại;
+- logic thế giới;
+- phong cách hình ảnh.
+
+Không thiết kế ngược vai trò/canon.
+
+Mọi chi tiết tự bổ sung phải được coi là:
+DESIGN_SUPPLEMENT
+và sau khi đã chốt thì trở thành continuity lock, không được đổi ngẫu nhiên giữa các ảnh.
+
+A9. ẢNH THAM CHIẾU ĐÃ ĐƯỢC NGƯỜI DÙNG XÁC NHẬN
+
+Nếu người dùng đã xác nhận một ảnh CHAR là reference authority:
+- prompt scene/state sau phải bám đúng identity/face/hair/body/outfit/scale của ảnh đó;
+- không được viết lại ngoại hình trái với ảnh đã xác nhận;
+- nếu ảnh đã xác nhận và mô tả cũ xung đột, phải báo/đồng bộ mô tả theo authority hiện hành, không âm thầm tạo một identity khác.
+
+=======================================================================================
+B. BỔ SUNG QUY TẮC BG REFERENCE-STATE
+=======================================================================================
+
+B1. MỘT BG = MỘT CANONICAL LOCATION/BACKGROUND FUNCTION + MỘT EXACT REFERENCE STATE
+
+- Mỗi BG_ID phải khóa một exact background reference state có thể tái sử dụng.
+- Cùng canonical location có thể có nhiều BG_ID nếu state thật sự khác và cần reference riêng.
+- Không biến một BG_ID đã khóa sang state khác bằng prose mà vẫn giữ nguyên ID.
+- Cùng location + cùng state + cùng fixed layout → REUSE BG.
+- Camera khác không tự động tạo BG mới.
+
+B2. BG VẬT LÝ VÀ BG ĐỘNG ĐỀU LÀ RESOURCE BG
+
+Khi project cần, cùng hệ BG có thể bao gồm:
+
+RESOURCE_ROLE:
+- PHYSICAL_ENVIRONMENT_BG;
+- LOCATION_DYNAMIC_STATE_BG;
+- EMOTIONAL_REACTION_BG;
+- ABSTRACT_MANGA_BG;
+- THOUGHT_INNER_IMAGE_BG;
+- MEMORY_FLASHBACK_TREATMENT_BG;
+- DREAM_VISION_BG;
+- HYPOTHETICAL_VISUALIZATION_BG;
+- COMBAT_ZONE_BG;
+- DESTRUCTION_STATE_BG;
+- IMPACT_FIELD_BG;
+- MOTION_SPEED_BG;
+- THREAT_POWER_BG;
+- ATMOSPHERIC_DANGER_BG.
+
+Dynamic BG phải có exact resource khi nó là một background mechanism/state thật sự cần khóa cho sản xuất; không chỉ ghi prose chung chung rồi để downstream tự biến đổi.
+
+Quy tắc đánh số phải kế thừa sequence BG hiện hành của project:
+- không reset;
+- không lấp ID cũ;
+- không đổi ID đã khóa;
+- `BG_00` không còn là reserved emotional background của project;
+- BG cảm xúc / abstract / thought / memory / flashback / dream / hypothetical / dynamic dùng exact numbered `BG_XX` tuần tự do B3 tạo/khóa;
+- nếu project có reserved ID khác ngoài `BG_00` thì giữ nguyên user/project lock đó.
+
+B3. METADATA BẮT BUỘC CHO BG KHI ÁP DỤNG
+
+Khuyến nghị lưu:
+
+BG_ID
+RESOURCE_ROLE
+REFERENCE_STATE
+CANONICAL_LOCATION_CONTEXT
+SAME_LOCATION_AS
+DERIVED_FROM_BG
+BG_FUNCTION
+DYNAMIC_BG_CONCEPT
+TOPOLOGY_NOTES
+COMBAT_ZONE_NOTES
+FORCE_DIRECTION_BASIS
+DESTRUCTION_LEVEL
+REUSE_SCOPE_NOTES
+STATE_START
+STATE_END
+FIXED_LAYOUT
+SCALE_CUES
+
+State nằm trong metadata, không gắn suffix state vào production token nếu project dùng BG_XX tuần tự.
+
+B4. KHI NÀO PHẢI TẠO BG MỚI
+
+Tạo BG mới khi reference cũ không còn đủ để khóa đúng một trong các yếu tố:
+
+- location khác;
+- functional subspace/phòng khác;
+- interior ↔ exterior;
+- fixed layout khác;
+- topology/zone khác có ý nghĩa sản xuất;
+- landmark relationships khác;
+- day ↔ night khi nhận diện/nguồn sáng/chức năng thay đổi rõ;
+- weather/season state nhìn thấy rõ;
+- normal ↔ flooded/frozen/abandoned/festival/war-zone;
+- pre-destruction ↔ post-destruction;
+- pre-repair ↔ post-repair;
+- thời kỳ khác làm thay đổi không gian;
+- impact/speed/threat/abstract field là background mechanism riêng;
+- atmosphere/danger state riêng;
+- scale/visibility/structural state thay đổi lớn.
+
+KHÔNG tạo BG mới chỉ vì:
+- camera angle;
+- crop;
+- lens;
+- shot size;
+- framing;
+- vị trí character;
+- pose/action của character;
+- expression;
+- số người hiện diện;
+- vật cầm tạm;
+- foreground occlusion tạm;
+- minor temporary particle;
+- thay đổi ánh sáng rất nhẹ không làm đổi exact reference state.
+
+B5. FIXED BACKGROUND LAYOUT LOCK
+
+Trong prompt BG nên khóa trực tiếp cụm:
+fixed background layout
+
+Ngoài danh sách đã có trong văn bản gốc, fixed layout phải ghi quan hệ vị trí tương đối khi có căn cứ:
+
+- entrance/exit;
+- cửa/cửa sổ;
+- cầu thang;
+- hành lang;
+- bàn/giường/bếp/lò/quầy;
+- cổng/đường/sông/cầu;
+- núi/tháp/lâu đài;
+- landmark chính;
+- foreground / midground / background;
+- open space;
+- major prop;
+- architectural/terrain scale cues.
+
+BG phải đủ cụ thể để lần tạo sau không đổi bố cục lớn.
+
+Không dùng khái niệm trừu tượng thay cho cấu trúc nhìn thấy được.
+Ví dụ phải ưu tiên:
+ruined stone houses / frozen fields / collapsed fence / narrow muddy road / distant fortress wall
+thay vì chỉ ghi:
+world of despair / land of fate / beautiful fantasy place.
+
+B6. BG REFERENCE KHÓA ENVIRONMENT DESIGN, KHÔNG KHÓA MỘT CAMERA DUY NHẤT
+
+- BG reference phải đủ topology/layout để downstream tái dựng cùng một canonical space từ góc khác.
+- Không tạo thêm BG chỉ để có một camera angle khác nếu location/state/layout không đổi.
+- Camera scene sau có thể đổi nhưng vẫn phải tôn trọng topology và landmark relationships đã khóa.
+
+B7. NẾU DÒNG/ĐOẠN KHÔNG NÊU RÕ LOCATION
+
+Không tự tạo location mới.
+
+Phải ưu tiên:
+1. đọc context hiện hành;
+2. đọc trước/sau;
+3. kiểm continuity location;
+4. reuse BG canonical đã khóa nếu chưa có transition;
+5. nếu vẫn không đủ bằng chứng → ghi LOCATION_GAP / BG_GAP.
+
+Không invent phòng, tòa nhà, landmark hay environment state chỉ để có BG.
+
+B8. DYNAMIC BG / ACTION / FORCE CONSISTENCY
+
+Với BG dynamic/combat/impact:
+
+- không chứa force/debris/energy trái source;
+- phải biết nguồn lực nếu source xác định;
+- phải khóa hướng chính khi hướng là yếu tố quan trọng;
+- phải biết vùng impact;
+- environment reaction phải hợp logic;
+- debris/motion direction phải thống nhất với lực;
+- không phóng đại destruction/power vượt source;
+- ưu tiên một dominant effect rõ ràng thay vì chồng quá nhiều effect cạnh tranh.
+
+Với isekai nam/action, ưu tiên:
+- physical spatial clarity;
+- perspective rõ;
+- scale cues rõ;
+- topology dễ đọc;
+- environment có phản ứng vật lý hợp lực;
+- impact point không bị BG/effect che;
+- establishing BG đủ chi tiết để người xem hiểu không gian.
+
+B9. NEGATIVE REFERENCE-ARTIFACT LOCK — BG
+
+Kích thước/layout metadata chỉ là hidden constraints.
+
+Không render:
+- BG_ID text;
+- filename;
+- landmark label;
+- measurement number;
+- dimension text;
+- ruler;
+- scale bar;
+- arrows;
+- technical annotation;
+- caption;
+- note;
+- watermark;
+- logo;
+- UI;
+- readable text từ reference.
+
+Giữ scale/layout bằng:
+- perspective;
+- kiến trúc;
+- tỷ lệ vật thể;
+- landmark relationships;
+- spatial spacing.
+
+Không vẽ sơ đồ đo hoặc nhãn kỹ thuật lên ảnh BG.
+
+B10. HARD FAIL BG
+
+FAIL nếu:
+- một BG_ID bị âm thầm tái định nghĩa sang exact state khác;
+- tạo BG mới chỉ vì camera/pose;
+- gộp hai functional spaces khác nhau thành một BG chỉ vì cùng building;
+- destruction/weather/time state quan trọng bị bỏ mặc dù cần reference riêng;
+- dynamic background cần exact state nhưng chỉ để prose generic;
+- dynamic force/debris/energy trái source;
+- landmark/layout quan trọng được invent không có basis;
+- collision/reset ID;
+- reference BG có text/measurement/annotation mà người dùng không yêu cầu.
+
+=======================================================================================
+C. BỔ SUNG QA CHAR/BG TRƯỚC KHI XUẤT
+=======================================================================================
+
+C1. QA CHAR
+
+Trước khi PASS một CHAR:
+- đúng identity;
+- đúng exact reference state;
+- mỗi ảnh chỉ có một canonical subject; toàn bộ bộ 3 ảnh chỉ đại diện cho cùng một identity/state;
+- cả 3 ảnh chức năng là cùng một người/sinh vật/state;
+- Ảnh 1 và Ảnh 3 phải full body không crop; Ảnh 2 chủ đích là close-up head-and-shoulders;
+- scale khóa rõ;
+- provenance scale rõ;
+- body/face/eyes/hair/outfit/accessories đồng nhất tuyệt đối giữa cả 3 ảnh;
+- hair left/right orientation không mirror;
+- không tạo CHAR mới chỉ vì emotion/pose/camera;
+- state lớn thì có CHAR mới riêng;
+- fixed gear tích hợp đúng;
+- không có measurement labels/ruler/text/ID trên ảnh;
+- design supplement được đánh dấu, không giả thành canon.
+
+C2. QA BG
+
+Trước khi PASS một BG:
+- đúng canonical location/background function;
+- đúng exact reference state;
+- đúng fixed layout;
+- đúng topology;
+- đúng functional space;
+- đúng interior/exterior;
+- đúng day/night/weather/season nếu là state khóa;
+- đúng pre/post destruction/repair nếu áp dụng;
+- cùng location/state thì reuse;
+- camera khác không tạo BG mới;
+- emotional / abstract / thought / memory / flashback / dream / hypothetical BG đúng RESOURCE_ROLE và exact state do B3 khóa;
+- không dùng BG_00 làm emotional background chung;
+- dynamic BG có force/direction/environment reaction đúng source;
+- không có main character trong BG theo rule gốc của file này;
+- không có readable text/logo/watermark;
+- không có measurement labels/technical annotation;
+- đủ landmark/scale cues để tái sử dụng ổn định.
+
+C3. QA ID / CONTINUITY
+
+- Không reset CHAR/BG sequence đã khóa.
+- Không lấp lỗ ID cũ.
+- Không đổi ID của resource đã xác nhận.
+- Không dùng cùng một ID cho hai exact states khác nhau.
+- Nếu cùng identity/location có nhiều state, dùng metadata SAME_ENTITY_AS / SAME_LOCATION_AS / DERIVED_FROM_* để liên kết.
+- Reference image đã được user xác nhận phải được giữ continuity ở các prompt sau.
+
+=======================================================================================
+END — PHẦN BỔ SUNG TỪ ZIP
+=======================================================================================

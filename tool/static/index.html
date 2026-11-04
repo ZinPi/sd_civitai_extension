@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tạo prompt ảnh</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%238f3d1b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css?v=4">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">Từ bản đã chia dòng</p>
+      <h1>Tạo prompt ảnh</h1>
+      <p class="lede">Dán bản audio, mỗi dòng một câu. Năm file quy tắc được đọc nguyên văn theo đúng bước. Xong thì tải ba file chữ.</p>
+      <p class="hint stay">Cửa sổ đen sẽ tự tắt. Trang vẫn mở. Muốn tắt hẳn thì bấm đúp Tat.bat, file nằm cạnh Chay.bat.</p>
+      <p id="connection" class="connection">Đang kiểm tra kết nối…</p>
+    </header>
+
+    <section class="sheet source" id="drop">
+      <div class="sheet-head">
+        <label for="source">Bản đã chia dòng</label>
+        <span id="count">Chưa có dòng</span>
+      </div>
+      <textarea id="source" rows="6" placeholder="Dán vào đây. Mỗi dòng là một câu." spellcheck="false"></textarea>
+      <div class="row">
+        <label class="file-btn">
+          Chọn file TXT
+          <input id="file" type="file" accept=".txt,text/plain">
+        </label>
+        <p class="hint">Dòng trống không tính. Không cần tách lại bằng dấu chấm.</p>
+      </div>
+    </section>
+
+    <details class="sheet settings" id="api" open>
+      <summary>API</summary>
+      <div class="form">
+        <label>
+          <select id="provider" aria-label="Chỗ dùng API">
+            <option value="teamsoclo" selected>TeamSocLo</option>
+            <option value="tuansu">TuanSu</option>
+            <option value="openai">OpenAI</option>
+            <option value="claude">Claude</option>
+          </select>
+        </label>
+        <label>API
+          <input id="api-key" type="password" autocomplete="off" placeholder="Dán API">
+        </label>
+        <button id="test" type="button">Kiểm tra</button>
+        <p id="test-result" class="hint"></p>
+        <label id="model-wrap" hidden>
+          <select id="model" aria-label="Chọn model"></select>
+        </label>
+        <details class="limits">
+          <summary>Khi một lượt quá dài</summary>
+          <div class="limits-grid">
+            <label>Token đầu vào tối đa
+              <input id="max-in" type="number" min="1024" max="2000000" step="1" value="120000">
+            </label>
+            <label>Token đầu ra tối đa
+              <input id="max-out" type="number" min="256" max="200000" step="1" value="8192">
+            </label>
+            <label>Giây chờ mỗi lượt
+              <input id="timeout" type="number" min="30" max="600" step="1" value="180">
+            </label>
+          </div>
+          <p class="hint">20 dòng chỉ là trần. Tool tự giảm số dòng cho vừa giới hạn, và không cắt file quy tắc. Hết giờ chờ thì không tự gửi lại.</p>
+        </details>
+      </div>
+    </details>
+
+    <section class="layout">
+      <section class="sheet work">
+        <ol id="steps">
+          <li class="step" data-step="1" data-file="danh-sach">
+            <span class="num">1</span>
+            <span class="copy">
+              <strong>Danh sách nhân vật và bối cảnh</strong>
+              <small>Tiếng Việt, mã CHAR và BG</small>
+            </span>
+            <span class="status">Chưa chạy</span>
+          </li>
+          <li class="step" data-step="2" data-file="char">
+            <span class="num">2</span>
+            <span class="copy">
+              <strong>Prompt ảnh nhân vật</strong>
+              <small>Bộ tham chiếu cho từng CHAR</small>
+            </span>
+            <span class="status">Chưa chạy</span>
+          </li>
+          <li class="step" data-step="3" data-file="bg">
+            <span class="num">3</span>
+            <span class="copy">
+              <strong>Prompt ảnh bối cảnh</strong>
+              <small>Một prompt cho từng BG</small>
+            </span>
+            <span class="status">Chưa chạy</span>
+          </li>
+          <li class="step" data-step="4" data-file="dong">
+            <span class="num">4</span>
+            <span class="copy">
+              <strong>Prompt ảnh theo dòng</strong>
+              <small>Một câu nguồn, một prompt tiếng Anh</small>
+            </span>
+            <span class="status">Chưa chạy</span>
+          </li>
+        </ol>
+
+        <p id="notice" class="notice" hidden></p>
+        <p id="detail" class="detail" aria-live="polite"></p>
+        <div class="meter" id="meter-wrap" hidden role="progressbar" aria-valuemin="0" aria-valuenow="0" aria-valuemax="0">
+          <span id="meter"></span>
+        </div>
+
+        <div class="actions">
+          <button id="run" class="primary" type="button">Chạy cả bốn bước</button>
+          <button id="next" type="button">Chỉ bước kế tiếp</button>
+          <button id="stop" type="button" hidden>Dừng sau lượt này</button>
+          <button id="clear" class="quiet" type="button" hidden>Xóa kết quả</button>
+        </div>
+        <ul id="log" class="log"></ul>
+      </section>
+
+      <section class="sheet results">
+        <div class="sheet-head">
+          <h2>Kết quả</h2>
+        </div>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-file="danh-sach" aria-selected="true">Danh sách</button>
+          <button type="button" role="tab" data-file="char">Prompt nhân vật</button>
+          <button type="button" role="tab" data-file="bg">Prompt bối cảnh</button>
+          <button type="button" role="tab" data-file="dong">Prompt theo dòng</button>
+        </div>
+        <pre id="preview">Kết quả hiện ở đây sau khi chạy.</pre>
+        <p id="preview-note" class="hint" hidden></p>
+        <a id="download" class="download" hidden>Tải file này</a>
+        <a id="reference" class="quiet-link" href="/api/file/tham-chieu" hidden>Tải file tham chiếu đã tổng hợp</a>
+      </section>
+    </section>
+
+    <details class="sheet rules">
+      <summary>Quy tắc đang dùng</summary>
+      <p class="hint" id="rules-dir"></p>
+      <ul id="rules"></ul>
+      <p class="hint">Sửa file rồi chạy lại. Mỗi lượt gọi API đều đọc bản đang nằm trên đĩa, không dùng bản nhớ cũ.</p>
+    </details>
+  </main>
+  <script src="/static/app.js?v=5"></script>
+</body>
+</html>

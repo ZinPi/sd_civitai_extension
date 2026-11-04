@@ -1,0 +1,1176 @@
+B3 — TRÍCH XUẤT NHÂN VẬT, SINH VẬT, VŨ KHÍ / VẬT PHẨM / CÔNG CỤ, BỐI CẢNH
+VERSION: B3_V2_SIMPLE_R1_NO_CONFLICT
+
+KHÓA NGUỒN KHI B3 THAM GIA PIPELINE KẾT HỢP B1 → B2 → B3:
+- B3 chỉ bắt đầu khi B2 đã có `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE` PASS/LOCK.
+- B3 dùng bản KHÔNG-TTS này làm nguồn nội dung chính để nhận diện theo câu, đếm `SOURCE_SENTENCE_IDS`, state, CHAR/BG và continuity; `SOURCE_ORIGINAL` để đối chiếu canon khi có.
+- Không dùng `AUDIO_ES_LATAM_40_TTS` thay thế nguồn nội dung chính trong pipeline kết hợp; các lựa chọn nguồn SRT/TTS ở các mục dưới chỉ dành cho pipeline khác khi được kích hoạt rõ.
+- Quy tắc ACTIVE CHARACTER VISUAL COUNT ở mục 2A có hiệu lực; rule cũ dùng số IMAGE_PROMPT cho CHARACTER chỉ là lịch sử, không được kích hoạt trở lại.
+- Các quyết định “chọn resource, reference, state” ở B3 là việc AI xác định từ source/lock, không phải câu hỏi bắt buộc người dùng điền.
+BASE_VERSION: B3_V2_SIMPLE
+REVISION_SCOPE: RESOLVE CHARACTER VISUAL-COUNT / REFERENCE THRESHOLD CONFLICT WITHOUT DELETING LEGACY RULES
+SCOPE: TRÍCH XUẤT TÀI NGUYÊN HÌNH ẢNH CHO CÁC BƯỚC SAU
+
+======================================================================
+0. MỤC ĐÍCH
+======================================================================
+
+B3 dùng để trích xuất các tài nguyên hình ảnh cần thiết cho các bước tạo ảnh tiếp theo.
+
+B3 chỉ tập trung vào 4 nhóm chính:
+
+1. NHÂN VẬT.
+2. SINH VẬT / QUÁI VẬT / THỰC THỂ PHI NHÂN.
+3. VŨ KHÍ / VẬT PHẨM / CÔNG CỤ / ĐẠO CỤ QUAN TRỌNG.
+4. BỐI CẢNH / LOCATION / BG.
+
+Mục tiêu:
+- xác định cái gì cần dùng lại;
+- xác định các trạng thái hình ảnh quan trọng;
+- xác định cái gì cần ảnh tham chiếu riêng;
+- xác định cái gì chỉ cần mô tả trực tiếp trong prompt ảnh ở bước sau.
+
+B3 KHÔNG phải bước:
+- chia scene;
+- chia panel;
+- dựng camera;
+- viết prompt ảnh theo từng dòng;
+- phân tích diễn xuất;
+- phân tích biểu cảm khuôn mặt thành state riêng.
+
+======================================================================
+1. ĐẦU VÀO
+======================================================================
+
+B3 nhận:
+
+- AUDIO_ES_LATAM_MASTER hoặc bản TTS Español Latino Neutral đã hoàn thành ở B2.
+- SRT hiện hành hoặc các mốc SRT / OUTPUT_SLOT nếu pipeline hiện tại đang phân tích theo SRT.
+- SOURCE_ORIGINAL nếu có.
+- các user lock hiện hành.
+- CHAR/BG/resource master cũ nếu project đã có phần trước.
+
+======================================================================
+2. NGUYÊN TẮC CHUNG
+======================================================================
+
+B3 phải đọc toàn bộ scope trước khi khóa danh sách tài nguyên.
+
+Không được:
+- chỉ search tên;
+- chỉ đếm keyword;
+- chỉ dùng số lần tên xuất hiện;
+- tự bịa ngoại hình hoặc bối cảnh thành canon;
+- tạo resource dư chỉ vì đối tượng được nhắc nhiều;
+- biến B3 thành hệ thống phân tích phức tạp không phục vụ tạo ảnh.
+
+Nguồn ưu tiên:
+
+1. Yêu cầu hiện tại của người dùng.
+2. SOURCE_ORIGINAL.
+3. AUDIO_ES_LATAM_MASTER hoặc bản TTS Español Latino Neutral đã hoàn thành ở B2.
+4. User locks.
+5. Previous master của project.
+6. CONTEXT_INFERENCE.
+7. DESIGN_SUPPLEMENT.
+
+Mọi chi tiết suy luận hoặc bổ sung phải được phân biệt với canon/source fact.
+
+======================================================================
+2A. ACTIVE CHARACTER VISUAL COUNT LOCK — QUY TẮC HIỆN HÀNH, KHÔNG XUNG ĐỘT
+======================================================================
+
+PHẠM VI:
+- Chỉ thay thế cách ĐẾM và QUYẾT ĐỊNH đưa NHÂN VẬT vào danh sách tạo CHAR/reference trong B3.
+- Không thay đổi các quy tắc khác về state, size, no-invention, creature, item, location, BG hoặc reference continuity.
+
+ĐƠN VỊ ĐẾM CHÍNH THỨC CHO NHÂN VẬT Ở B3:
+→ CÂU NGUỒN CÓ GIÁ TRỊ HÌNH ẢNH.
+→ KHÔNG phải số IMAGE_PROMPT.
+
+ĐỊNH NGHĨA:
+Mỗi câu nguồn khác nhau được tính tối đa 1 lần cho một nhân vật khi đồng thời thỏa cả hai điều kiện:
+1. câu đó nhắc trực tiếp hoặc có thể quy chiếu chắc chắn về đúng nhân vật đó;
+2. câu đó có giá trị trực quan hóa nhân vật trong ảnh.
+
+Có thể tính khi identity được xác định chắc chắn qua:
+- tên riêng;
+- alias / danh xưng;
+- đại từ;
+- chủ ngữ lược nhưng antecedent rõ;
+- cụm như người đàn ông / cô gái / chàng trai / nhân vật đó nếu continuity chỉ ra duy nhất một identity;
+- tham chiếu nhóm nếu có thể xác định chắc chắn cá nhân đó đang hiện diện và có giá trị hình ảnh.
+
+Không tính:
+- MENTION_ONLY;
+- OFFSCREEN_ONLY;
+- tên chỉ xuất hiện trong lời kể/lore nhưng nhân vật không có giá trị trực quan hóa ở câu đó;
+- UI_ONLY chỉ hiển thị tên/trạng thái mà không trực quan hóa nhân vật;
+- câu tham chiếu mơ hồ không thể xác định chắc chắn identity;
+- lặp tên nhiều lần trong cùng một câu.
+
+QUY TẮC ĐẾM:
+- 1 câu có giá trị hình ảnh = 1 VISUAL_USE_COUNT cho nhân vật đó.
+- Cùng một nhân vật được nhắc nhiều lần trong cùng một câu vẫn chỉ = 1.
+- Hai câu nguồn khác nhau cùng có giá trị hình ảnh = 2.
+- Phải đếm bằng semantic/coreference, không chỉ search tên hoặc keyword.
+
+QUYẾT ĐỊNH CHAR:
+VISUAL_USE_COUNT = 0 hoặc 1
+→ KHÔNG đưa vào danh sách tạo CHAR/reference riêng.
+→ nếu cần, mô tả trực tiếp trong prompt ảnh của cảnh tương ứng.
+
+VISUAL_USE_COUNT >= 2
+→ ĐƯA vào CHARACTER_MASTER / danh sách tạo CHAR.
+→ REFERENCE_REQUIRED = YES, trừ khi người dùng có lock riêng khác.
+→ cần continuity giữa các lần xuất hiện.
+
+BẮT BUỘC AUDIT:
+Mỗi record CHARACTER_MASTER phải có:
+- VISUAL_USE_COUNT = số nguyên chính xác;
+- SOURCE_SENTENCE_IDS = danh sách câu nguồn đã thực sự được tính;
+- mỗi SOURCE_SENTENCE_ID phải tra ngược được về source và chứng minh được visual value;
+- tổng số SOURCE_SENTENCE_IDS phải bằng VISUAL_USE_COUNT.
+
+QUY ƯỚC FIELD:
+Đối với CHARACTER trong B3:
+VISUAL_USE_COUNT
+= số CÂU NGUỒN KHÁC NHAU có giá trị hình ảnh theo quy tắc trên.
+
+Đối với CREATURE / ITEM / LOCATION / BG:
+VISUAL_USE_COUNT vẫn giữ nghĩa B3 hiện hành của chính loại resource đó và không bị phần 2A thay đổi.
+
+IMAGE_PROMPT THRESHOLD:
+- mọi rule cũ dùng số IMAGE_PROMPT để quyết định CHARACTER được giữ lại bên dưới chỉ để bảo toàn lịch sử tài liệu;
+- các rule đó có trạng thái:
+  LEGACY_RULE = TRUE
+  ACTIVE_FOR_CHARACTER_DECISION = FALSE
+  ACTIVE_FOR_QA_GATE = FALSE
+- số IMAGE_PROMPT chỉ có thể được dùng ở bước downstream sau khi IMAGE_PROMPT thật sự tồn tại;
+- không được dùng ngược lại để loại một CHAR đã đạt VISUAL_USE_COUNT >= 2 theo câu nguồn ở B3.
+
+THỨ TỰ ƯU TIÊN KHI CÓ XUNG ĐỘT:
+1. ACTIVE CHARACTER VISUAL COUNT LOCK này.
+2. yêu cầu trực tiếp mới hơn của người dùng nếu có.
+3. các quy tắc B3 còn lại không xung đột.
+4. LEGACY IMAGE_PROMPT threshold chỉ để tham khảo lịch sử, không được thực thi cho CHARACTER.
+
+======================================================================
+3. QUY TẮC XUẤT HIỆN VÀ REFERENCE
+======================================================================
+
+Đối với:
+- nhân vật;
+- sinh vật;
+- vũ khí;
+- vật phẩm;
+- công cụ;
+- bối cảnh;
+
+phải đánh giá xem chúng có thực sự cần tái sử dụng hay không.
+
+Mặc định:
+
+Đối với NHÂN VẬT — ACTIVE:
+- dùng ACTIVE CHARACTER VISUAL COUNT LOCK tại mục 2A.
+- VISUAL_USE_COUNT = số câu nguồn khác nhau có giá trị hình ảnh.
+- VISUAL_USE_COUNT = 0 hoặc 1:
+  → không đưa vào danh sách tạo CHAR/reference riêng.
+- VISUAL_USE_COUNT >= 2:
+  → đưa vào CHARACTER_MASTER / danh sách tạo CHAR;
+  → REFERENCE_REQUIRED = YES.
+- bắt buộc lưu SOURCE_SENTENCE_IDS để audit.
+- không được dùng số IMAGE_PROMPT làm gate quyết định CHARACTER ở B3.
+
+LEGACY_RULE — GIỮ NGUYÊN NỘI DUNG CŨ, KHÔNG CÒN ACTIVE CHO CHARACTER:
+[LEGACY_BEGIN]
+Đối với NHÂN VẬT:
+Nếu nhân vật xuất hiện trong trên 2 IMAGE_PROMPT:
+→ tạo CHAR/reference riêng để giữ nhất quán.
+
+Nếu nhân vật xuất hiện trong 2 IMAGE_PROMPT trở xuống:
+→ không tạo CHAR/reference riêng.
+[LEGACY_END]
+LEGACY_RULE = TRUE
+ACTIVE_FOR_CHARACTER_DECISION = FALSE
+ACTIVE_FOR_QA_GATE = FALSE
+
+Đối với sinh vật, vũ khí, vật phẩm, công cụ và bối cảnh:
+Nếu chỉ xuất hiện hình ảnh 1 lần:
+→ không bắt buộc tạo ảnh tham chiếu riêng.
+→ mô tả trực tiếp trong prompt ảnh ở bước sau là đủ.
+
+Nếu xuất hiện hình ảnh từ 2 lần trở lên:
+→ nên tạo resource/reference riêng để giữ nhất quán.
+
+Ngoại lệ đối với sinh vật, vũ khí, vật phẩm, công cụ và bối cảnh:
+Dù chỉ xuất hiện 1 lần vẫn có thể tạo reference riêng nếu:
+- thiết kế cực kỳ phức tạp;
+- là vật thể hoặc sinh vật then chốt;
+- dễ sai nếu chỉ mô tả ngắn trong prompt;
+- người dùng yêu cầu riêng.
+
+Không dùng raw mention count để quyết định.
+
+Chỉ tính khi đối tượng thật sự có giá trị hình ảnh.
+
+MENTION_ONLY / OFFSCREEN_ONLY:
+→ không tính như một lần xuất hiện hình ảnh.
+
+======================================================================
+4. NHÂN VẬT
+======================================================================
+
+Phải trích xuất mọi nhân vật có giá trị hình ảnh.
+
+Với mỗi nhân vật phải tìm tối đa các dữ liệu source có thể cung cấp:
+
+- tên;
+- alias / danh xưng;
+- giới tính;
+- tuổi / nhóm tuổi;
+- chủng tộc / species;
+- vai trò;
+- chiều cao / kích thước nếu có;
+- vóc dáng;
+- khuôn mặt cơ bản;
+- màu mắt;
+- tóc;
+- màu tóc;
+- độ dài tóc;
+- kiểu tóc;
+- tông da;
+- trang phục;
+- phụ kiện cố định;
+- dấu hiệu nhận diện;
+- trạng thái cơ thể;
+- hình thái đặc biệt.
+
+======================================================================
+5. TRẠNG THÁI NHÂN VẬT
+======================================================================
+
+Phải trích xuất mọi trạng thái ngoại hình hoặc trang phục có khác biệt hình ảnh rõ.
+
+Có thể tạo state mới khi thay đổi:
+
+- trẻ nhỏ → thiếu niên → trưởng thành;
+- body form khác;
+- tái sinh body khác;
+- người → quái vật / spirit / transformation;
+- tóc thay đổi đáng kể;
+- trang phục thường ngày → đồng phục;
+- thường phục → giáp;
+- lễ phục;
+- đồ ngủ;
+- disguise;
+- prison outfit;
+- battle outfit;
+- trang phục bị rách/hư hại đáng kể;
+- cơ thể bị thương nặng;
+- mất chi;
+- cháy sém;
+- ướt rõ rệt;
+- phủ máu/bùn nếu trạng thái kéo dài và quan trọng;
+- accessory cố định được thêm hoặc mất;
+- transformation làm đổi silhouette.
+
+KHÔNG tạo state mới chỉ vì:
+
+- cười;
+- khóc;
+- giận;
+- buồn;
+- ngạc nhiên;
+- đỏ mặt;
+- sợ;
+- ánh mắt khác;
+- biểu cảm khuôn mặt;
+- pose;
+- action;
+- camera;
+- framing;
+- ánh sáng.
+
+Biểu cảm khuôn mặt không được dùng làm lý do tạo CHAR mới.
+
+======================================================================
+6. KÍCH THƯỚC NHÂN VẬT
+======================================================================
+
+Danh sách CHAR xuất ra phải có:
+
+SOURCE_SIZE
+SIZE_EVIDENCE
+SIZE_LOCK
+SIZE_ORIGIN
+
+Nếu source có exact height:
+→ dùng canon.
+
+Nếu source chỉ có relative scale:
+→ dùng relative source.
+
+Nếu source không có:
+→ được khóa một production size hợp lý,
+nhưng phải ghi:
+SIZE_ORIGIN = INFERRED_DESIGN.
+
+QUY TẮC QUAN TRỌNG:
+
+KÍCH THƯỚC / CHIỀU CAO PHẢI CÓ TRONG CHAR MASTER.
+
+Nhưng:
+
+PROMPT ẢNH KHÔNG BẮT BUỘC PHẢI GHI KÍCH THƯỚC / CHIỀU CAO.
+
+Không ép chiều cao vào mọi prompt ảnh.
+
+======================================================================
+7. SINH VẬT / QUÁI VẬT / THỰC THỂ PHI NHÂN
+======================================================================
+
+Xử lý tương tự nhân vật.
+
+Phải trích xuất:
+
+- tên / loại;
+- species;
+- kích thước;
+- body form;
+- số chi;
+- cánh;
+- đuôi;
+- sừng;
+- tai;
+- móng;
+- vảy;
+- lông;
+- da / chất liệu bề mặt;
+- mắt;
+- màu sắc;
+- mark / glow;
+- accessory / armor nếu có;
+- trạng thái hình thái khác nhau;
+- transformation nếu có.
+
+Mọi trạng thái có khác biệt hình ảnh rõ phải được ghi lại.
+
+Không tạo state mới chỉ vì:
+- biểu cảm;
+- pose;
+- action ngắn;
+- camera.
+
+Nếu sinh vật chỉ xuất hiện 1 lần:
+→ mặc định không cần ảnh reference riêng.
+→ mô tả trực tiếp trong prompt ảnh.
+
+Nếu xuất hiện từ 2 lần trở lên:
+→ tạo resource/reference riêng nếu cần continuity.
+
+======================================================================
+8. VŨ KHÍ / VẬT PHẨM / CÔNG CỤ
+======================================================================
+
+Phải trích xuất những thứ có giá trị hình ảnh hoặc continuity rõ.
+
+Bao gồm:
+
+- kiếm;
+- dao;
+- thương;
+- cung;
+- súng;
+- trượng;
+- quyền trượng;
+- sách phép;
+- bùa;
+- nhẫn;
+- dây chuyền;
+- mặt dây;
+- áo giáp;
+- khiên;
+- chìa khóa;
+- bình thuốc;
+- hộp;
+- công cụ nghề nghiệp;
+- ma đạo cụ;
+- vật phẩm quest;
+- đạo cụ quan trọng;
+- item nhận diện nhân vật.
+
+Với mỗi item cần ghi:
+
+- tên;
+- loại;
+- chủ sở hữu nếu có;
+- hình dạng;
+- kích thước nếu source có;
+- màu;
+- chất liệu;
+- hoa văn;
+- đặc điểm nhận diện;
+- trạng thái;
+- biến đổi;
+- trạng thái kích hoạt nếu khác hình ảnh rõ.
+
+Ví dụ state item:
+
+- trong vỏ / rút ra;
+- đóng / mở;
+- tắt / sáng;
+- bình thường / kích hoạt ma lực;
+- nguyên vẹn / hư hại;
+- sealed / unsealed.
+
+Nếu chỉ xuất hiện 1 lần:
+→ không bắt buộc reference riêng.
+→ mô tả trực tiếp trong prompt ảnh.
+
+Nếu dùng lặp lại hoặc cần giữ hình dạng ổn định:
+→ tạo ITEM resource riêng.
+
+======================================================================
+9. BỐI CẢNH / LOCATION / BG
+======================================================================
+
+Phải trích xuất mọi bối cảnh có giá trị hình ảnh hoặc có khả năng tái sử dụng.
+
+Bao gồm:
+
+- thành phố;
+- làng;
+- đường;
+- nhà;
+- phòng;
+- lâu đài;
+- trường học;
+- lớp học;
+- cửa hàng;
+- workshop;
+- dungeon;
+- rừng;
+- núi;
+- đồng cỏ;
+- chiến trường;
+- không gian tinh thần;
+- dream space;
+- divine space;
+- các location khác.
+
+Không được tự tạo exact room nếu source không nói rõ.
+
+======================================================================
+10. TRẠNG THÁI BỐI CẢNH
+======================================================================
+
+Cùng một location có thể có nhiều BG state.
+
+Phải xem xét các thay đổi hình ảnh quan trọng như:
+
+TIME:
+- bình minh;
+- sáng;
+- trưa;
+- chiều;
+- hoàng hôn;
+- tối;
+- đêm.
+
+WEATHER:
+- trời quang;
+- mưa;
+- tuyết;
+- bão;
+- sương;
+- gió mạnh.
+
+SEASON:
+- xuân;
+- hạ;
+- thu;
+- đông.
+
+PHYSICAL:
+- bình thường;
+- sạch;
+- đông người;
+- lễ hội;
+- bỏ hoang;
+- hư hại;
+- cháy;
+- sau cháy;
+- bị phá hủy;
+- được sửa chữa;
+- ngập;
+- đóng băng;
+- sau trận chiến.
+
+SPECIAL:
+- magic field;
+- divine field;
+- time domain;
+- curse;
+- fog;
+- black mist;
+- hazard zone;
+- spiritual state;
+- dream state;
+- projection state.
+
+Đặc biệt:
+
+CÙNG MỘT LOCATION NHƯNG BAN NGÀY VÀ BAN ĐÊM
+→ có thể là 2 BG STATE khác nhau nếu hình ảnh khác rõ.
+
+Không tạo BG mới chỉ vì:
+- camera khác;
+- character đứng ở vị trí khác;
+- pose khác;
+- biểu cảm khác.
+
+======================================================================
+10A. ACTIVE BACKGROUND VISUAL MODE / BG CẢM XÚC, TRỪU TƯỢNG, HỒI TƯỞNG, SUY NGHĨ
+======================================================================
+
+PHẦN NÀY THAY THẾ HOÀN TOÀN QUY ƯỚC CŨ DÙNG `BG_00` LÀ NỀN CẢM XÚC CHUNG.
+
+`BG_00` KHÔNG CÒN LÀ RESOURCE DÀNH RIÊNG CHO CẢM XÚC.
+KHÔNG dùng `BG_00` như nền trắng mặc định, nền cảm xúc mặc định hoặc fallback mặc định.
+
+Mọi background resource thực sự được B3 tạo/khóa đều dùng exact numbered `BG_XX` theo sequence BG hiện hành của project.
+
+Không reset sequence.
+Không lấp ID cũ.
+Không đổi ID đã khóa.
+Không dùng suffix state/version trong production token.
+
+B3 phải phân loại BACKGROUND_VISUAL_MODE khi phân tích toàn bộ tác phẩm hoặc khi phân tích các mốc SRT / OUTPUT_SLOT:
+
+- PHYSICAL_BG;
+- PHYSICAL_BG_PLUS_DYNAMIC;
+- DYNAMIC_BG.
+
+PHYSICAL_BG:
+- dùng khi hình ảnh cần một location/environment vật lý cụ thể;
+- giữ canonical location, topology, landmark, material, scale và exact environment state;
+- hồi tưởng, ký ức hoặc suy nghĩ vẫn có thể dùng PHYSICAL_BG nếu nội dung được trực quan hóa là một địa điểm/sự kiện vật lý cụ thể đã có basis.
+
+PHYSICAL_BG_PLUS_DYNAMIC:
+- dùng khi vẫn cần location vật lý làm continuity anchor nhưng phải có thêm lớp nhấn mạnh cảm xúc / áp lực / chuyển động / impact / threat / atmosphere / memory-treatment / thought-treatment;
+- physical layer vẫn giữ topology/location continuity;
+- dynamic layer không được tự biến thành magic nếu source không có magic;
+- không tạo location mới chỉ vì lớp nhấn mạnh.
+
+DYNAMIC_BG:
+- dùng khi background chính là một field đồ họa / abstract / emotional / impact / threat / speed / atmosphere / mental-visualization và physical room/location không phải phần cần render trực tiếp;
+- vẫn phải lưu PHYSICAL_LOCATION_CONTEXT nếu nhân vật/sự kiện về mặt continuity vẫn thuộc một location vật lý;
+- dynamic field không tự tạo canonical location mới.
+
+B3 phải nhận diện các nhóm nội dung sau khi chúng có giá trị trực quan hóa trong tác phẩm hoặc trong SEMANTIC_ANALYSIS_WINDOW / mốc SRT hiện hành:
+
+- EMOTIONAL_REACTION / PSYCHOLOGICAL_PRESSURE;
+- FLASHBACK / PAST_EVENT;
+- MEMORY;
+- THOUGHT / INNER_IMAGE;
+- DREAM / VISION;
+- FEAR / WORRY / HYPOTHETICAL;
+- HOPE / DESIRE / GOAL;
+- PLAN / STRATEGY / EXPECTED_RESULT;
+- REPORTED / DESCRIBED_EVENT;
+- ABSTRACT_TRANSITION / TIME_PASSAGE;
+- IMPACT / MOTION / SPEED;
+- THREAT / POWER / ATMOSPHERIC_DANGER;
+- các abstract manga background function khác thật sự cần cho sản xuất.
+
+Các nhóm trên KHÔNG có nghĩa mọi cue thuộc nhóm đó đều phải dùng DYNAMIC_BG.
+
+QUY TẮC ROUTING:
+
+1. Nếu nội dung hồi tưởng / ký ức / suy nghĩ / kể lại đang trực quan hóa một địa điểm hoặc sự kiện vật lý cụ thể đã xác định:
+→ ưu tiên PHYSICAL_BG của đúng timeline/location/state đó.
+
+2. Nếu location vật lý vẫn cần đọc rõ nhưng cảm xúc / suy nghĩ / hồi tưởng / áp lực / impact cần một lớp đồ họa hỗ trợ:
+→ PHYSICAL_BG_PLUS_DYNAMIC.
+
+3. Nếu chính emotional/abstract/thought/memory/dream/hypothetical/impact field là background function chủ đạo và physical environment không cần render trực tiếp:
+→ DYNAMIC_BG.
+
+4. Cảm xúc của nhân vật tự nó KHÔNG bắt buộc tạo BG mới.
+Happy / sad / crying / angry / afraid / shocked / suspicious / embarrassed và các expression khác vẫn là SCENE PERFORMANCE.
+Chỉ tạo emotional/dynamic BG resource khi background mechanism đó thật sự được chọn làm visual function cần khóa hoặc cần tái sử dụng.
+
+5. Không literal hóa suy nghĩ, ví von, giả định hoặc fear/hypothetical thành physical canon.
+Nếu dynamic BG biểu đạt một nội dung không phải physical reality:
+→ REALITY_LAYER / BG_FUNCTION / SYMBOLIC_NOT_LITERAL phải ghi rõ.
+
+6. Với FLASHBACK / MEMORY:
+- đúng tuổi/state/outfit/injury/location/timeline của quá khứ;
+- không tự đưa current physical character vào memory nếu source không có;
+- nếu chỉ dùng treatment đồ họa để báo quá khứ/ký ức, treatment đó thuộc PHYSICAL_BG_PLUS_DYNAMIC hoặc DYNAMIC_BG theo routing phía trên.
+
+7. Với THOUGHT / INNER_IMAGE:
+- có thể giữ current physical BG và chỉ dùng visual acting nếu không cần visualization riêng;
+- có thể dùng PHYSICAL_BG_PLUS_DYNAMIC khi current location vẫn cần neo;
+- có thể dùng DYNAMIC_BG khi nội dung suy nghĩ trở thành background field/inner visualization chính;
+- không mặc định cứ có suy nghĩ là tạo BG mới.
+
+8. Với DREAM / VISION / FEAR / HYPOTHETICAL / HOPE / PLAN:
+- phải phân biệt rõ với PRESENT physical reality;
+- không biến khả năng, mong muốn, kế hoạch hoặc viễn cảnh thành canon fact;
+- BG resource phải khóa đúng function/reality layer.
+
+RESOURCE_ROLE có thể gồm khi áp dụng:
+
+- PHYSICAL_ENVIRONMENT_BG;
+- LOCATION_DYNAMIC_STATE_BG;
+- EMOTIONAL_REACTION_BG;
+- ABSTRACT_MANGA_BG;
+- THOUGHT_INNER_IMAGE_BG;
+- MEMORY_FLASHBACK_TREATMENT_BG;
+- DREAM_VISION_BG;
+- HYPOTHETICAL_VISUALIZATION_BG;
+- IMPACT_FIELD_BG;
+- MOTION_SPEED_BG;
+- THREAT_POWER_BG;
+- ATMOSPHERIC_DANGER_BG;
+- COMBAT_ZONE_BG;
+- DESTRUCTION_STATE_BG.
+
+Không tạo một BG_ID mới cho từng câu/cue chỉ vì wording cảm xúc khác nhau.
+
+Cùng exact background function + cùng visual state + cùng reuse scope
+→ REUSE BG.
+
+Khác background mechanism / reality-layer treatment / dominant visual field đủ lớn khiến reference cũ không còn khóa đúng
+→ tạo exact BG_XX mới theo sequence hiện hành.
+
+REFERENCE_REQUIRED vẫn tuân quy tắc B3:
+- resource có thể có BG_ID trong BG_MASTER nhưng không bắt buộc phải có ảnh reference riêng nếu chỉ dùng một lần và không phức tạp;
+- khi dynamic/emotional BG cần tái sử dụng hoặc cần khóa thiết kế ổn định, đưa vào REFERENCE_QUEUE.
+
+B3 KHÔNG được để downstream tự phát minh:
+- BG cảm xúc;
+- BG abstract;
+- BG thought/memory;
+- BG dynamic manga;
+- exact BG_ID;
+nếu background function đó đã được xác định là resource cần khóa cho sản xuất.
+
+
+======================================================================
+11. BG KHÔNG PHẢI SCENE
+======================================================================
+
+BG chỉ khóa identity của environment.
+
+Không đưa vào BG master như fixed element:
+
+- hành động chính;
+- exact pose nhân vật;
+- exact expression;
+- camera cụ thể;
+- current story event;
+- nhân vật chính đứng cố định trong nền.
+
+BG phải tái sử dụng được.
+
+======================================================================
+12. QUYẾT ĐỊNH CÓ CẦN REFERENCE HAY KHÔNG
+======================================================================
+
+Đối với NHÂN VẬT — ACTIVE:
+
+VISUAL_USE_COUNT = 0 hoặc 1 CÂU NGUỒN CÓ GIÁ TRỊ HÌNH ẢNH
+→ không đưa vào danh sách tạo CHAR/reference riêng.
+
+VISUAL_USE_COUNT >= 2 CÂU NGUỒN KHÁC NHAU CÓ GIÁ TRỊ HÌNH ẢNH
+→ đưa vào CHARACTER_MASTER / danh sách tạo CHAR.
+→ REFERENCE_REQUIRED = YES.
+
+BẮT BUỘC:
+- VISUAL_USE_COUNT là số nguyên chính xác;
+- SOURCE_SENTENCE_IDS phải có;
+- len(SOURCE_SENTENCE_IDS) = VISUAL_USE_COUNT;
+- chỉ tính câu có visual value và identity/coreference chắc chắn;
+- MENTION_ONLY / OFFSCREEN_ONLY / UI_ONLY không có character visualization = 0.
+
+LEGACY_RULE — GIỮ NGUYÊN NỘI DUNG CŨ, KHÔNG CÒN ACTIVE CHO CHARACTER:
+[LEGACY_BEGIN]
+VISUAL_USE_COUNT <= 2 IMAGE_PROMPT
+→ không tạo CHAR/reference riêng.
+
+VISUAL_USE_COUNT > 2 IMAGE_PROMPT
+→ tạo CHAR/reference để giữ nhất quán.
+[LEGACY_END]
+LEGACY_RULE = TRUE
+ACTIVE_FOR_CHARACTER_DECISION = FALSE
+ACTIVE_FOR_QA_GATE = FALSE
+
+Đối với các tài nguyên còn lại:
+
+VISUAL_USE_COUNT = 0
+→ không cần reference.
+
+VISUAL_USE_COUNT = 1
+→ mặc định không cần reference.
+→ mô tả trực tiếp trong prompt ảnh.
+
+VISUAL_USE_COUNT >= 2
+→ tạo reference nếu cần continuity.
+
+Không cần tạo hàng loạt resource chỉ vì được nhắc trong nội dung.
+
+Mục tiêu:
+GIỮ NHỮNG CÁI CẦN DÙNG LẠI.
+KHÔNG TẠO REFERENCE VÔ ÍCH.
+
+======================================================================
+13. OUTPUT CHÍNH
+======================================================================
+
+B3 tạo:
+
+01_CHARACTER_MASTER
+02_CREATURE_MASTER
+03_ITEM_MASTER
+04_LOCATION_MASTER
+05_BG_MASTER
+06_REFERENCE_QUEUE
+07_GAP_UNRESOLVED
+08_B3_QA_REPORT
+
+Không bắt buộc tạo hàng loạt file trung gian nếu không cần.
+
+======================================================================
+14. CHARACTER_MASTER
+======================================================================
+
+Mỗi nhân vật tối thiểu có:
+
+CHARACTER_ID
+ENTITY_NAME
+ALIASES
+SOURCE_NAME
+SEX_GENDER
+AGE
+AGE_RANGE
+SPECIES_RACE
+ROLE
+OCCUPATION
+
+SOURCE_SIZE
+SIZE_EVIDENCE
+SIZE_LOCK
+SIZE_ORIGIN
+
+BODY
+FACE
+EYES
+HAIR
+SKIN
+OUTFIT
+FIXED_ACCESSORIES
+NON_HUMAN_FEATURES
+
+STATE_LIST
+VISUAL_USE_COUNT
+SOURCE_SENTENCE_IDS
+REFERENCE_REQUIRED
+REFERENCE_STATUS
+
+SOURCE_FACTS
+CONTEXT_INFERENCE
+DESIGN_SUPPLEMENT
+UNRESOLVED_FIELDS
+
+======================================================================
+15. CREATURE_MASTER
+======================================================================
+
+Mỗi sinh vật:
+
+CREATURE_ID
+NAME
+TYPE_SPECIES
+SIZE
+BODY_FORM
+SURFACE
+COLOR
+EYES
+HORNS
+WINGS
+TAIL
+LIMBS
+CLAWS
+MARKS
+ARMOR_ACCESSORY
+STATE_LIST
+VISUAL_USE_COUNT
+REFERENCE_REQUIRED
+REFERENCE_STATUS
+SOURCE_FACTS
+DESIGN_SUPPLEMENT
+UNRESOLVED_FIELDS
+
+======================================================================
+16. ITEM_MASTER
+======================================================================
+
+Mỗi item:
+
+ITEM_ID
+ITEM_NAME
+ITEM_TYPE
+OWNER
+SIZE_IF_KNOWN
+SHAPE
+COLOR
+MATERIAL
+PATTERN
+ORNAMENT
+IDENTITY_FEATURE
+STATE_LIST
+VISUAL_USE_COUNT
+REFERENCE_REQUIRED
+REFERENCE_STATUS
+SOURCE_FACTS
+DESIGN_SUPPLEMENT
+UNRESOLVED_FIELDS
+
+======================================================================
+17. LOCATION_MASTER
+======================================================================
+
+Mỗi location:
+
+LOCATION_ID
+LOCATION_NAME
+ALIASES
+PARENT_LOCATION
+LOCATION_TYPE
+FUNCTION
+
+FIXED_LAYOUT
+TOPOLOGY
+ENTRY_EXIT
+ARCHITECTURE_TERRAIN
+MATERIALS
+FIXED_PROPS
+LANDMARKS
+SCALE_CUES
+
+STATE_LIST
+SOURCE_FACTS
+CONTEXT_INFERENCE
+DESIGN_SUPPLEMENT
+UNRESOLVED_FIELDS
+
+======================================================================
+18. BG_MASTER
+======================================================================
+
+Mỗi BG:
+
+BG_ID
+LOCATION_ID
+LOCATION_NAME
+REFERENCE_STATE
+
+RESOURCE_ROLE
+BACKGROUND_VISUAL_MODE
+BG_FUNCTION
+REALITY_LAYER
+CANONICAL_LOCATION_CONTEXT
+PHYSICAL_LOCATION_CONTEXT
+DERIVED_FROM_BG
+DYNAMIC_BG_CONCEPT
+SYMBOLIC_NOT_LITERAL
+REUSE_SCOPE_NOTES
+
+TIME_STATE
+WEATHER_STATE
+SEASON_STATE
+PHYSICAL_STATE
+SPECIAL_STATE
+
+FIXED_LAYOUT
+ARCHITECTURE_TERRAIN
+MATERIALS
+FIXED_PROPS
+LANDMARKS
+LIGHTING
+ATMOSPHERE
+
+VISUAL_USE_COUNT
+REFERENCE_REQUIRED
+REFERENCE_STATUS
+
+SOURCE_FACTS
+CONTEXT_INFERENCE
+DESIGN_SUPPLEMENT
+
+======================================================================
+19. REFERENCE_QUEUE
+======================================================================
+
+Chỉ đưa vào queue những resource thực sự cần ảnh tham chiếu.
+
+Có thể gồm:
+
+CHARACTER
+CREATURE
+ITEM
+BG
+
+Mỗi task:
+
+TASK_ID
+RESOURCE_TYPE
+RESOURCE_ID
+RESOURCE_NAME
+REFERENCE_STATE
+VISUAL_USE_COUNT
+TRIGGER_REASON
+REFERENCE_STATUS
+
+REFERENCE_STATUS:
+
+READY_TO_RENDER
+CREATED
+NOT_REQUIRED
+NEEDS_USER_DECISION
+
+Không được ghi CREATED nếu chưa có ảnh thật.
+
+======================================================================
+20. GAP / UNRESOLVED
+======================================================================
+
+Nếu thiếu dữ liệu:
+
+GAP_ID
+RESOURCE_TYPE
+RESOURCE_ID_OR_NAME
+FIELD
+MISSING_INFORMATION
+WHY_UNRESOLVED
+DOWNSTREAM_IMPACT
+
+Không bịa canon để xóa GAP.
+
+Nếu chỉ là chi tiết production:
+được DESIGN_SUPPLEMENT,
+nhưng phải ghi rõ.
+
+======================================================================
+21. QA ĐƠN GIẢN
+======================================================================
+
+Không cần hệ thống QA quá nhiều tầng.
+
+Chỉ kiểm các mục chính:
+
+Q01 CHARACTER COVERAGE
+- có bỏ sót nhân vật có giá trị hình ảnh không?
+
+Q02 CHARACTER STATE
+- có trích đủ các trạng thái ngoại hình / trang phục quan trọng không?
+- có tạo state dư chỉ vì biểu cảm không?
+
+Q03 CREATURE COVERAGE
+- có bỏ sinh vật / quái vật / thực thể phi nhân quan trọng không?
+
+Q04 ITEM COVERAGE
+- có bỏ vũ khí / vật phẩm / công cụ quan trọng không?
+
+Q05 LOCATION / BG COVERAGE
+- có bỏ location/BG cần dùng không?
+- có xét ngày / đêm / trạng thái môi trường quan trọng không?
+- có nhận diện đúng emotional / abstract / dynamic / thought / memory / flashback / dream / hypothetical background function khi nội dung cần trực quan hóa không?
+- có route đúng PHYSICAL_BG / PHYSICAL_BG_PLUS_DYNAMIC / DYNAMIC_BG không?
+- có dùng exact numbered BG_XX theo sequence hiện hành và không quay lại quy ước BG_00 cảm xúc không?
+
+Q06 REFERENCE DECISION
+- đối tượng chỉ xuất hiện 1 lần có bị tạo reference vô ích không?
+- đối tượng xuất hiện lặp lại có được tạo reference khi cần continuity không?
+- RIÊNG CHARACTER: đã dùng đúng ACTIVE CHARACTER VISUAL COUNT LOCK chưa?
+- RIÊNG CHARACTER: VISUAL_USE_COUNT có phải exact integer theo câu nguồn có visual value không?
+- RIÊNG CHARACTER: SOURCE_SENTENCE_IDS có đủ, không trùng, tra ngược được và số lượng có bằng VISUAL_USE_COUNT không?
+- RIÊNG CHARACTER: có vô tình dùng LEGACY IMAGE_PROMPT threshold làm gate hoặc QA gate không? Nếu có → FAIL.
+
+Q07 SIZE RULE
+- CHAR list có size lock / provenance không?
+- prompt ảnh không bị bắt buộc ghi size.
+
+Q08 NO INVENTION
+- source fact / inference / design supplement có phân biệt không?
+
+Q09 RESOURCE SIMPLICITY
+- có tạo resource phục vụ trực tiếp tạo ảnh không?
+- có tránh phân tích dư thừa không?
+
+======================================================================
+22. PASS / FAIL
+======================================================================
+
+B3 PASS khi:
+
+- nhân vật chính/phụ có giá trị hình ảnh được trích đủ;
+- state ngoại hình và trang phục quan trọng được trích đủ;
+- sinh vật được trích đủ;
+- item quan trọng được trích đủ;
+- location/BG và state ngày/đêm/môi trường được trích đủ;
+- emotional / abstract / dynamic / thought / memory / flashback / dream / hypothetical background function cần thiết được nhận diện và route đúng mode;
+- không dùng BG_00 làm nền cảm xúc chung; mọi BG resource dùng exact numbered BG_XX theo sequence hiện hành;
+- đối tượng 1 lần không bị ép tạo reference;
+- resource lặp lại có reference khi cần;
+- CHAR master có size;
+- prompt ảnh không bắt buộc ghi size;
+- không biến expression thành state;
+- không bịa canon;
+- output đủ gọn để downstream sử dụng.
+
+Nếu một nhóm quan trọng bị bỏ sót:
+→ FAIL.
+
+Nếu tạo quá nhiều resource vô ích:
+→ FAIL.
+
+Nếu quy tắc hoặc output xa rời mục tiêu tạo ảnh:
+→ FAIL.
+
+======================================================================
+23. QUY TRÌNH B3
+======================================================================
+
+B3-01
+Trong pipeline kết hợp: đọc toàn bộ `AUDIO_ES_LATAM_40_ONE_SENTENCE_PER_LINE` đã PASS/LOCK ở B2, đối chiếu `SOURCE_ORIGINAL` khi cần để bảo toàn canon. Nguồn master hoặc TTS chỉ áp dụng cho pipeline khác nếu người dùng kích hoạt rõ; không tự dùng bản TTS thay nguồn B3 hiện hành.
+
+B3-02
+Trích xuất toàn bộ:
+- character;
+- creature;
+- item;
+- location.
+- background function / reality layer có giá trị trực quan hóa từ toàn tác phẩm hoặc từ các mốc SRT / OUTPUT_SLOT khi pipeline đang chạy theo SRT.
+
+B3-03
+Với mỗi resource:
+xác định các visual state quan trọng.
+Với mỗi BG/background function:
+xác định PHYSICAL_BG / PHYSICAL_BG_PLUS_DYNAMIC / DYNAMIC_BG và exact numbered BG_XX nếu resource cần được khóa.
+
+B3-04
+Đếm số lần thật sự cần xuất hiện hình ảnh.
+
+RIÊNG CHARACTER:
+- đếm theo ACTIVE CHARACTER VISUAL COUNT LOCK;
+- 1 câu nguồn có visual value = 1;
+- dùng semantic/coreference;
+- lưu exact VISUAL_USE_COUNT + SOURCE_SENTENCE_IDS;
+- 0–1 → không vào danh sách tạo CHAR;
+- >=2 → vào danh sách tạo CHAR/reference;
+- KHÔNG dùng số IMAGE_PROMPT ở B3.
+
+CREATURE / ITEM / LOCATION / BG:
+- tiếp tục dùng quy tắc visual-use/reference hiện hành của từng loại resource.
+
+B3-05
+Quyết định:
+- reference riêng;
+hoặc
+- chỉ mô tả trong prompt ảnh.
+
+B3-06
+Tạo:
+CHARACTER_MASTER
+CREATURE_MASTER
+ITEM_MASTER
+LOCATION_MASTER
+BG_MASTER.
+
+B3-07
+Tạo REFERENCE_QUEUE cho những tài nguyên thật sự cần reference.
+
+B3-08
+QA đơn giản toàn bộ.
+
+B3-09
+LOCK B3 khi PASS.
+
+======================================================================
+24. CÂU KHÓA CUỐI
+======================================================================
+
+MỤC ĐÍCH B3:
+
+TRÍCH XUẤT TÀI NGUYÊN HÌNH ẢNH CẦN THIẾT.
+
+NHÂN VẬT:
+TRÍCH MỌI TRẠNG THÁI NGOẠI HÌNH + TRANG PHỤC QUAN TRỌNG.
+KHÔNG TÁCH THEO BIỂU CẢM KHUÔN MẶT.
+ACTIVE COUNT:
+- 1 câu nguồn có giá trị hình ảnh = 1 lần.
+- 0 hoặc 1 lần → không vào danh sách tạo CHAR.
+- từ 2 câu nguồn khác nhau trở lên → vào danh sách tạo CHAR/reference.
+- bắt buộc exact VISUAL_USE_COUNT + SOURCE_SENTENCE_IDS.
+- không dùng IMAGE_PROMPT threshold làm gate CHARACTER ở B3.
+
+SINH VẬT:
+XỬ LÝ TƯƠNG TỰ NHÂN VẬT.
+
+VŨ KHÍ / VẬT PHẨM / CÔNG CỤ:
+TRÍCH NẾU CÓ GIÁ TRỊ HÌNH ẢNH HOẶC CONTINUITY.
+
+BỐI CẢNH:
+TRÍCH MỌI STATE HÌNH ẢNH QUAN TRỌNG,
+KỂ CẢ NGÀY / ĐÊM.
+PHẢI NHẬN DIỆN CẢ BACKGROUND FUNCTION CẢM XÚC / TRỪU TƯỢNG / DYNAMIC / HỒI TƯỞNG / KÝ ỨC / SUY NGHĨ / DREAM / VISION / HYPOTHETICAL KHI NỘI DUNG THỰC SỰ CẦN TRỰC QUAN HÓA.
+ROUTE THEO PHYSICAL_BG / PHYSICAL_BG_PLUS_DYNAMIC / DYNAMIC_BG.
+KHÔNG DÙNG BG_00 LÀ NỀN CẢM XÚC CHUNG.
+MỌI BG RESOURCE DÙNG EXACT NUMBERED BG_XX THEO SEQUENCE HIỆN HÀNH.
+
+CHỈ XUẤT HIỆN 1 LẦN:
+- RIÊNG CHARACTER: hiểu là đúng 1 CÂU NGUỒN có giá trị hình ảnh theo mục 2A.
+  → không vào danh sách tạo CHAR/reference.
+- CREATURE / ITEM / LOCATION / BG:
+  → mặc định không cần reference riêng;
+  → mô tả trong prompt ảnh là đủ, trừ ngoại lệ phức tạp/then chốt của B3.
+
+XUẤT HIỆN LẶP LẠI:
+- RIÊNG CHARACTER: từ 2 CÂU NGUỒN KHÁC NHAU có giá trị hình ảnh trở lên
+  → đưa vào danh sách tạo CHAR/reference.
+- CREATURE / ITEM / LOCATION / BG:
+  → tạo reference khi cần giữ nhất quán theo quy tắc hiện hành của từng loại.
+
+CHAR MASTER:
+PHẢI CÓ KÍCH THƯỚC / CHIỀU CAO NẾU XÁC ĐỊNH ĐƯỢC.
+
+PROMPT ẢNH:
+KHÔNG BẮT BUỘC GHI KÍCH THƯỚC.
+
+B3 PHẢI ĐƠN GIẢN,
+DỄ THỰC THI,
+DỄ KIỂM TRA,
+KHÔNG XA RỜI MỤC ĐÍCH BAN ĐẦU.
+
+======================================================================
+REVISION_LOG — R1_NO_CONFLICT
+======================================================================
+
+- Không xóa legacy rule cũ.
+- Đã đánh dấu mọi IMAGE_PROMPT threshold dùng để quyết định CHARACTER là LEGACY / INACTIVE.
+- Đã thiết lập một gate duy nhất cho CHARACTER:
+  1 câu nguồn có visual value = 1;
+  0–1 = không tạo CHAR;
+  >=2 câu khác nhau = đưa vào danh sách tạo CHAR/reference.
+- Đã bổ sung SOURCE_SENTENCE_IDS vào CHARACTER_MASTER.
+- Đã cập nhật Q06, B3-04 và câu khóa cuối để cùng dùng một logic.
+- Creature / item / location / BG không bị thay đổi ngưỡng reference bởi revision này.
+- Nếu có user lock mới hơn sau này, user lock mới hơn vẫn ưu tiên theo mục 2.
+
+======================================================================
+END B3_V2_SIMPLE_R1_NO_CONFLICT
+======================================================================
