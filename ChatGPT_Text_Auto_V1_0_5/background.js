@@ -216,11 +216,15 @@ async function startImageRun(tabId,config){
   if(!isChatUrl(tab.url||''))return {ok:false,error:'TAB_NOT_CHATGPT'};
   const fromCfg=imageRefs.splitPromptLines(Array.isArray(config?.lines)?config.lines.join('\n'):String(config?.lines||''));
   if(!fromCfg.length)return {ok:false,error:'NO_IMAGE_LINES'};
+  const extraText=String(config?.extraText||'').trim();
+  const batchSize=imageRefs.clampBatchSize(config?.batchSize);
+  const batches=imageRefs.sliceBatches(fromCfg,batchSize);
+  if(!batches.length)return {ok:false,error:'NO_IMAGE_LINES'};
   const cs=await ensureContent(tabId);if(!cs.ok)return cs;
   await abortTab(tabId);
   const prefix=imageRefs.sanitizePrefix(config?.outputPrefix||'');
-  state.run={id:uid('img'),kind:'IMAGE',status:'RUNNING',phase:'READY',startedAt:nowIso(),finishedAt:null,targetTabId:tabId,conversationUrl:tab.url||'',conversationId:conversationId(tab.url||''),config:{stableSec:Math.max(2,Math.min(60,Number(config?.stableSec||4))),nextDelaySec:Math.max(0,Math.min(60,Number(config?.nextDelaySec||2))),responseTimeoutMin:Math.max(1,Math.min(360,Number(config?.responseTimeoutMin||15))),cdpFallback:config?.cdpFallback!==false,composerSelector:String(config?.selectors?.composer||''),sendSelector:String(config?.selectors?.send||''),plusSelector:String(config?.selectors?.plus||''),createImageSelector:String(config?.selectors?.createImage||'')},lines:fromCfg,outputPrefix:prefix,projectName:safeName(config?.projectName||'ANH_001'),totalTurns:fromCfg.length,outputs:[],outputMeta:[],savedCount:0,lastSavedName:'',pendingTurn:null,error:'',completionReason:'',lastVerification:''};
-  log('INFO','Started image run',{tabId,totalTurns:fromCfg.length,refFiles:Object.keys(imageFileStore).length,prefix:prefix||'ANH'});
+  state.run={id:uid('img'),kind:'IMAGE',status:'RUNNING',phase:'READY',startedAt:nowIso(),finishedAt:null,targetTabId:tabId,conversationUrl:tab.url||'',conversationId:conversationId(tab.url||''),config:{stableSec:Math.max(2,Math.min(60,Number(config?.stableSec||4))),nextDelaySec:Math.max(0,Math.min(60,Number(config?.nextDelaySec||2))),responseTimeoutMin:Math.max(1,Math.min(360,Number(config?.responseTimeoutMin||15))),cdpFallback:config?.cdpFallback!==false,composerSelector:String(config?.selectors?.composer||''),sendSelector:String(config?.selectors?.send||''),plusSelector:String(config?.selectors?.plus||''),createImageSelector:String(config?.selectors?.createImage||''),batchSize,extraText:!!extraText},lines:fromCfg,batches,extraText,outputPrefix:prefix,projectName:safeName(config?.projectName||'ANH_001'),totalTurns:batches.length,outputs:[],outputMeta:[],savedCount:0,lastSavedName:'',pendingTurn:null,error:'',completionReason:'',lastVerification:''};
+  log('INFO','Started image run',{tabId,totalTurns:batches.length,lineCount:fromCfg.length,batchSize,hasExtra:!!extraText,refFiles:Object.keys(imageFileStore).length,prefix:prefix||'ANH'});
   await saveNow();setTimeout(()=>pumpImage().catch(e=>failRun(String(e?.message||e))),150);return {ok:true,runId:state.run.id};
 }
 
@@ -230,9 +234,10 @@ async function pumpImage(){
   if(index>=run.totalTurns)return finishImageRun('ALL_TURNS_COMPLETED');
   const target=await validateTarget(run,run.targetTabId);if(!target.ok)return failRun(target.error);
   const cs=await ensureContent(run.targetTabId);if(!cs.ok)return failRun(cs.error);
-  const prompt=run.lines[index];
-  const refIds=imageRefs.parseRefIds(prompt);
-  const turn={id:uid('imgturn'),index,kind:`IMAGE_${index+1}`,prompt,refIds,startedAt:nowIso(),sentConfirmed:false,stage:'PREPARE',conversationId:run.conversationId||conversationId(target.tab.url||'')};
+  const batch=run.batches[index]||[run.lines[index]].filter(Boolean);
+  const prompt=imageRefs.composeImagePrompt(batch,run.extraText||'');
+  const refIds=imageRefs.parseRefIdsFromLines(batch);
+  const turn={id:uid('imgturn'),index,kind:`IMAGE_${index+1}`,prompt,refIds,batchSize:batch.length,startedAt:nowIso(),sentConfirmed:false,stage:'PREPARE',conversationId:run.conversationId||conversationId(target.tab.url||'')};
   run.pendingTurn=turn;run.phase='PREPARE_TURN';save();
   const payload={type:'RUN_IMAGE_TURN',turn:{id:turn.id,index:turn.index,kind:turn.kind,prompt,refIds},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}};
   let r=await chrome.tabs.sendMessage(run.targetTabId,payload).catch(e=>({ok:false,error:String(e?.message||e)}));

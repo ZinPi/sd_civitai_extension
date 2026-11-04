@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>ChatGPT Text Auto</h1>
-    <div class="sub">V1.0.7 • văn bản lặp hoặc tạo ảnh</div>
+    <div class="sub">V1.0.8 • văn bản lặp hoặc tạo ảnh</div>
   </header>
 
   <nav class="tabs" aria-label="Chế độ">
@@ -67,13 +67,32 @@
   <main id="viewImage" hidden>
     <section class="card">
       <h2>1. Prompt ảnh — một dòng một ảnh</h2>
-      <p class="muted">Dán hoặc chọn file TXT. Tool đếm số dòng không trống và chạy đúng bấy nhiêu lượt. CHAR_XX / BG_XX trong dòng là tên ảnh tham chiếu. Có một trong hai, hoặc không có, vẫn tạo được.</p>
+      <p class="muted">Dán hoặc chọn file TXT. CHAR_XX / BG_XX trong dòng là tên ảnh tham chiếu. Có một trong hai, hoặc không có, vẫn tạo được. Số lần gửi phụ thuộc ô “Số prompt mỗi lần gửi”.</p>
       <div class="fileRow"><input id="imageTextFile" type="file" accept=".txt,text/plain"><span id="imageLineCount" class="counter">0 dòng</span></div>
       <textarea id="imageText" rows="12" spellcheck="false" placeholder="001 | CHAR_01.BG_02 | IMAGE_PROMPT: ..."></textarea>
     </section>
 
     <section class="card">
-      <h2>2. Thư mục ảnh tham chiếu</h2>
+      <h2>2. Yêu cầu chung — tùy chọn</h2>
+      <p class="muted">Có chữ thì tool ghép vào cuối mỗi lần gửi. Để trống thì chỉ gửi đúng các dòng prompt đã chọn.</p>
+      <textarea id="imageExtra" rows="5" spellcheck="false" placeholder="Ví dụ: tỷ lệ 16:9, ánh sáng điện ảnh, không chữ trên ảnh..."></textarea>
+    </section>
+
+    <section class="card">
+      <h2>3. Số prompt mỗi lần gửi</h2>
+      <p class="muted">Mỗi lần gửi vào ô chat ChatGPT có thể gồm nhiều dòng prompt. Tối đa 10. Để 1 thì mỗi ảnh một dòng như cũ.</p>
+      <div class="grid2">
+        <label>Bắt đầu từ dòng
+          <input id="imageStartLine" type="number" min="1" max="9999" value="1">
+        </label>
+        <label>Số prompt mỗi lần gửi (1–10)
+          <input id="imageSendCount" type="number" min="1" max="10" value="1">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Thư mục ảnh tham chiếu</h2>
       <p class="muted">Chọn thư mục chứa CHAR_01.png, BG_02.jpg… Tên file khớp mã trong prompt. Thiếu ảnh thì vẫn gửi dòng đó.</p>
       <div class="fileRow">
         <label class="fileBtn">Chọn thư mục ảnh
@@ -85,7 +104,7 @@
     </section>
 
     <section class="card">
-      <h2>3. Tên ảnh tải về</h2>
+      <h2>5. Tên ảnh tải về</h2>
       <label>Tiền tố tên (để trống = ANH)
         <input id="imagePrefix" placeholder="canh → canh_1.png, canh_2.png">
       </label>
@@ -96,7 +115,7 @@
     </section>
 
     <section class="card">
-      <h2>4. Điều khiển tạo ảnh</h2>
+      <h2>6. Điều khiển tạo ảnh</h2>
       <div class="grid2">
         <label>Ổn định ảnh trước khi lưu (giây)
           <input id="imageStableSec" type="number" min="2" max="60" step="0.5" value="4">
@@ -109,7 +128,7 @@
         </label>
       </div>
       <label class="check"><input id="imageCdp" type="checkbox" checked> Debugger fallback nếu không dán/gửi được</label>
-      <div class="notice">Mỗi dòng: gắn ảnh CHAR/BG khớp → dán đúng dòng đó → bấm dấu cộng → chọn <b>Tạo ảnh</b> → gửi → chờ ảnh xong → tải về → dòng tiếp.</div>
+      <div class="notice">Mỗi lần gửi: gắn ảnh CHAR/BG của các dòng trong lượt → dán prompt (kèm yêu cầu chung nếu có) → bấm dấu cộng → chọn <b>Tạo ảnh</b> → gửi → chờ ảnh xong → tải về → lượt tiếp.</div>
       <div class="actions">
         <button id="imageProbeBtn">KIỂM TRA UI</button>
         <button id="imageStartBtn" class="primary">▶ TẠO ẢNH</button>

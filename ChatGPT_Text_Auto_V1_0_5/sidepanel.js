@@ -56,6 +56,9 @@ function applyUi(v={}){
 }
 function readImageUi(){return {
   imageText:$('#imageText').value,
+  imageExtra:String($('#imageExtra').value||''),
+  imageStartLine:Math.max(1,Math.floor(Number($('#imageStartLine').value||1))),
+  imageSendCount:refs?refs.clampBatchSize($('#imageSendCount').value):Math.max(1,Math.min(10,Math.floor(Number($('#imageSendCount').value||1)))),
   imagePrefix:String($('#imagePrefix').value||''),
   imageProject:String($('#imageProject').value||'ANH_001'),
   imageStableSec:Math.max(2,Math.min(60,Number($('#imageStableSec').value||4))),
@@ -67,6 +70,9 @@ function readImageUi(){return {
 };}
 function applyImageUi(v={}){
   if('imageText'in v)$('#imageText').value=String(v.imageText??'');
+  if('imageExtra'in v)$('#imageExtra').value=String(v.imageExtra??'');
+  if('imageStartLine'in v)$('#imageStartLine').value=Math.max(1,Math.floor(Number(v.imageStartLine||1)));
+  if('imageSendCount'in v)$('#imageSendCount').value=refs?refs.clampBatchSize(v.imageSendCount):v.imageSendCount;
   if('imagePrefix'in v)$('#imagePrefix').value=String(v.imagePrefix??'');
   if('imageProject'in v)$('#imageProject').value=String(v.imageProject??'ANH_001');
   if('imageStableSec'in v)$('#imageStableSec').value=v.imageStableSec;
@@ -137,7 +143,12 @@ $('#imageFolder').onchange=e=>{
   renderFolder();
 };
 $('#imageText').addEventListener('input',()=>{refreshImageCount();scheduleSave();});
-for(const el of document.querySelectorAll('#viewText textarea,#viewText input,#plusSelector,#createImageSelector,#imagePrefix,#imageProject,#imageStableSec,#imageDelaySec,#imageTimeoutMin')){
+$('#imageExtra').addEventListener('input',scheduleSave);
+$('#imageSendCount').addEventListener('change',()=>{
+  if(refs)$('#imageSendCount').value=refs.clampBatchSize($('#imageSendCount').value);
+  scheduleSave();
+});
+for(const el of document.querySelectorAll('#viewText textarea,#viewText input,#plusSelector,#createImageSelector,#imagePrefix,#imageProject,#imageStableSec,#imageDelaySec,#imageTimeoutMin,#imageStartLine,#imageSendCount')){
   el.addEventListener('input',()=>{chars();scheduleSave();});
 }
 for(const el of document.querySelectorAll('input[type=checkbox]')) el.addEventListener('change',scheduleSave);
@@ -178,11 +189,16 @@ $('#resumeBtn').onclick=async()=>{const tab=await activeChatTab();if(!tab)return
 $('#imageStartBtn').onclick=async()=>{
   try{
     if(!refs)return setImageStatus('Thiếu image_refs.js. Reload extension.',true);
-    const lines=imageLines();
-    if(!lines.length)return setImageStatus('Chưa có dòng prompt ảnh.',true);
-    setImageStatus(`Đang chuẩn bị ${lines.length} dòng…`);
+    const allLines=imageLines();
+    if(!allLines.length)return setImageStatus('Chưa có dòng prompt ảnh.',true);
+    const uiPreview=readImageUi();
+    const selected=refs.sliceFromStart(allLines,uiPreview.imageStartLine);
+    if(!selected.length)return setImageStatus(`Không còn dòng nào từ dòng ${uiPreview.imageStartLine}.`,true);
+    const batchSize=refs.clampBatchSize(uiPreview.imageSendCount);
+    const batches=refs.sliceBatches(selected,batchSize);
+    setImageStatus(`Đang chuẩn bị ${selected.length} dòng • ${batches.length} lần gửi • mỗi lần ${batchSize} prompt…`);
     const tab=await activeChatTab();if(!tab)return setImageStatus('Hãy bấm vào tab ChatGPT rồi bấm TẠO ẢNH. Tool chỉ điều khiển tab đang mở.',true);
-    const pack=collectImagePayloads(lines);
+    const pack=collectImagePayloads(selected);
     await msg({type:'CLEAR_IMAGE_FILES'});
     let uploaded=0;
     for(const id of pack.wanted){
@@ -198,7 +214,10 @@ $('#imageStartBtn').onclick=async()=>{
       type:'START_IMAGE_RUN',
       tabId:tab.id,
       config:{
-        lines,
+        lines:selected,
+        extraText:ui.imageExtra,
+        batchSize,
+        startLine:ui.imageStartLine,
         outputPrefix:ui.imagePrefix,
         projectName:ui.imageProject,
         stableSec:ui.imageStableSec,
@@ -209,7 +228,7 @@ $('#imageStartBtn').onclick=async()=>{
       }
     });
     const missing=pack.preview.flatMap(p=>p.missing);
-    setImageStatus(r?.ok?`Đã bắt đầu ${lines.length} dòng • ${uploaded} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
+    setImageStatus(r?.ok?`Đã bắt đầu ${selected.length} dòng / ${batches.length} lần gửi (mỗi lần ${batchSize}) • ${uploaded} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
     refresh();
   }catch(e){setImageStatus(`Lỗi khi bắt đầu: ${e?.message||e}`,true);}
 };

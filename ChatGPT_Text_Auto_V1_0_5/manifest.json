@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Text Auto - Long Payload Repeater V1.0.7",
-  "version": "1.0.7",
+  "name": "ChatGPT Text Auto - Long Payload Repeater V1.0.8",
+  "version": "1.0.8",
   "description": "Gửi văn bản dài tự động, hoặc tạo ảnh từng dòng prompt với ảnh tham chiếu CHAR_XX/BG_XX trên tab ChatGPT hiện tại.",
   "minimum_chrome_version": "120",
   "permissions": [

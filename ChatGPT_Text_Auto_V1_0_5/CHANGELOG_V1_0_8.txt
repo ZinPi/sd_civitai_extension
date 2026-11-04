@@ -1,0 +1,6 @@
+ChatGPT Text Auto V1.0.8
+Date: 2026-11-04
+
+- Ô yêu cầu chung: có chữ thì ghép vào cuối mỗi lần gửi; để trống thì chỉ gửi đúng dòng prompt.
+- Ô số prompt mỗi lần gửi (1–10): một lần dán vào ô chat có thể gồm nhiều dòng. Để 1 thì mỗi ảnh một dòng.
+- Ô bắt đầu từ dòng: bỏ qua các dòng trước đó.

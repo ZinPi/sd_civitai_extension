@@ -54,4 +54,14 @@ assert.equal(api.outputName("canh", 1, "png"), "canh_1.png");
 assert.equal(api.outputName("", 3, "jpg"), "ANH_3.jpg");
 assert.equal(api.outputName("a/b:c", 2, "png"), "a_b_c_2.png");
 
-console.log("image_refs.js: 16 tests passed");
+assert.equal(api.clampBatchSize(0), 1);
+assert.equal(api.clampBatchSize(10), 10);
+assert.equal(api.clampBatchSize(99), 10);
+assert.equal(api.composeImagePrompt(["a"], ""), "a");
+assert.equal(api.composeImagePrompt(["a", "b"], "  "), "a\nb");
+assert.equal(api.composeImagePrompt(["a"], "nét 16:9"), "a\n\nnét 16:9");
+assert.deepEqual(api.sliceFromStart(["a", "b", "c"], 2), ["b", "c"]);
+assert.deepEqual(api.sliceBatches(["a", "b", "c", "d", "e"], 2), [["a", "b"], ["c", "d"], ["e"]]);
+assert.deepEqual(api.parseRefIdsFromLines(["CHAR_01 x", "BG_02 y CHAR_01"]), ["CHAR_01", "BG_02"]);
+
+console.log("image_refs.js: 25 tests passed");
