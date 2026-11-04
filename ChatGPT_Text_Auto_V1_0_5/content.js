@@ -1,5 +1,5 @@
 (()=>{
-  if(window.__CHATGPT_TEXT_AUTO_VERSION__==='1.0.5')return;window.__CHATGPT_TEXT_AUTO_VERSION__='1.0.5';
+  if(window.__CHATGPT_TEXT_AUTO_VERSION__==='1.0.6')return;window.__CHATGPT_TEXT_AUTO_VERSION__='1.0.6';
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   let activeTurn=null;
   let cancelRequested=false;
@@ -380,47 +380,72 @@
   }
 
   function findPlus(selectors={}){
-    return qVisible([
+    const hit=qVisible([
       selectors.plus,
       '[data-testid="composer-plus-btn"]',
+      '#composer-plus-btn',
+      'button[data-composer-navigation-target="add-context"]',
+      '[data-composer-navigation-target="add-context"]',
       'button[aria-label="Add files and more"]',
       'button[aria-label="Thêm tệp và nội dung khác"]',
       'button[aria-label*="Add files"]',
       'button[aria-label*="Thêm tệp"]',
       'button[aria-label*="Add photos"]',
       'button[aria-label*="Thêm ảnh"]',
+      'button[aria-label*="Attach"]',
+      'button[aria-label*="Đính kèm"]',
       'form[data-type="unified-composer"] button[aria-haspopup="menu"]',
       'form[data-type="unified-composer"] button[aria-expanded]'
     ]);
+    if(hit)return hit;
+    const form=nearestComposerForm(findComposer(selectors));
+    const buttons=[...((form||document).querySelectorAll('button'))].filter(visible);
+    return buttons.find(b=>/plus|add-context|add files|attach|thêm tệp|thêm ảnh|đính kèm/i.test(`${b.getAttribute('data-testid')||''} ${b.getAttribute('aria-label')||''} ${b.getAttribute('data-composer-navigation-target')||''}`))
+      ||buttons.find(b=>b.getAttribute('aria-haspopup')==='menu')
+      ||null;
   }
   function findCreateImageItem(selectors={}){
     if(selectors.createImage){try{const hit=[...document.querySelectorAll(selectors.createImage)].find(visible);if(hit)return hit;}catch(_){}}
-    const labels=/tạo ảnh|create image|tạo hình ảnh|generate image/i;
-    return [...document.querySelectorAll('div.__menu-item,[role="menuitem"],[data-radix-collection-item],button,div[role="option"]')]
-      .find(el=>visible(el)&&labels.test(`${rawText(el)} ${el.getAttribute('aria-label')||''} ${el.getAttribute('title')||''}`))||null;
+    const labels=/tạo ảnh|create image|tạo hình ảnh|generate image|hình ảnh|images/i;
+    const nodes=[...document.querySelectorAll('div.__menu-item,[class*="__menu-item"],[role="menuitem"],[data-radix-collection-item],button,div[role="option"]')];
+    return nodes.find(el=>{
+      if(!visible(el))return false;
+      const t=`${rawText(el)} ${el.getAttribute('aria-label')||''} ${el.getAttribute('title')||''}`.trim();
+      return labels.test(t)&&t.length<80;
+    })||null;
   }
   function composerHasImageMode(el){
-    const t=`${rawText(el||findComposer())} ${el?.getAttribute?.('data-placeholder')||''}`;
-    return /create image|tạo ảnh|describe or edit an image|mô tả hoặc chỉnh/i.test(t);
+    const node=el||findComposer();
+    const t=`${composerText(node)} ${rawText(node)} ${node?.getAttribute?.('data-placeholder')||''}`;
+    return /create image|tạo ảnh|tạo hình/i.test(t);
   }
   async function openPlus(selectors){
     const plus=findPlus(selectors);if(!plus)throw new Error('UI_PLUS_NOT_FOUND');
-    if(plus.getAttribute('aria-expanded')!=='true'){plus.click();await sleep(280);}
+    if(plus.getAttribute('aria-expanded')!=='true'){plus.click();await sleep(400);}
     return plus;
+  }
+  async function waitCreateImageItem(selectors,ms=2500){
+    const end=Date.now()+ms;
+    while(Date.now()<end){
+      const item=findCreateImageItem(selectors);
+      if(item)return item;
+      await sleep(120);
+    }
+    return null;
   }
   async function ensureImageMode(selectors,emit){
     throwIfAborted();
     const current=findComposer(selectors);
     if(composerHasImageMode(current)){await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:'already on'});return true;}
     await openPlus(selectors);
-    const item=findCreateImageItem(selectors);
+    let item=await waitCreateImageItem(selectors);
     if(!item)throw new Error('UI_CREATE_IMAGE_NOT_FOUND');
     item.click();
-    await sleep(350);
+    await sleep(400);
     if(!composerHasImageMode(findComposer(selectors))){
       await openPlus(selectors);
-      const again=findCreateImageItem(selectors);
-      if(again){again.click();await sleep(350);}
+      const again=await waitCreateImageItem(selectors,1500);
+      if(again){again.click();await sleep(400);}
     }
     await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:composerHasImageMode(findComposer(selectors))?'Create image on':'Create image clicked'});
     return true;
@@ -447,7 +472,7 @@
       if(add){add.click();await sleep(250);}
       input=composerFileInput(selectors);
     }
-    if(!input)throw new Error('UI_FILE_INPUT_NOT_FOUND');
+    if(!input){await emit({kind:'PROGRESS',phase:'REFS_ATTACHED',verification:'UI_FILE_INPUT_NOT_FOUND, continue without refs'});return {ok:false,attached:0};}
     const dt=new DataTransfer();
     for(const file of filesFromPayloads(payloads)) dt.items.add(file);
     input.files=dt.files;
@@ -506,18 +531,22 @@
     try{
       cancelRequested=false;
       throwIfAborted();
-      await emit({kind:'PROGRESS',phase:'WAIT_CHAT_IDLE'});
+      await emit({kind:'PROGRESS',phase:'PREPARE_IMAGE',verification:'bắt đầu lượt ảnh'});
       await waitPreSendIdle(settings,emit);
       const baselineSrcs=imageSrcList();
-      await ensureImageMode(settings.selectors||{},emit);
-      await attachRefs(turn.refFiles||[],settings.selectors||{},emit);
       throwIfAborted();
       const paste=await pasteVerified(turn.prompt,settings,emit);
-      if(!composerHasImageMode(findComposer(settings.selectors||{}))) await ensureImageMode(settings.selectors||{},emit);
+      try{await ensureImageMode(settings.selectors||{},emit);}
+      catch(e){await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:`warn ${e.message}`});}
+      try{await attachRefs(turn.refFiles||[],settings.selectors||{},emit);}
+      catch(e){await emit({kind:'PROGRESS',phase:'REFS_ATTACHED',verification:`warn ${e.message}`});}
+      if(!composerHasImageMode(findComposer(settings.selectors||{}))){
+        try{await ensureImageMode(settings.selectors||{},emit);}catch(e){await emit({kind:'PROGRESS',phase:'IMAGE_MODE',verification:`retry warn ${e.message}`});}
+      }
       const live=findComposer(settings.selectors||{});
       if(live&&canon(composerText(live)).indexOf(canon(turn.prompt).slice(0,Math.min(48,turn.prompt.length)))<0){
         await pasteVerified(turn.prompt,settings,emit);
-        if(!composerHasImageMode(findComposer(settings.selectors||{}))) await ensureImageMode(settings.selectors||{},emit);
+        try{await ensureImageMode(settings.selectors||{},emit);}catch(_){}
       }
       const sent=await sendVerified(turn.prompt,paste,settings,emit);
       await emit({kind:'SENT',method:sent.method,verification:`${sent.conf.evidence} • refs=${(turn.refIds||[]).join(',')||'none'}`});
@@ -530,7 +559,7 @@
   chrome.runtime.onMessage.addListener((msg,_sender,sendResponse)=>{
     (async()=>{
       if(msg?.type==='ABORT_TEXT_AUTO'){cancelRequested=true;activeTurn=null;return {ok:true};}
-      if(msg?.type==='PING_TEXT_AUTO')return {ok:true,version:'1.0.5',activeTurnId:activeTurn?.id||''};
+      if(msg?.type==='PING_TEXT_AUTO')return {ok:true,version:'1.0.6',activeTurnId:activeTurn?.id||''};
       if(msg?.type==='PROBE_TEXT_UI'){
         const selectors=msg.selectors||{};
         const c=findComposer(selectors),s=findSendButton(selectors),plus=findPlus(selectors);

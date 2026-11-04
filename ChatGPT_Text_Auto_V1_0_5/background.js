@@ -25,9 +25,36 @@ async function saveNow(){clearTimeout(saveTimer);await chrome.storage.local.set(
 function isChatUrl(u=''){return /^https:\/\/(chatgpt\.com|chat\.openai\.com)(?:\/|$)/i.test(String(u||''));}
 function conversationId(u=''){try{const x=new URL(u);const m=x.pathname.match(/(?:^|\/)c\/([^/?#]+)/i);return m?m[1]:'';}catch(_){return '';}}
 
+const CONTENT_VERSION='1.0.6';
+async function pingContent(tabId){try{return await chrome.tabs.sendMessage(tabId,{type:'PING_TEXT_AUTO'});}catch(_){return null;}}
+async function waitTabComplete(tabId,ms=15000){
+  const end=Date.now()+ms;
+  while(Date.now()<end){
+    const tab=await chrome.tabs.get(tabId).catch(()=>null);
+    if(tab?.status==='complete'&&isChatUrl(tab.url||'')){await new Promise(r=>setTimeout(r,500));return true;}
+    await new Promise(r=>setTimeout(r,200));
+  }
+  return false;
+}
 async function ensureContent(tabId){
-  try{const p=await chrome.tabs.sendMessage(tabId,{type:'PING_TEXT_AUTO'});if(p?.ok)return {ok:true,method:'PING'};}catch(_){}
-  try{await chrome.scripting.executeScript({target:{tabId},files:['content.js']});await new Promise(r=>setTimeout(r,350));const p=await chrome.tabs.sendMessage(tabId,{type:'PING_TEXT_AUTO'});if(p?.ok)return {ok:true,method:'INJECT'};}catch(e){return {ok:false,error:String(e?.message||e)};}
+  let p=await pingContent(tabId);
+  if(p?.ok&&p.version===CONTENT_VERSION)return {ok:true,method:'PING'};
+  if(p?.ok&&p.version!==CONTENT_VERSION){
+    await chrome.tabs.reload(tabId);
+    await waitTabComplete(tabId);
+    p=await pingContent(tabId);
+    if(p?.ok&&p.version===CONTENT_VERSION)return {ok:true,method:'RELOAD'};
+  }
+  try{
+    await chrome.scripting.executeScript({target:{tabId},files:['content.js']});
+    await new Promise(r=>setTimeout(r,400));
+    p=await pingContent(tabId);
+    if(p?.ok&&p.version===CONTENT_VERSION)return {ok:true,method:'INJECT'};
+    await chrome.tabs.reload(tabId);
+    await waitTabComplete(tabId);
+    p=await pingContent(tabId);
+    if(p?.ok&&p.version===CONTENT_VERSION)return {ok:true,method:'RELOAD_AFTER_INJECT'};
+  }catch(e){return {ok:false,error:String(e?.message||e)};}
   return {ok:false,error:'CONTENT_SCRIPT_UNAVAILABLE'};
 }
 async function validateTarget(run,tabId){
@@ -148,6 +175,7 @@ function filesForLine(line){
 }
 
 async function startImageRun(tabId,config,files){
+  if(!imageRefs)return {ok:false,error:'IMAGE_REFS_MISSING: reload extension trên chrome://extensions'};
   if(state.run?.status==='RUNNING')return {ok:false,error:'RUN_ALREADY_RUNNING'};
   tabId=Number(tabId);if(!tabId)return {ok:false,error:'NO_TAB'};
   let tab;try{tab=await chrome.tabs.get(tabId);}catch(_){return {ok:false,error:'TAB_NOT_FOUND'};}
@@ -178,7 +206,11 @@ async function pumpImage(){
   const refFiles=filesForLine(prompt);
   const turn={id:uid('imgturn'),index,kind:`IMAGE_${index+1}`,prompt,refIds,refFiles,startedAt:nowIso(),sentConfirmed:false,stage:'PREPARE',conversationId:run.conversationId||conversationId(target.tab.url||'')};
   run.pendingTurn=turn;run.phase='PREPARE_TURN';save();
-  const r=await chrome.tabs.sendMessage(run.targetTabId,{type:'RUN_IMAGE_TURN',turn:{...turn,refFiles},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}}).catch(e=>({ok:false,error:String(e?.message||e)}));
+  let r=await chrome.tabs.sendMessage(run.targetTabId,{type:'RUN_IMAGE_TURN',turn:{...turn,refFiles},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}}).catch(e=>({ok:false,error:String(e?.message||e)}));
+  if(!r?.ok&&/UNKNOWN_MESSAGE|Receiving end does not exist/i.test(String(r?.error||''))){
+    const cs=await ensureContent(run.targetTabId);if(!cs.ok)return failRun(cs.error);
+    r=await chrome.tabs.sendMessage(run.targetTabId,{type:'RUN_IMAGE_TURN',turn:{...turn,refFiles},settings:{stableSec:run.config.stableSec,responseTimeoutMin:run.config.responseTimeoutMin,cdpFallback:run.config.cdpFallback,selectors:{composer:run.config.composerSelector,send:run.config.sendSelector,plus:run.config.plusSelector,createImage:run.config.createImageSelector}}}).catch(e=>({ok:false,error:String(e?.message||e)}));
+  }
   if(!r?.ok)return failRun(r?.error||'IMAGE_TURN_START_FAILED');
 }
 

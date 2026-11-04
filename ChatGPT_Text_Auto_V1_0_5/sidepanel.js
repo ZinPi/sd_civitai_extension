@@ -11,7 +11,7 @@ function msg(m){if(!hasChrome())return Promise.resolve({ok:false,error:'NO_EXTEN
 function setStatus(t,err=false){const e=$('#statusLine');e.textContent=t;e.style.color=err?'#ff9aa2':'#aeb8c5';}
 function setImageStatus(t,err=false){const e=$('#imageStatus');e.textContent=t;e.style.color=err?'#ff9aa2':'#aeb8c5';}
 function chars(){ $('#initialChars').textContent=`${$('#initialText').value.length.toLocaleString()} ký tự`; $('#repeatChars').textContent=`${$('#repeatText').value.length.toLocaleString()} ký tự`; }
-function imageLines(){return refs.splitPromptLines($('#imageText').value);}
+function imageLines(){if(!refs)return [];return refs.splitPromptLines($('#imageText').value);}
 function refreshImageCount(){ $('#imageLineCount').textContent=`${imageLines().length} dòng`; }
 function fileText(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result||''));r.onerror=()=>rej(r.error);r.readAsText(file,'utf-8');});}
 async function activeChatTab(){if(!hasChrome()||!chrome.tabs)return null;const [tab]=await chrome.tabs.query({active:true,currentWindow:true});if(!tab)return null;return /^https:\/\/(chatgpt\.com|chat\.openai\.com)(?:\/|$)/i.test(String(tab.url||''))?tab:null;}
@@ -159,35 +159,39 @@ $('#stopBtn').onclick=async()=>{const r=await msg({type:'STOP_RUN'});setStatus(r
 $('#resumeBtn').onclick=async()=>{const tab=await activeChatTab();if(!tab)return setStatus('Hãy mở đúng conversation ChatGPT cần tiếp tục.',true);const r=await msg({type:'RESUME_RUN',tabId:tab.id});setStatus(r?.ok?'Đã nối lại workflow.':`Không nối lại được: ${r?.error||'UNKNOWN'}`,!r?.ok);refresh();};
 
 $('#imageStartBtn').onclick=async()=>{
-  const lines=imageLines();
-  if(!lines.length)return setImageStatus('Chưa có dòng prompt ảnh.',true);
-  const tab=await activeChatTab();if(!tab)return setImageStatus('Hãy mở đúng cuộc chat ChatGPT rồi bấm TẠO ẢNH.',true);
-  const pack=collectImagePayloads(lines);
-  const payloads=[];
-  for(const id of pack.wanted){
-    const file=pack.index[id];
-    if(file) payloads.push(await fileToPayload(file,id));
-  }
-  const ui=readImageUi();
-  if(hasChrome()&&chrome.storage?.local)await chrome.storage.local.set({[IMAGE_UI_KEY]:ui});
-  const r=await msg({
-    type:'START_IMAGE_RUN',
-    tabId:tab.id,
-    config:{
-      lines,
-      outputPrefix:ui.imagePrefix,
-      projectName:ui.imageProject,
-      stableSec:ui.imageStableSec,
-      nextDelaySec:ui.imageDelaySec,
-      responseTimeoutMin:ui.imageTimeoutMin,
-      cdpFallback:ui.imageCdp,
-      selectors:selectors()
-    },
-    files:payloads
-  });
-  const missing=pack.preview.flatMap(p=>p.missing);
-  setImageStatus(r?.ok?`Đã bắt đầu ${lines.length} dòng • ${payloads.length} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
-  refresh();
+  try{
+    if(!refs)return setImageStatus('Thiếu image_refs.js. Reload extension.',true);
+    const lines=imageLines();
+    if(!lines.length)return setImageStatus('Chưa có dòng prompt ảnh.',true);
+    setImageStatus(`Đang chuẩn bị ${lines.length} dòng…`);
+    const tab=await activeChatTab();if(!tab)return setImageStatus('Hãy bấm vào tab ChatGPT rồi bấm TẠO ẢNH. Tool chỉ điều khiển tab đang mở.',true);
+    const pack=collectImagePayloads(lines);
+    const payloads=[];
+    for(const id of pack.wanted){
+      const file=pack.index[id];
+      if(file) payloads.push(await fileToPayload(file,id));
+    }
+    const ui=readImageUi();
+    if(hasChrome()&&chrome.storage?.local)await chrome.storage.local.set({[IMAGE_UI_KEY]:ui});
+    const r=await msg({
+      type:'START_IMAGE_RUN',
+      tabId:tab.id,
+      config:{
+        lines,
+        outputPrefix:ui.imagePrefix,
+        projectName:ui.imageProject,
+        stableSec:ui.imageStableSec,
+        nextDelaySec:ui.imageDelaySec,
+        responseTimeoutMin:ui.imageTimeoutMin,
+        cdpFallback:ui.imageCdp,
+        selectors:selectors()
+      },
+      files:payloads
+    });
+    const missing=pack.preview.flatMap(p=>p.missing);
+    setImageStatus(r?.ok?`Đã bắt đầu ${lines.length} dòng • ${payloads.length} ảnh tham chiếu.${missing.length?` Thiếu: ${[...new Set(missing)].join(', ')} (vẫn chạy).`:''}`:`Không chạy được: ${r?.error||'UNKNOWN'}`,!r?.ok);
+    refresh();
+  }catch(e){setImageStatus(`Lỗi khi bắt đầu: ${e?.message||e}`,true);}
 };
 $('#imageStopBtn').onclick=async()=>{const r=await msg({type:'STOP_RUN'});setImageStatus(r?.ok?'Đã dừng tạo ảnh.':`Không dừng được: ${r?.error||'UNKNOWN'}`,!r?.ok);refresh();};
 
@@ -205,6 +209,11 @@ function render(run){
     `${run.lastVerification?`<br>Xác minh gần nhất: ${esc(run.lastVerification)}`:''}`+
     `${run.completionReason?`<br>Kết thúc: ${esc(run.completionReason)}`:''}`+
     `${run.error?`<br><span style="color:#ff9aa2">${esc(run.error)}</span>`:''}`;
+  if(run.kind==='IMAGE'){
+    if(run.status==='RUNNING')setImageStatus(`Đang chạy: ${run.phase||''} • lượt ${Math.min((run.outputs||[]).length+1,total)}/${total}${run.lastVerification?` • ${run.lastVerification}`:''}`);
+    else if(run.error)setImageStatus(run.error,true);
+    else if(run.status==='DONE')setImageStatus(`Xong ${done}/${total} ảnh.${run.lastSavedName?` Cuối: ${run.lastSavedName}`:''}`);
+  }
 }
 async function refresh(){
   const r=await msg({type:'GET_STATE'}).catch(()=>null);if(!r?.ok)return;

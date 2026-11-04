@@ -1,0 +1,12 @@
+ChatGPT Text Auto V1.0.6
+Date: 2026-11-04
+
+Sửa tab Tạo ảnh không thao tác trên ChatGPT.
+
+- Content script cũ V1.0.4 nhận PING rồi chặn lệnh tạo ảnh. Giờ bắt buộc bản 1.0.6; sai phiên bản thì tự reload tab ChatGPT.
+- Dán prompt trước (giống tab văn bản) rồi mới bấm + → Tạo ảnh, để nhìn thấy chữ ngay.
+- Thêm selector nút + / Tạo ảnh mới hơn của ChatGPT.
+- Thiếu ảnh tham chiếu hoặc không tìm thấy ô file thì vẫn dán và gửi dòng đó.
+- Side panel báo lỗi rõ nếu không chạy được.
+
+Cài đặt: Reload extension trên chrome://extensions, rồi Ctrl+R tab ChatGPT.
