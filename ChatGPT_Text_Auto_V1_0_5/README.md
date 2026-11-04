@@ -1,5 +1,7 @@
 # ChatGPT Text Auto V1.0.5
 
+Load unpacked thư mục này trên Chrome / Cốc Cốc (`chrome://extensions` → Developer mode).
+
 Chrome / Cốc Cốc side panel:
 
 - **Văn bản lặp** — gửi payload dài nhiều lượt trên tab ChatGPT đang mở.
