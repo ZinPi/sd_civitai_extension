@@ -1,0 +1,11 @@
+{
+  "name": "chrome-chatgpt-autofill",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/test_fill.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

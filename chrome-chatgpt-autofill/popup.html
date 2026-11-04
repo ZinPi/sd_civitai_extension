@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChatGPT auto điền</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>Auto điền ChatGPT</h1>
+    <p class="lede">Dán văn bản, rồi gửi sang ô chat ChatGPT.</p>
+    <label class="file">
+      Chọn file TXT
+      <input id="file" type="file" accept=".txt,text/plain">
+    </label>
+    <textarea id="text" rows="10" placeholder="Dán văn bản cần điền vào đây."></textarea>
+    <label class="check">
+      <input id="autosend" type="checkbox" checked>
+      Gửi tự động sau khi điền
+    </label>
+    <button id="run" type="button">Điền và chạy</button>
+    <p id="status" role="status"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>
