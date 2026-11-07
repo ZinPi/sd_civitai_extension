@@ -149,13 +149,29 @@
   }
 
   function parseAdaptBatchMark(text) {
-    const all = [...String(text || "").matchAll(/BATCH ADAPTATION\s+(\d+)\s*\/\s*(\d+)\s+XONG/gi)];
+    const raw = String(text || "");
+    const strict = [...raw.matchAll(/BATCH ADAPTATION\s+(\d+)\s*\/\s*(\d+)\s+XONG/gi)];
+    const loose = [...raw.matchAll(/BATCH ADAPTATION\s+(\d+)\s*\/\s*(\d+)/gi)];
+    const all = strict.length ? strict : loose;
     if (!all.length) return null;
     const m = all[all.length - 1];
     const index = Number(m[1]);
     const total = Number(m[2]);
     if (!(index > 0) || !(total > 0) || index > total) return null;
     return { index, total };
+  }
+
+  function parseAdaptBatchProgress(text) {
+    const mark = parseAdaptBatchMark(text);
+    const listed = parseAdaptBatchTotal(text);
+    const total = (mark && mark.total) || listed || 0;
+    const done = mark ? mark.index : 0;
+    return {
+      total,
+      done,
+      complete: !!(mark && total && mark.index >= total),
+      mark,
+    };
   }
 
   function matchStepSignal(step, text, ctx) {
@@ -166,7 +182,9 @@
       if (!signal || !mark) return null;
       const expect = adaptBatchCursor(ctx);
       if (expect.total > 0) {
-        if (mark.index !== expect.index || mark.total !== expect.total) return null;
+        if (mark.total !== expect.total) return null;
+        if (mark.index === expect.done) return null;
+        if (mark.index !== expect.index) return null;
         if (expect.last && signal.id !== "ADAPT_BATCH_ALL") return null;
         if (!expect.last && signal.id !== "ADAPT_BATCH_NEXT") return null;
       } else if (mark.index < mark.total && signal.id !== "ADAPT_BATCH_NEXT") {
@@ -379,6 +397,7 @@
     adaptBatchFooter,
     parseAdaptBatchTotal,
     parseAdaptBatchMark,
+    parseAdaptBatchProgress,
     promptBatchFooter,
     parsePromptProgress,
     parseSplitLineCount,

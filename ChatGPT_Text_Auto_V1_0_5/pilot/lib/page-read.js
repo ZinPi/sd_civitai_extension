@@ -451,6 +451,10 @@
     const candidateObj = bestResponseCandidate(base);
     const fresh = findFreshAssistant(base);
     const reply = candidateObj?.text || fresh?.text || latestAssistant().text || "";
+    const assistantTexts = assistantNodes()
+      .map((el) => turnText(el) || canonLoose(rawText(el)))
+      .filter(Boolean);
+    const threadTail = assistantTexts.slice(-20).join("\n\n").slice(-120000);
     const sawNew = !!(
       candidateObj ||
       fresh ||
@@ -462,6 +466,7 @@
       version: "1.8.4",
       reply,
       pageTail: reply.slice(-8000),
+      threadTail,
       lastChars: reply.slice(-240),
       candidateKey: candidateObj?.key || fresh?.key || "",
       candidateSource: candidateObj?.source || (fresh ? "fresh" : ""),

@@ -1,0 +1,9 @@
+ChatGPT Text Auto V1.1.5
+Date: 2026-11-07
+
+Tab Pilot: tự quét và ghi số batch từ ChatGPT.
+
+- Đọc `TỔNG SỐ BATCH ADAPTATION: N` và `BATCH ADAPTATION 4/11 XONG LÀM BATCH TIẾP THEO`.
+- Chọn bước chuyển đổi từng batch / đọc câu cuối trên tab ChatGPT khác: tool ghi 4/11 rồi gửi batch 5.
+
+Cài: Reload unpacked, phải thấy V1.1.5, Ctrl+R tab ChatGPT.

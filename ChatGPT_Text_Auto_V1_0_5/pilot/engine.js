@@ -136,6 +136,18 @@
     return count;
   }
 
+  function rememberBatchProgress(text) {
+    const parsed = S.parseAdaptBatchProgress(text);
+    if (!parsed.total) return parsed;
+    pstate.adaptBatchTotal = parsed.total;
+    if (parsed.done > 0) pstate.adaptBatchDone = parsed.done;
+    return parsed;
+  }
+
+  function scanTextOf(result) {
+    return [result?.threadTail, result?.reply, result?.pageTail, result?.lastChars].filter(Boolean).join("\n");
+  }
+
   function totalLinesOrThrow() {
     const n = rememberTotalLines(pstate.totalLines);
     if (!n) {
@@ -160,7 +172,7 @@
       adaptBatchDone: pstate.adaptBatchDone || 0,
     };
     if (step.id === "batchAdapt" && !ctx.adaptBatchTotal) {
-      throw new Error("Chưa có số batch. Chạy bước phân tích nguồn để ChatGPT in: TỔNG SỐ BATCH ADAPTATION: N.");
+      throw new Error("Chưa có số batch. Tool chưa đọc được TỔNG SỐ BATCH ADAPTATION: N hoặc BATCH ADAPTATION X/Y trên tab ChatGPT.");
     }
     if (step.id === "promptBatch") ctx.totalLines = totalLinesOrThrow();
     return step.build(ctx);
@@ -199,11 +211,13 @@
     }
 
     if (step.id === "batchAdapt") {
+      const mark = S.parseAdaptBatchProgress(reply || "").mark;
+      if (mark?.total) pstate.adaptBatchTotal = mark.total;
       if (signalId === "ADAPT_BATCH_NEXT") {
-        pstate.adaptBatchDone = (pstate.adaptBatchDone || 0) + 1;
+        pstate.adaptBatchDone = mark?.index || (pstate.adaptBatchDone || 0) + 1;
         addLog(`Batch ${pstate.adaptBatchDone}/${pstate.adaptBatchTotal} xong. Gửi batch tiếp theo.`);
       } else if (signalId === "ADAPT_BATCH_ALL") {
-        pstate.adaptBatchDone = pstate.adaptBatchTotal;
+        pstate.adaptBatchDone = mark?.index || pstate.adaptBatchTotal;
         addLog(`Đã chuyển hết ${pstate.adaptBatchTotal} batch. Sang hợp nhất.`);
       }
     }
@@ -349,7 +363,7 @@
       persist();
       return;
     }
-    const step = M.STEP_MAP[pstate.stepId];
+    let step = M.STEP_MAP[pstate.stepId];
     if (!step) return failStep("Bước không hợp lệ.");
     const tabId = Number(pstate.tabId);
     if (!tabId) return failStep("Không có tab ChatGPT.");
@@ -361,6 +375,25 @@
       }
       if (typeof keepTabAlive === "function") await keepTabAlive(tabId);
       if (typeof ensurePilotContent === "function") await ensurePilotContent(tabId);
+      if (step.id === "batchAdapt") {
+        const page = await readPage(tabId, ["XONG LÀM BATCH TIẾP THEO", "XONG THỰC HIỆN HỢP NHẤT LIỀN MẠCH"], {}).catch(
+          () => null
+        );
+        const parsed = rememberBatchProgress(scanTextOf(page));
+        if (parsed.total) {
+          addLog(`Đọc từ ChatGPT: BATCH ADAPTATION ${pstate.adaptBatchDone}/${pstate.adaptBatchTotal}.`);
+        }
+        if (parsed.complete || (pstate.adaptBatchTotal && pstate.adaptBatchDone >= pstate.adaptBatchTotal)) {
+          pstate.stepId = "continuityMerge";
+          pstate.startStep = "continuityMerge";
+          pstate.pendingTurn = null;
+          addLog("ChatGPT đã xong hết batch. Sang hợp nhất liền mạch.");
+          persist();
+          schedulePump(200);
+          return;
+        }
+        step = M.STEP_MAP[pstate.stepId];
+      }
       const text = buildMessage(step);
       if (!String(text || "").trim()) return failStep("Lệnh bước này trống, không có gì để dán.");
       if (step.id === "promptBatch") {
@@ -717,12 +750,26 @@
       return { ok: true };
     }
     addLog("Đọc câu trả lời đang có trên tab, không gửi lại.");
+    const batchInfo = rememberBatchProgress(scanTextOf(result) + "\n" + reply);
+    if (batchInfo.total) {
+      addLog(`Ghi nhớ số batch từ ChatGPT: ${pstate.adaptBatchDone}/${pstate.adaptBatchTotal}.`);
+    }
     let okHit = false;
     try {
       okHit = handleReply(step, reply);
     } catch (err) {
       failStep(err.message || String(err));
       return { ok: false, error: err.message || String(err) };
+    }
+    if (!okHit && batchInfo.total) {
+      pstate.lastError = "";
+      pstate.stepId = batchInfo.complete ? "continuityMerge" : "batchAdapt";
+      okHit = true;
+      addLog(
+        batchInfo.complete
+          ? `ChatGPT đã xong ${batchInfo.total} batch. Bấm Chạy tiếp để hợp nhất.`
+          : `Đã ghi batch ${pstate.adaptBatchDone}/${pstate.adaptBatchTotal}. Bấm Chạy tiếp để làm batch ${pstate.adaptBatchDone + 1}.`
+      );
     }
     await abortTab(tabId);
     pstate.pendingTurn = null;
