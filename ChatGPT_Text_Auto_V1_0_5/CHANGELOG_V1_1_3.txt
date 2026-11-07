@@ -1,0 +1,10 @@
+ChatGPT Text Auto V1.1.3
+Date: 2026-11-07
+
+Sửa tab Pilot: Đọc câu cuối rồi Chạy tiếp không dán vào ô ChatGPT.
+
+- Đọc câu cuối chỉ nhận bước, không tự gửi. Bấm Chạy tiếp mới dán lệnh.
+- Gửi bằng cách dán thẳng vào ô chat (không kẹt chờ idle).
+- Nếu đang chạy mà ô chat trống, bấm lại nút chính để gửi lại vào ô chat.
+
+Cài: Reload unpacked, phải thấy V1.1.3, Ctrl+R tab ChatGPT.

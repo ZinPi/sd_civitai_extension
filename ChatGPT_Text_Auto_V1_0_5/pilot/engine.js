@@ -302,7 +302,8 @@
 
   async function pumpPilot() {
     await ready;
-    if (!pstate.running || pstate.paused || pstate.pendingTurn) return;
+    if (!pstate.running || pstate.paused) return;
+    if (pstate.pendingTurn?.sentConfirmed) return;
     if (pstate.stepId === "done") {
       pstate.running = false;
       persist();
@@ -313,24 +314,26 @@
     const tabId = Number(pstate.tabId);
     if (!tabId) return failStep("Không có tab ChatGPT.");
     try {
-      if (typeof keepTabAlive === "function") await keepTabAlive(tabId);
-      if (typeof ensureContent === "function") {
-        const cs = await ensureContent(tabId);
-        if (!cs?.ok) return failStep(cs?.error || "CONTENT_SCRIPT_UNAVAILABLE");
+      if (pstate.pendingTurn && !pstate.pendingTurn.sentConfirmed) {
+        addLog("Lượt trước chưa dán xong — hủy rồi dán lại vào ô chat.");
+        await abortTab(tabId);
+        pstate.pendingTurn = null;
       }
+      if (typeof keepTabAlive === "function") await keepTabAlive(tabId);
       if (typeof ensurePilotContent === "function") await ensurePilotContent(tabId);
       const text = buildMessage(step);
+      if (!String(text || "").trim()) return failStep("Lệnh bước này trống, không có gì để dán.");
       if (step.id === "promptBatch") {
         const batch = M.currentBatch(pstate);
         addLog(
           batch.count
-            ? `Gửi prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: dòng ${batch.from}–${batch.to} / ${pstate.totalLines}`
-            : `Gửi prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: QA cuối ${pstate.promptLinesDone}/${pstate.totalLines}`
+            ? `Dán prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: dòng ${batch.from}–${batch.to} / ${pstate.totalLines}`
+            : `Dán prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: QA cuối ${pstate.promptLinesDone}/${pstate.totalLines}`
         );
       } else if (step.id === "batchAdapt") {
-        addLog(`Gửi chuyển đổi batch ${(pstate.adaptBatchDone || 0) + 1}/${pstate.adaptBatchTotal}`);
+        addLog(`Dán chuyển đổi batch ${(pstate.adaptBatchDone || 0) + 1}/${pstate.adaptBatchTotal}`);
       } else {
-        addLog(`Gửi: ${step.title}`);
+        addLog(`Dán vào ô chat: ${step.title}`);
       }
       const turn = {
         id: `pilot_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -344,18 +347,21 @@
         baseline: null,
       };
       pstate.pendingTurn = turn;
-      pstate.phase = "PREPARE_TURN";
+      pstate.phase = "PASTE_SEND";
       pstate.lastError = "";
       await persistNow();
-      const settings = {
-        stableSec: 5,
-        responseTimeoutMin: pstate.waitMinutes || 60,
-        cdpFallback: true,
-        selectors: {},
-      };
-      const r = await chrome.tabs
-        .sendMessage(tabId, { type: "RUN_TEXT_TURN", turn, settings })
+      const settings = { responseTimeoutMin: pstate.waitMinutes || 60 };
+      let r = await chrome.tabs
+        .sendMessage(tabId, { type: "RUN_PILOT_TURN", turn, settings })
         .catch((e) => ({ ok: false, error: String(e?.message || e) }));
+      if (!r?.ok && /TURN_ALREADY_ACTIVE|Receiving end does not exist/i.test(String(r?.error || ""))) {
+        await abortTab(tabId);
+        await new Promise((res) => setTimeout(res, 400));
+        if (typeof ensurePilotContent === "function") await ensurePilotContent(tabId);
+        r = await chrome.tabs
+          .sendMessage(tabId, { type: "RUN_PILOT_TURN", turn, settings })
+          .catch((e) => ({ ok: false, error: String(e?.message || e) }));
+      }
       if (!r?.ok) return failStep(r?.error || "TURN_START_FAILED");
     } catch (err) {
       failStep(err.message || String(err));
@@ -601,10 +607,11 @@
     pstate.lastError = "";
     pstate.running = true;
     pstate.paused = false;
+    await abortTab(pstate.tabId);
     pstate.pendingTurn = null;
-    addLog("Gửi lại bước hiện tại.");
+    addLog("Gửi lại bước hiện tại — dán vào ô chat ngay.");
     await persistNow();
-    schedulePump(150);
+    schedulePump(200);
     return { ok: true };
   }
 
@@ -652,12 +659,15 @@
       failStep(err.message || String(err));
       return { ok: false, error: err.message || String(err) };
     }
-    persist();
+    await abortTab(tabId);
+    pstate.pendingTurn = null;
+    pstate.running = false;
+    pstate.paused = false;
     if (pstate.stepId !== "done") {
-      pstate.running = true;
-      pstate.paused = false;
-      schedulePump(150);
+      pstate.phase = "READY";
+      addLog("Đã nhận. Bấm Chạy tiếp để dán lệnh bước sau vào ô ChatGPT.");
     }
+    persist();
     return { ok: true };
   }
 

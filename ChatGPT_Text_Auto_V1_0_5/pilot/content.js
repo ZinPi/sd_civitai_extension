@@ -464,13 +464,86 @@
     };
   }
 
+  let activePilotTurn = null;
+
+  async function waitPilotReply(turn, timeoutMs, emit) {
+    const stableMs = 5000;
+    let remaining = Math.max(60000, Number(timeoutMs) || 60 * 60 * 1000);
+    let lastTick = Date.now();
+    let last = "";
+    let lastKey = "";
+    let lastChange = Date.now();
+    let sawNew = false;
+    let lastBeat = 0;
+    const baseline = turn?.baseline || {};
+    while (remaining > 0) {
+      if (abortWait) throw new Error("STOPPED_BY_USER");
+      const now = Date.now();
+      const dt = Math.max(0, now - lastTick);
+      lastTick = now;
+      if (!document.hidden) remaining -= dt;
+      const st =
+        typeof __lnReadPage === "function"
+          ? __lnReadPage([], baseline)
+          : readState([]);
+      if (st?.sawNew) sawNew = true;
+      const candidate = String(st?.reply || "");
+      const candidateKey = String(st?.candidateKey || "");
+      if (candidate && (candidate !== last || candidateKey !== lastKey)) {
+        last = candidate;
+        lastKey = candidateKey;
+        lastChange = now;
+      }
+      const generating = !!st?.generating;
+      const composerReady = st?.composerReady !== false;
+      const stableFor = now - lastChange;
+      if (now - lastBeat >= 2000) {
+        lastBeat = now;
+        await emit({
+          kind: "PROGRESS",
+          phase: "WAIT_RESPONSE",
+          verification: `pilotWait chars=${last.length} generating=${generating} stable=${Math.round(stableFor / 100) / 10}s hidden=${document.hidden}`,
+        });
+      }
+      if (sawNew && last && !generating && composerReady && stableFor >= stableMs) return last;
+      await sleep(document.hidden ? 750 : 300);
+    }
+    throw new Error("RESPONSE_TIMEOUT_NO_SAFE_ADVANCE");
+  }
+
+  async function runPilotTurn(turn, settings) {
+    const emit = (e) =>
+      chrome.runtime.sendMessage({ type: "TEXT_EVENT", event: { turnId: turn.id, ...e } }).catch(() => null);
+    try {
+      abortWait = false;
+      await emit({ kind: "PROGRESS", phase: "PASTE_SEND", verification: "dán lệnh vào ô chat ngay, không chờ idle" });
+      let sent;
+      if (typeof __lnSendPrompt === "function") sent = await __lnSendPrompt(turn.prompt || "");
+      else sent = await sendPrompt(turn.prompt || "", []);
+      if (sent?.ok === false) throw new Error(sent.error || "SEND_FAILED");
+      turn.baseline = sent?.baseline || sent || {};
+      await emit({
+        kind: "SENT",
+        method: "PILOT_FILL_SEND",
+        baseline: turn.baseline,
+        verification: "đã dán và bấm gửi",
+      });
+      const timeoutMs = Math.max(60000, Number(settings?.responseTimeoutMin || 60) * 60000);
+      const reply = await waitPilotReply(turn, timeoutMs, emit);
+      await emit({ kind: "DONE", text: reply, method: "PILOT_ASSISTANT_DONE" });
+    } catch (err) {
+      await emit({ kind: "FAILED", error: String(err?.message || err) });
+    }
+  }
+
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!isLive()) return false;
     (async () => {
       if (msg?.type === "PING") return status();
       if (msg?.type === "GET_STATUS") return status();
-      if (msg?.type === "STOP_WAIT") {
+      if (msg?.type === "STOP_WAIT" || msg?.type === "ABORT_TEXT_AUTO") {
         abortWait = true;
+        activePilotTurn = null;
         return { ok: true };
       }
       if (msg?.type === "READ_LAST") {
@@ -482,6 +555,15 @@
       }
       if (msg?.type === "SEND_PROMPT") {
         return sendPrompt(msg.text, msg.expectPhrases || []);
+      }
+      if (msg?.type === "RUN_PILOT_TURN") {
+        if (activePilotTurn) return { ok: false, error: "TURN_ALREADY_ACTIVE" };
+        abortWait = false;
+        activePilotTurn = msg.turn;
+        runPilotTurn(msg.turn, msg.settings || {}).finally(() => {
+          if (activePilotTurn?.id === msg.turn?.id) activePilotTurn = null;
+        });
+        return { ok: true };
       }
       if (msg?.type === "SEND_AND_WAIT") {
         await sendPrompt(msg.text, msg.expectPhrases || []);
@@ -513,6 +595,8 @@
       "CLICK_SEND",
       "SEND_PROMPT",
       "SEND_AND_WAIT",
+      "RUN_PILOT_TURN",
+      "ABORT_TEXT_AUTO",
     ].includes(msg?.type);
   });
 })();

@@ -241,8 +241,8 @@
           ? "Tool nhớ bước đang dừng. Chạy tiếp không quay về đầu. Muốn làm lại từ bước đầu thì bấm Chạy lại từ đầu. Đóng panel không dừng pipeline."
           : "Đóng panel hoặc đổi tab không dừng pipeline — background cầm lệnh giống tab Văn bản / Tạo ảnh.";
     }
-    els.btnStart.textContent = resume ? "Chạy tiếp" : "Chạy pipeline";
-    els.btnStart.disabled = state.running && !state.paused;
+    els.btnStart.textContent = state.running && !state.paused ? "Gửi lại vào ô chat" : resume ? "Chạy tiếp" : "Chạy pipeline";
+    els.btnStart.disabled = false;
     els.btnPause.disabled = !state.running || state.paused;
     els.btnStop.disabled = false;
     setBadge();
@@ -344,7 +344,17 @@
     setTimeout(refreshTabStatus, 1200);
   });
 
-  els.btnStart.addEventListener("click", () => {
+  els.btnStart.addEventListener("click", async () => {
+    if (state.running && !state.paused) {
+      try {
+        const tabId = await tabIdOrThrow();
+        await msg({ type: "RESEND_PILOT", tabId, config: readForm() });
+        await refresh();
+      } catch (err) {
+        els.tabStatus.textContent = err.message || String(err);
+      }
+      return;
+    }
     if (state.paused) return startFrom(true, false);
     startFrom(shouldResume(state), false);
   });
