@@ -345,10 +345,17 @@
   });
 
   els.btnStart.addEventListener("click", async () => {
+    const config = readForm();
+    const chosen = String(config.startStep || "");
+    const chosenDiffers = !!(chosen && chosen !== state.stepId);
+    if (chosenDiffers) {
+      startFrom(false, false);
+      return;
+    }
     if (state.running && !state.paused) {
       try {
         const tabId = await tabIdOrThrow();
-        await msg({ type: "RESEND_PILOT", tabId, config: readForm() });
+        await msg({ type: "RESEND_PILOT", tabId, config });
         await refresh();
       } catch (err) {
         els.tabStatus.textContent = err.message || String(err);
@@ -387,9 +394,14 @@
   });
 
   els.btnReadLast.addEventListener("click", async () => {
-    const r = await msg({ type: "READ_PILOT_LAST" });
-    if (!r?.ok) els.tabStatus.textContent = r?.error || "Không đọc được câu cuối.";
-    await refresh();
+    try {
+      await tabIdOrThrow();
+      const r = await msg({ type: "READ_PILOT_LAST" });
+      if (!r?.ok) els.tabStatus.textContent = r?.error || "Không đọc được câu cuối.";
+      await refresh();
+    } catch (err) {
+      els.tabStatus.textContent = err.message || String(err);
+    }
   });
 
   els.btnForceNext.addEventListener("click", async () => {

@@ -272,21 +272,61 @@
     if (step.kind === "fix" && !(step.allowed || []).length) {
       addLog("Sửa xong, gửi lại QA.");
       pstate.stepId = step.afterIdle;
-      return;
+      return true;
     }
-    const signal = S.matchStepSignal(step, reply, pstate);
+    let signal = S.matchStepSignal(step, reply, pstate);
     if (!signal) {
-      pstate.lastError = "Không thấy cụm nhận biết riêng của bước này.";
+      const allIds = [...new Set(M.visibleSteps(pstate).flatMap((s) => s.allowed || []))];
+      signal = S.findSignal(reply, allIds);
+      if (signal) {
+        const owner = M.visibleSteps(pstate).find((s) => (s.allowed || []).includes(signal.id));
+        if (owner && owner.id !== step.id) {
+          addLog(`Câu cuối thuộc bước “${owner.title}”, không phải “${step.title}”.`);
+          step = owner;
+          pstate.stepId = owner.id;
+          signal = S.matchStepSignal(step, reply, pstate) || signal;
+        }
+      }
+    }
+    if (!signal) {
+      const tail = String(reply || "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(-220);
+      pstate.lastError = "Không thấy cụm nhận biết trong câu cuối.";
       pstate.running = false;
       pstate.paused = false;
       pstate.pendingTurn = null;
       pstate.phase = "ERROR";
-      addLog(`${pstate.lastError} Dừng ở “${step.title}”. Bấm Chạy tiếp để gửi lại đúng bước này.`);
-      return;
+      addLog(`${pstate.lastError} Dừng ở “${step.title}”. Cuối: ${tail || "(trống)"}`);
+      return false;
     }
     applySignal(step, signal, reply);
     const next = M.STEP_MAP[pstate.stepId];
     if (next && next.id !== "done") addLog(`Sắp gửi bước tiếp: ${next.title}`);
+    return true;
+  }
+
+  async function resolvePilotTab() {
+    let tabId = Number(pstate.tabId);
+    if (tabId) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab?.id && (typeof isChatUrl !== "function" || isChatUrl(tab.url || ""))) return tab.id;
+      } catch {
+        /* find again */
+      }
+    }
+    const tabs = await chrome.tabs
+      .query({ url: ["https://chatgpt.com/*", "https://chat.openai.com/*"] })
+      .catch(() => []);
+    const tab = (tabs || []).find((t) => t.active) || (tabs || [])[0] || null;
+    if (tab?.id) {
+      pstate.tabId = tab.id;
+      persist();
+      return tab.id;
+    }
+    return 0;
   }
 
   function failStep(message) {
@@ -508,8 +548,10 @@
     mergeConfig(msg.config || {});
     pstate.tabId = tabId;
     pstate.lastError = "";
-    const fromCurrent = !!msg.fromCurrent;
     const restart = !!msg.restart;
+    const chosenStart = String(pstate.startStep || "").trim();
+    const startFromChosen = !!(chosenStart && chosenStart !== pstate.stepId && M.STEP_MAP[chosenStart]);
+    const fromCurrent = !!msg.fromCurrent && !restart && !startFromChosen;
     if (!fromCurrent) {
       pstate.stepId = restart ? M.startStepId(pstate) : M.entryStepId(pstate);
       pstate.qaLoops = 0;
@@ -525,6 +567,7 @@
         pstate.totalLines = 0;
       }
     }
+    pstate.startStep = pstate.stepId;
     pstate.safetyRetries = 0;
     pstate.engaged = true;
     pstate.running = true;
@@ -538,9 +581,12 @@
         return { ok: false, error: err.message || String(err) };
       }
     }
-    if (typeof ensureContent === "function") {
-      const cs = await ensureContent(tabId);
-      if (!cs?.ok) return cs;
+    if (typeof ensurePilotContent === "function") {
+      try {
+        await ensurePilotContent(tabId);
+      } catch (err) {
+        return { ok: false, error: err.message || String(err) };
+      }
     }
     await abortTab(tabId);
     const chosen = M.STEP_MAP[pstate.stepId];
@@ -551,8 +597,8 @@
     addLog(
       fromCurrent
         ? `Chạy tiếp đúng bước đang dừng: “${chosen?.title || pstate.stepId}”.`
-        : skipped
-          ? `Bắt đầu từ “${chosen?.title || pstate.stepId}”. Bỏ các bước trước.`
+        : startFromChosen || skipped
+          ? `Bắt đầu từ bước đã chọn: “${chosen?.title || pstate.stepId}”.`
           : `Bắt đầu pipeline · cô đọng ${pstate.condensePercent}%${pstate.doLatin ? " · có Mỹ Latinh" : " · bỏ Mỹ Latinh, chia dòng bản Nhật"}${pstate.doVideo ? " · prompt video theo dòng" : " · prompt ảnh theo dòng"}.`
     );
     await persistNow();
@@ -626,22 +672,40 @@
 
   async function readLast() {
     await ready;
-    const step = M.STEP_MAP[pstate.stepId];
-    if (!step || step.id === "done") return { ok: false, error: "NO_STEP" };
-    const tabId = Number(pstate.tabId);
+    const tabId = await resolvePilotTab();
     if (!tabId) return { ok: false, error: "NO_TAB" };
-    const expectPhrases = (step.allowed || [])
-      .flatMap((id) => S.signalPhrases(S.CATALOG.find((s) => s.id === id)))
-      .filter(Boolean);
+    if (typeof ensurePilotContent === "function") {
+      try {
+        await ensurePilotContent(tabId);
+      } catch (err) {
+        return { ok: false, error: err.message || String(err) };
+      }
+    }
+    let step = M.STEP_MAP[pstate.stepId] || M.STEP_MAP.sourceAnalysis;
+    const expectPhrases = [
+      ...new Set(
+        M.visibleSteps(pstate).flatMap((s) =>
+          (s.allowed || []).flatMap((id) => S.signalPhrases(S.CATALOG.find((x) => x.id === id)))
+        )
+      ),
+    ].filter(Boolean);
     let result;
     try {
       result = await readPage(tabId, expectPhrases, {});
     } catch (err) {
-      return { ok: false, error: err.message || String(err) };
+      result = { ok: false, error: err.message || String(err) };
+    }
+    if (!result?.ok || !(result?.reply || result?.pageTail)) {
+      try {
+        const fallback = await chrome.tabs.sendMessage(tabId, { type: "READ_LAST", expectPhrases });
+        if (fallback?.reply || fallback?.ok) result = fallback;
+      } catch (err) {
+        if (!result?.reply) return { ok: false, error: result?.error || err.message || "Không đọc được câu trả lời cuối." };
+      }
     }
     const hit = pickSignaledText(step, result, "");
-    const reply = hit.text || result?.reply || "";
-    if (!reply) return { ok: false, error: "Không đọc được câu trả lời cuối." };
+    const reply = hit.text || result?.reply || result?.pageTail || "";
+    if (!reply) return { ok: false, error: result?.error || "Không đọc được câu trả lời cuối." };
     if (R.isSafetyRefusal(reply)) {
       addLog("Câu cuối bị chặn vì an toàn. Gửi lại đúng bước này.");
       pstate.safetyRetries = 0;
@@ -649,12 +713,13 @@
       pstate.paused = false;
       pstate.pendingTurn = null;
       persist();
-      schedulePump(150);
+      schedulePump(200);
       return { ok: true };
     }
     addLog("Đọc câu trả lời đang có trên tab, không gửi lại.");
+    let okHit = false;
     try {
-      handleReply(step, reply);
+      okHit = handleReply(step, reply);
     } catch (err) {
       failStep(err.message || String(err));
       return { ok: false, error: err.message || String(err) };
@@ -663,12 +728,14 @@
     pstate.pendingTurn = null;
     pstate.running = false;
     pstate.paused = false;
-    if (pstate.stepId !== "done") {
+    pstate.startStep = pstate.stepId;
+    if (okHit && pstate.stepId !== "done") {
+      pstate.lastError = "";
       pstate.phase = "READY";
       addLog("Đã nhận. Bấm Chạy tiếp để dán lệnh bước sau vào ô ChatGPT.");
     }
     persist();
-    return { ok: true };
+    return okHit ? { ok: true } : { ok: false, error: pstate.lastError || "Không thấy cụm nhận biết trong câu cuối." };
   }
 
   function forceNext() {

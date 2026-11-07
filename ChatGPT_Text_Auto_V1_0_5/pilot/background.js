@@ -37,7 +37,20 @@ async function keepTabAlive(tabId) {
 
 async function injectDriver(tabId) {
   await keepTabAlive(tabId);
-  if (pilotInjectedTabs.has(tabId)) return;
+  let hasReader = false;
+  try {
+    const [check] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => typeof __lnReadPage === "function",
+    });
+    hasReader = !!check?.result;
+  } catch {
+    hasReader = false;
+  }
+  if (hasReader) {
+    pilotInjectedTabs.add(tabId);
+    return;
+  }
   await chrome.scripting.executeScript({
     target: { tabId },
     files: ["pilot/lib/page-read.js"],

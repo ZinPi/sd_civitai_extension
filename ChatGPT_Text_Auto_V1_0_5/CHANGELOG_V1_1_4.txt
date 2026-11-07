@@ -1,0 +1,8 @@
+ChatGPT Text Auto V1.1.4
+Date: 2026-11-07
+
+Sửa tab Pilot:
+- Chọn bước rồi bấm chạy phải dán đúng bước đó, không bị “Chạy tiếp” kéo về bước cũ.
+- Đọc câu cuối: tự tìm tab ChatGPT, quét câu chốt của mọi bước (không chỉ bước đang mở).
+
+Cài: Reload unpacked, phải thấy V1.1.4, Ctrl+R tab ChatGPT.
