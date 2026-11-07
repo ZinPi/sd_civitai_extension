@@ -1,5 +1,10 @@
 importScripts('image_refs.js');
+importScripts('pilot/lib/signals.js');
+importScripts('pilot/lib/prompts.js');
+importScripts('pilot/lib/machine.js');
+importScripts('pilot/lib/runner.js');
 importScripts('pilot/background.js');
+importScripts('pilot/engine.js');
 const STORAGE_KEY='chatgptTextAutoStateV1';
 const imageRefs=self.ChatGptImageRefs;
 const DEFAULTS={stableSec:5,nextDelaySec:1,responseTimeoutMin:30,saveEachResponse:true,cdpFallback:true,composerSelector:'',sendSelector:''};
@@ -69,6 +74,7 @@ async function validateTarget(run,tabId){
   run.conversationUrl=tab.url||run.conversationUrl;
   return {ok:true,tab};
 }
+function isTextOrImageRunning(){return state?.run?.status==='RUNNING';}
 function totalTurns(cfg){return (cfg.sendInitial?1:0)+Number(cfg.repeatCount||0);}
 function payloadFor(run,index){
   if(run.config.sendInitial && index===0)return {kind:'INITIAL',text:run.initialText};
@@ -77,6 +83,7 @@ function payloadFor(run,index){
 }
 
 async function startRun(tabId,config){
+  if(self.PilotEngine?.isOccupied())return {ok:false,error:'PILOT_RUNNING'};
   if(state.run?.status==='RUNNING')return {ok:false,error:'RUN_ALREADY_RUNNING'};
   tabId=Number(tabId);if(!tabId)return {ok:false,error:'NO_TAB'};
   let tab;try{tab=await chrome.tabs.get(tabId);}catch(_){return {ok:false,error:'TAB_NOT_FOUND'};}
@@ -144,9 +151,20 @@ async function nudgePendingResponse(tabId,reason='NUDGE'){
     if(rr?.ok){run.phase='RECOVER_WAIT_RESPONSE';log('INFO','Auto recovery attached',{reason,turn:turn.index+1,tabId:run.targetTabId});save();}
   }finally{autoRecoverBusy=false;}
 }
-chrome.tabs.onActivated.addListener(info=>{nudgePendingResponse(info.tabId,'TAB_ACTIVATED').catch(()=>{});});
-chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{if(changeInfo.status==='complete')nudgePendingResponse(tabId,'TAB_RELOADED_OR_RESTORED').catch(()=>{});});
-ready.then(()=>setTimeout(()=>{const id=state.run?.targetTabId;if(id)nudgePendingResponse(id,'SERVICE_WORKER_RESTART').catch(()=>{});},800));
+chrome.tabs.onActivated.addListener(info=>{
+  nudgePendingResponse(info.tabId,'TAB_ACTIVATED').catch(()=>{});
+  self.PilotEngine?.nudge(info.tabId,'TAB_ACTIVATED')?.catch(()=>{});
+});
+chrome.tabs.onUpdated.addListener((tabId,changeInfo)=>{
+  if(changeInfo.status==='complete'){
+    nudgePendingResponse(tabId,'TAB_RELOADED_OR_RESTORED').catch(()=>{});
+    self.PilotEngine?.nudge(tabId,'TAB_RELOADED_OR_RESTORED')?.catch(()=>{});
+  }
+});
+ready.then(()=>setTimeout(()=>{
+  const id=state.run?.targetTabId;if(id)nudgePendingResponse(id,'SERVICE_WORKER_RESTART').catch(()=>{});
+  const pid=self.PilotEngine?.getState?.()?.tabId;if(pid)self.PilotEngine?.nudge(pid,'SERVICE_WORKER_RESTART')?.catch(()=>{});
+},800));
 
 async function onTextEvent(tabId,event){
   const run=state.run,turn=run?.pendingTurn;if(!run||run.kind==='IMAGE'||run.status!=='RUNNING'||tabId!==run.targetTabId)return {ok:false,error:'RUN_NOT_ACTIVE'};
@@ -211,6 +229,7 @@ function filesForLine(line){
 
 async function startImageRun(tabId,config){
   if(!imageRefs)return {ok:false,error:'IMAGE_REFS_MISSING: reload extension trên chrome://extensions'};
+  if(self.PilotEngine?.isOccupied())return {ok:false,error:'PILOT_RUNNING'};
   if(state.run?.status==='RUNNING')return {ok:false,error:'RUN_ALREADY_RUNNING'};
   tabId=Number(tabId);if(!tabId)return {ok:false,error:'NO_TAB'};
   let tab;try{tab=await chrome.tabs.get(tabId);}catch(_){return {ok:false,error:'TAB_NOT_FOUND'};}
@@ -315,7 +334,11 @@ chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
     case 'START_IMAGE_RUN':return startImageRun(msg.tabId,msg.config||{});
     case 'STOP_RUN':return stopRun();
     case 'RESUME_RUN':return resumeRun(msg.tabId);
-    case 'TEXT_EVENT':return onTextEvent(sender.tab?.id,msg.event||{});
+    case 'TEXT_EVENT':{
+      const ev=msg.event||{};
+      if(self.PilotEngine?.ownsEvent(sender.tab?.id,ev))return self.PilotEngine.onTextEvent(sender.tab?.id,ev);
+      return onTextEvent(sender.tab?.id,ev);
+    }
     case 'IMAGE_EVENT':return onImageEvent(sender.tab?.id,msg.event||{});
     case 'PROBE_UI':{const tabId=Number(msg.tabId);const cs=await ensureContent(tabId);if(!cs.ok)return cs;return chrome.tabs.sendMessage(tabId,{type:'PROBE_TEXT_UI',selectors:msg.selectors||{}});}
     case 'CDP_INSERT_TEXT':if(!sender.tab?.id)return {ok:false,error:'NO_SENDER_TAB'};try{await cdpInsert(sender.tab.id,msg.text||'');return {ok:true};}catch(e){return {ok:false,error:String(e?.message||e)};}

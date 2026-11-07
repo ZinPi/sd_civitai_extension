@@ -1,0 +1,11 @@
+ChatGPT Text Auto V1.1.1
+Date: 2026-11-07
+
+Tab Pilot Tác Phẩm chạy cùng cơ chế với tab Văn bản lặp / Tạo ảnh.
+
+- Background (service worker) cầm pipeline, không còn vòng chờ trong panel.
+- Content script trên tab ChatGPT gửi lệnh và chờ câu trả lời (tab ẩn không trừ giờ chờ).
+- Đóng panel hoặc đổi tab không dừng pipeline.
+- Tính năng pipeline giữ nguyên: bước, câu chốt, CHAR/BG dạng chữ, 20 dòng/lô, Chạy tiếp / Đọc câu cuối / Ép XONG.
+
+Cài: Reload unpacked, phải thấy V1.1.1, Ctrl+R tab ChatGPT.

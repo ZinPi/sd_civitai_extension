@@ -1,11 +1,11 @@
-# ChatGPT Text Auto V1.1.0
+# ChatGPT Text Auto V1.1.1
 
 Load unpacked thư mục này trên Chrome / Cốc Cốc (`chrome://extensions` → Developer mode). Sau khi cập nhật: bấm Reload trên `chrome://extensions`, rồi Ctrl+R tab ChatGPT.
 
 Ba tab:
 - **Văn bản lặp** — gửi payload dài nhiều lượt.
 - **Tạo ảnh** — mỗi dòng (hoặc nhóm 1–10 dòng) một lần tạo ảnh trên ChatGPT.
-- **Pilot tác phẩm** — pipeline chuyển tác phẩm (Nhật / Latinh / CHAR-BG / prompt ảnh).
+- **Pilot tác phẩm** — pipeline chuyển tác phẩm (Nhật / Latinh / CHAR-BG / prompt ảnh). Cùng cơ chế background với hai tab kia: đóng panel không dừng chạy.
 
 Chrome / Cốc Cốc side panel:
 
