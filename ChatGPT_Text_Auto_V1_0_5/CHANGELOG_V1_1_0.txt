@@ -1,0 +1,10 @@
+ChatGPT Text Auto V1.1.0
+Date: 2026-11-07
+
+THÊM tab thứ 3: Pilot Tác Phẩm (bản 1.8.4 trong ZIP ZinPi/extention-chrome).
+
+- Giữ nguyên tab Văn bản lặp và tab Tạo ảnh.
+- Tab mới chạy pipeline chuyển tác phẩm trên tab ChatGPT: cô đọng Nhật, QA, tùy Mỹ Latinh, chia dòng, CHAR/BG, prompt ảnh theo dòng.
+- Hai tab cũ và Pilot dùng chung một extension, không đè lệnh của nhau.
+
+Cài: Reload unpacked, phải thấy V1.1.0, Ctrl+R tab ChatGPT.

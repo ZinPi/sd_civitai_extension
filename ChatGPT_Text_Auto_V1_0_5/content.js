@@ -575,7 +575,9 @@
     }catch(e){await emit({kind:'FAILED',error:String(e?.message||e)});}
   }
 
+  const TEXT_AUTO_TYPES=new Set(['ABORT_TEXT_AUTO','PING_TEXT_AUTO','PROBE_TEXT_UI','RUN_TEXT_TURN','RUN_IMAGE_TURN','RECOVER_TEXT_TURN']);
   chrome.runtime.onMessage.addListener((msg,_sender,sendResponse)=>{
+    if(!TEXT_AUTO_TYPES.has(msg?.type))return false;
     (async()=>{
       if(msg?.type==='ABORT_TEXT_AUTO'){cancelRequested=true;activeTurn=null;return {ok:true};}
       if(msg?.type==='PING_TEXT_AUTO')return {ok:true,version:'1.0.7',activeTurnId:activeTurn?.id||''};

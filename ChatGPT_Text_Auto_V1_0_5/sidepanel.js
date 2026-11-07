@@ -18,10 +18,15 @@ async function activeChatTab(){if(!hasChrome()||!chrome.tabs)return null;const [
 
 function showView(which){
   const image=which==='image';
-  $('#viewText').hidden=image;
+  const pilot=which==='pilot';
+  $('#viewText').hidden=image||pilot;
   $('#viewImage').hidden=!image;
-  $('#tabText').classList.toggle('active',!image);
+  $('#viewPilot').hidden=!pilot;
+  const extras=$('#viewAutoExtras');
+  if(extras) extras.hidden=pilot;
+  $('#tabText').classList.toggle('active',which==='text');
   $('#tabImage').classList.toggle('active',image);
+  $('#tabPilot').classList.toggle('active',pilot);
   if(hasChrome()&&chrome.storage?.local)chrome.storage.local.set({activeToolView:which});
 }
 
@@ -134,6 +139,7 @@ function collectImagePayloads(lines){
 
 $('#tabText').onclick=()=>showView('text');
 $('#tabImage').onclick=()=>showView('image');
+$('#tabPilot').onclick=()=>showView('pilot');
 
 $('#initialFile').onchange=async e=>{const f=e.target.files?.[0];if(f){$('#initialText').value=await fileText(f);chars();scheduleSave();}};
 $('#repeatFile').onchange=async e=>{const f=e.target.files?.[0];if(f){$('#repeatText').value=await fileText(f);chars();scheduleSave();}};
@@ -260,12 +266,12 @@ async function refresh(){
   const logs=r.state?.logs||[];$('#logBox').textContent=logs.slice(-80).map(x=>`${String(x.ts||'').slice(11,19)} [${x.level}] ${x.message}${x.data?' '+JSON.stringify(x.data):''}`).join('\n');
 }
 (async()=>{
-  if(!refs){setImageStatus('Thiếu image_refs.js',true);return;}
+  if(!refs)setImageStatus('Thiếu image_refs.js',true);
   if(!hasChrome()){chars();refreshImageCount();showView('text');setStatus('Bản xem giao diện (không phải extension).');return;}
   const bag=await chrome.storage.local.get([UI_KEY,IMAGE_UI_KEY,'activeToolView']);
   if(bag[UI_KEY])applyUi(bag[UI_KEY]);else chars();
   if(bag[IMAGE_UI_KEY])applyImageUi(bag[IMAGE_UI_KEY]);else refreshImageCount();
-  showView(bag.activeToolView==='image'?'image':'text');
+  showView(bag.activeToolView==='image'||bag.activeToolView==='pilot'?bag.activeToolView:'text');
   await refresh();
   poll=setInterval(refresh,1200);
 })();

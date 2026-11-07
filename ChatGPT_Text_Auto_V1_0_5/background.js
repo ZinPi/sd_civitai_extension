@@ -1,4 +1,5 @@
 importScripts('image_refs.js');
+importScripts('pilot/background.js');
 const STORAGE_KEY='chatgptTextAutoStateV1';
 const imageRefs=self.ChatGptImageRefs;
 const DEFAULTS={stableSec:5,nextDelaySec:1,responseTimeoutMin:30,saveEachResponse:true,cdpFallback:true,composerSelector:'',sendSelector:''};
@@ -302,6 +303,8 @@ async function cdpInsert(tabId,text){return withDebugger(tabId,t=>chrome.debugge
 async function cdpEnter(tabId){return withDebugger(tabId,async t=>{await chrome.debugger.sendCommand(t,'Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});await chrome.debugger.sendCommand(t,'Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,nativeVirtualKeyCode:13});});}
 
 chrome.runtime.onMessage.addListener((msg,sender,sendResponse)=>{
+  const types=new Set(['GET_STATE','START_RUN','CLEAR_IMAGE_FILES','STORE_IMAGE_CHUNK','GET_IMAGE_FILE_META','GET_IMAGE_FILE_CHUNK','START_IMAGE_RUN','STOP_RUN','RESUME_RUN','TEXT_EVENT','IMAGE_EVENT','PROBE_UI','CDP_INSERT_TEXT','CDP_PRESS_ENTER']);
+  if(!types.has(msg?.type))return false;
   (async()=>{await ready;switch(msg?.type){
     case 'GET_STATE':return {ok:true,state:persistableState()};
     case 'START_RUN':return startRun(msg.tabId,msg.config||{});

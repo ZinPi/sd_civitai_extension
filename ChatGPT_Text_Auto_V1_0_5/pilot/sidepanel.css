@@ -1,0 +1,84 @@
+#viewPilot {
+  color-scheme: dark;
+  --bg: #12110f;
+  --bg-2: #1b1916;
+  --line: #2d2923;
+  --text: #f4efe6;
+  --muted: #b3a898;
+  --gold: #e4b56a;
+  --gold-2: #c9923d;
+  --green: #8fce7a;
+  --red: #e07a6a;
+  --blue: #8fb4e0;
+  padding: 4px 12px 16px;
+  background: radial-gradient(circle at top, #221e18 0%, var(--bg) 46%);
+  color: var(--text);
+  font: 14px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+#viewPilot h1,
+#viewPilot h2,
+#viewPilot p,
+#viewPilot ol,
+#viewPilot ul { margin: 0; }
+#viewPilot h1 { font-size: 22px; letter-spacing: -0.03em; }
+#viewPilot h2 { font-size: 13px; letter-spacing: 0.02em; color: var(--gold); }
+#viewPilot .eyebrow { color: var(--gold); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 4px; }
+#viewPilot .top,
+#viewPilot .row { display: flex; gap: 12px; }
+#viewPilot .top,
+#viewPilot .between { align-items: flex-start; justify-content: space-between; }
+#viewPilot .card { background: color-mix(in srgb, var(--bg-2) 88%, transparent); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 0 0 10px; }
+#viewPilot .muted,
+#viewPilot .hint,
+#viewPilot .now { color: var(--muted); font-size: 12px; }
+#viewPilot .hint,
+#viewPilot .now { margin-top: 8px; }
+#viewPilot code { color: var(--gold); }
+#viewPilot label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+#viewPilot textarea { width: 100%; min-height: 140px; resize: vertical; border: 1px solid var(--line); background: #100f0d; color: var(--text); border-radius: 10px; padding: 10px 12px; outline: none; font: 13px/1.45 ui-sans-serif, system-ui, sans-serif; }
+#viewPilot textarea:focus,
+#viewPilot input[type="text"]:focus,
+#viewPilot input[type="number"]:focus,
+#viewPilot select:focus { border-color: var(--gold-2); }
+#viewPilot input[type="text"],
+#viewPilot input[type="number"],
+#viewPilot select { width: 100%; border: 1px solid var(--line); background: #100f0d; color: var(--text); border-radius: 10px; padding: 10px 12px; outline: none; }
+#viewPilot label.spaced { margin-top: 12px; }
+#viewPilot label.check { display: flex; align-items: flex-start; gap: 8px; color: var(--text); font-size: 13px; cursor: pointer; line-height: 1.4; }
+#viewPilot label.check input { width: auto; margin-top: 2px; accent-color: var(--gold); }
+#viewPilot .file-row { display: flex; gap: 8px; align-items: center; }
+#viewPilot .file-row input[type="text"] { flex: 1; min-width: 0; }
+#viewPilot .file-btn { flex: 0 0 auto; margin: 0; }
+#viewPilot .actions { display: flex; gap: 8px; margin-top: 12px; }
+#viewPilot .wrap { flex-wrap: wrap; }
+#viewPilot .btn { border: 0; border-radius: 999px; padding: 8px 12px; font-weight: 600; cursor: pointer; }
+#viewPilot .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+#viewPilot .btn.primary { background: var(--gold); color: #1a140b; }
+#viewPilot .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+#viewPilot .btn.danger { background: #4a241f; color: #ffd4cc; }
+#viewPilot .btn.small { font-size: 12px; padding: 6px 10px; }
+#viewPilot .badge { border-radius: 999px; padding: 4px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+#viewPilot .badge.idle { background: #2a261f; color: var(--muted); }
+#viewPilot .badge.run { background: #2d3a22; color: var(--green); }
+#viewPilot .badge.pause { background: #3a3220; color: var(--gold); }
+#viewPilot .badge.err { background: #3a201c; color: var(--red); }
+#viewPilot .badge.done { background: #1f2f3a; color: var(--blue); }
+#viewPilot .steps,
+#viewPilot .signals,
+#viewPilot .log { list-style: none; padding: 0; margin-top: 10px; }
+#viewPilot .steps li,
+#viewPilot .signals li,
+#viewPilot .log li { border-top: 1px solid var(--line); padding: 8px 0; }
+#viewPilot .steps li:first-child,
+#viewPilot .signals li:first-child,
+#viewPilot .log li:first-child { border-top: 0; padding-top: 0; }
+#viewPilot .steps li.active { color: var(--gold); }
+#viewPilot .steps li.stuck { color: var(--red); }
+#viewPilot .steps li.done { color: var(--green); }
+#viewPilot .steps .group { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
+#viewPilot .signals li { font-size: 12px; }
+#viewPilot .signals .kind { color: var(--gold); font-size: 10px; text-transform: uppercase; margin-right: 6px; }
+#viewPilot .log { max-height: 240px; overflow: auto; }
+#viewPilot .log li { font-size: 12px; color: var(--muted); }
+#viewPilot .log .time { color: var(--gold); margin-right: 6px; }
+#viewPilot[hidden] { display: none; }

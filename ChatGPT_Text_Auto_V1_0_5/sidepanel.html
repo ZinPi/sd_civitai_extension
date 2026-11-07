@@ -5,16 +5,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ChatGPT Text Auto</title>
   <link rel="stylesheet" href="sidepanel.css">
+  <link rel="stylesheet" href="pilot/sidepanel.css">
 </head>
 <body>
   <header>
     <h1>ChatGPT Text Auto</h1>
-    <div class="sub">V1.0.8 • văn bản lặp hoặc tạo ảnh</div>
+    <div class="sub">V1.1.0 • văn bản lặp, tạo ảnh, hoặc pipeline tác phẩm</div>
   </header>
 
   <nav class="tabs" aria-label="Chế độ">
     <button id="tabText" type="button" class="active">Văn bản lặp</button>
     <button id="tabImage" type="button">Tạo ảnh</button>
+    <button id="tabPilot" type="button">Pilot tác phẩm</button>
   </nav>
 
   <main id="viewText">
@@ -138,6 +140,94 @@
     </section>
   </main>
 
+  <main id="viewPilot" hidden>
+    <header class="top">
+      <div>
+        <p class="eyebrow">Pipeline ChatGPT</p>
+        <h1>Pilot Tác Phẩm</h1>
+        <p id="buildVersion" class="hint"></p>
+      </div>
+      <span id="runBadge" class="badge idle">Đang chờ</span>
+    </header>
+
+    <section class="card">
+      <div class="row between">
+        <div>
+          <h2>Tab ChatGPT</h2>
+          <p id="tabStatus" class="muted">Chưa kết nối. Mở chatgpt.com và đăng nhập trên trang chính thức.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnConnect" class="btn primary" type="button">Kết nối tab</button>
+        <button id="btnOpen" class="btn ghost" type="button">Mở ChatGPT</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <label for="condensePercent">Tỷ lệ cô đọng (%)</label>
+      <input id="condensePercent" type="number" min="1" max="100" step="1" value="40">
+      <p class="hint">Mặc định 40. Đây là mục tiêu cô đọng của cả tác phẩm ở bước cân chỉnh, và được ghi vào lệnh chuyển batch. Không ép từng batch đúng tỷ lệ này. Để trống thì tool dùng 40.</p>
+
+      <label for="waitMinutes" class="spaced">Giới hạn chờ mỗi bước (phút)</label>
+      <input id="waitMinutes" type="number" min="5" max="180" step="1" value="60">
+      <p class="hint">Mặc định 60 phút. Tool chờ đến khi ChatGPT ngừng viết. Hết số phút này mà nút Ngừng vẫn còn thì bước dừng. Có thể đặt từ 5 đến 180.</p>
+
+      <label class="check spaced" for="doLatin">
+        <input id="doLatin" type="checkbox">
+        <span>Chuyển Mỹ Latinh — dịch bản Nhật đã cô đọng, rồi chia dòng 48–72 âm tiết</span>
+      </label>
+      <p class="hint">Không tích: sau QA Nhật ĐẠT, tool chia dòng bản Nhật (48–76 âm tiết) rồi sang trích xuất ảnh.</p>
+
+      <label for="refFileName" class="spaced">Tài liệu tham khảo (phần liền trước)</label>
+      <div class="file-row">
+        <input id="refFileName" type="text" placeholder="tên file trong project, ví dụ tap1_ht.txt" autocomplete="off">
+        <label class="btn ghost small file-btn" for="refFile">Chọn file</label>
+        <input id="refFile" type="file" accept=".txt,.md,.csv,text/plain" hidden>
+      </div>
+      <p id="refFileHint" class="hint">Để trống thì chạy bình thường từ Bước 1. Có file thì tool gửi file đó trước, chờ câu <code>ĐÃ CẬP NHẬT ĐẦY ĐỦ DỮ LIỆU THAM KHẢO</code>.</p>
+
+      <label for="fileName" class="spaced">Tên file hỗ trợ</label>
+      <input id="fileName" type="text" placeholder="ví dụ: sakura_tap1" autocomplete="off">
+      <label for="totalLines" class="spaced">Số dòng tool ghi nhớ sau khi chia dòng</label>
+      <input id="totalLines" type="number" min="1" step="1" placeholder="tự điền sau bước chia dòng">
+      <p class="hint">Không cần nhập tay. Sau chia dòng ChatGPT phải báo <code>TÁC PHẨM CHIA DÒNG XONG CÓ N DÒNG</code>. Tool quét số N, rồi bước prompt theo dòng làm 20 dòng/lần đến hết.</p>
+    </section>
+
+    <section class="card controls">
+      <label for="startStep">Bắt đầu từ bước</label>
+      <select id="startStep"></select>
+      <p class="hint">Đã có bản chia âm tiết thì chọn “3. Ảnh tham chiếu — Chia tác phẩm thành 4 chunk” để bỏ các bước trước và trích xuất ảnh ngay.</p>
+      <div class="actions">
+        <button id="btnStart" class="btn primary" type="button">Chạy pipeline</button>
+        <button id="btnRestart" class="btn ghost" type="button">Chạy lại từ đầu</button>
+        <button id="btnPause" class="btn ghost" type="button" disabled>Tạm dừng</button>
+        <button id="btnStop" class="btn danger" type="button">Dừng</button>
+      </div>
+      <div class="actions wrap">
+        <button id="btnResend" class="btn ghost small" type="button">Gửi lại bước này</button>
+        <button id="btnReadLast" class="btn ghost small" type="button">Đọc câu cuối rồi chạy tiếp</button>
+        <button id="btnForceNext" class="btn ghost small" type="button">Ép XONG / ĐẠT</button>
+        <button id="btnForceFail" class="btn ghost small" type="button">Ép CHƯA ĐẠT</button>
+      </div>
+      <p id="nowText" class="now">Bước hiện tại: chưa chạy</p>
+      <p id="resumeHint" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Các bước</h2>
+      <ol id="stepList" class="steps"></ol>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>Nhật ký</h2>
+        <button id="btnClearLog" class="btn ghost small" type="button">Xóa</button>
+      </div>
+      <ol id="logList" class="log"></ol>
+    </section>
+  </main>
+
+  <div id="viewAutoExtras">
   <section class="card">
     <h2>Tiến độ</h2>
     <div id="progress">Chưa chạy.</div>
@@ -156,8 +246,14 @@
     <summary>Log gần nhất</summary>
     <pre id="logBox"></pre>
   </details>
+  </div>
 
   <script src="image_refs.js"></script>
   <script src="sidepanel.js"></script>
+  <script src="pilot/lib/prompts.js"></script>
+  <script src="pilot/lib/signals.js"></script>
+  <script src="pilot/lib/machine.js"></script>
+  <script src="pilot/lib/runner.js"></script>
+  <script src="pilot/sidepanel.js"></script>
 </body>
 </html>

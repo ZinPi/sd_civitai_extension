@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Text Auto - Long Payload Repeater V1.0.8",
-  "version": "1.0.8",
-  "description": "Gửi văn bản dài tự động, hoặc tạo ảnh từng dòng prompt với ảnh tham chiếu CHAR_XX/BG_XX trên tab ChatGPT hiện tại.",
+  "name": "ChatGPT Text Auto V1.1.0",
+  "version": "1.1.0",
+  "description": "Văn bản lặp, tạo ảnh CHAR/BG, và pipeline Pilot Tác Phẩm trên tab ChatGPT hiện tại.",
   "minimum_chrome_version": "120",
   "permissions": [
     "tabs",
@@ -20,7 +20,19 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "ChatGPT Text Auto"
+    "default_title": "ChatGPT Text Auto",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
@@ -33,6 +45,17 @@
       ],
       "js": [
         "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "pilot/lib/page-read.js",
+        "pilot/content.js"
       ],
       "run_at": "document_idle"
     }
