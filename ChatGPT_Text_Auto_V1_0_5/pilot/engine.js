@@ -114,6 +114,7 @@
       pstate.timeoutMs = pstate.waitMinutes * 60 * 1000;
     }
     if (cfg.doLatin != null) pstate.doLatin = !!cfg.doLatin;
+    if (cfg.doVideo != null) pstate.doVideo = !!cfg.doVideo;
     if (cfg.startStep != null) pstate.startStep = String(cfg.startStep || "");
     if (cfg.refFileName != null) pstate.refFileName = String(cfg.refFileName || "").trim();
     if (cfg.refFileText != null) pstate.refFileText = String(cfg.refFileText || "");
@@ -154,6 +155,7 @@
       refFileName: pstate.refFileName,
       refFileText: pstate.refFileText,
       doLatin: pstate.doLatin,
+      doVideo: pstate.doVideo,
       adaptBatchTotal: pstate.adaptBatchTotal || 0,
       adaptBatchDone: pstate.adaptBatchDone || 0,
     };
@@ -322,8 +324,8 @@
         const batch = M.currentBatch(pstate);
         addLog(
           batch.count
-            ? `Gửi prompt theo dòng: dòng ${batch.from}–${batch.to} / ${pstate.totalLines}`
-            : `Gửi prompt theo dòng: QA cuối ${pstate.promptLinesDone}/${pstate.totalLines}`
+            ? `Gửi prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: dòng ${batch.from}–${batch.to} / ${pstate.totalLines}`
+            : `Gửi prompt ${pstate.doVideo ? "video" : "ảnh"} theo dòng: QA cuối ${pstate.promptLinesDone}/${pstate.totalLines}`
         );
       } else if (step.id === "batchAdapt") {
         addLog(`Gửi chuyển đổi batch ${(pstate.adaptBatchDone || 0) + 1}/${pstate.adaptBatchTotal}`);
@@ -545,7 +547,7 @@
         ? `Chạy tiếp đúng bước đang dừng: “${chosen?.title || pstate.stepId}”.`
         : skipped
           ? `Bắt đầu từ “${chosen?.title || pstate.stepId}”. Bỏ các bước trước.`
-          : `Bắt đầu pipeline · cô đọng ${pstate.condensePercent}%${pstate.doLatin ? " · có Mỹ Latinh" : " · bỏ Mỹ Latinh, chia dòng bản Nhật"}.`
+          : `Bắt đầu pipeline · cô đọng ${pstate.condensePercent}%${pstate.doLatin ? " · có Mỹ Latinh" : " · bỏ Mỹ Latinh, chia dòng bản Nhật"}${pstate.doVideo ? " · prompt video theo dòng" : " · prompt ảnh theo dòng"}.`
     );
     await persistNow();
     schedulePump(150);
@@ -622,7 +624,7 @@
     const tabId = Number(pstate.tabId);
     if (!tabId) return { ok: false, error: "NO_TAB" };
     const expectPhrases = (step.allowed || [])
-      .map((id) => S.CATALOG.find((s) => s.id === id)?.phrase)
+      .flatMap((id) => S.signalPhrases(S.CATALOG.find((s) => s.id === id)))
       .filter(Boolean);
     let result;
     try {

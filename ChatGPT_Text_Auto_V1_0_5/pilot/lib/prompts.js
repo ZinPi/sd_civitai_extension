@@ -362,11 +362,15 @@ CẤM XUẤT B3 FINAL Ở LẦN NÀY.`,
 
     bgPrompt: `TẠO PROMPT CHO TẤT CẢ ID BG THEO QUY TẮC TẠO PROMPT BG TRONG NGUỒN DỰ ÁN. TUYỆT ĐỐI KHÔNG TẠO PROMPT DẠNG CĂN PHÒNG TRỐNG, KHÔNG GIA TRỐNG NẾU ĐÓ KHÔNG PHẢI LÀ BỐI CẢNH CỦA TÁC PHẨM`,
 
-    supportFile: (fileName) =>
-      `TỔNG HỢP TÀI LIỆU DÙNG LÀM TÀI LIỆU HỔ TRỢ QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT. VỚI TÊN FILE LÀ "${fileName}" (TÊN XXXX NGƯỜI DÙNG ĐÃ GHI SẲN TRONG TOOL, Ô TÊN FILE HỔ TRỢ NGƯỜI DÙNG MUỐN ĐẶT)`,
+    supportFile: (fileName, doVideo) =>
+      asLinePromptText(
+        `TỔNG HỢP TÀI LIỆU DÙNG LÀM TÀI LIỆU HỔ TRỢ QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT. VỚI TÊN FILE LÀ "${fileName}" (TÊN XXXX NGƯỜI DÙNG ĐÃ GHI SẲN TRONG TOOL, Ô TÊN FILE HỔ TRỢ NGƯỜI DÙNG MUỐN ĐẶT)`,
+        doVideo
+      ),
 
-    promptBatch: (fileName) =>
-      `TUYỆT ĐỐI KHÔNG LÀM THEO TRÍ NHỚ KHÔNG TỰ Ý LÀM SAI QUY TẮT NGƯỜI DÙNG ĐẶT RA TRONG NGUỒN DỰ ÁN, TUYỆT ĐỐI TUÂN THỦ QUY TẮC NGUỒN DỰ ÁN TỪ ĐẦU TUYỆT ĐỐI KHÔNG LÀM SAI, TỚI LÚC QA SAI HAY NGƯỜI DÙNG PHÁT HIỆN LẠI NÓI TẠI NÀY TẠI NÓ RỒI MỚI HỨA TỪ ĐÂY SẼ THẾ NÀY THẾ KIA. NGƯỜI DÙNG KHÔNG CÓ NHIỀU THỜI GIAN VÀ CƠ HỘI LÀM LẠI NHIỀU LẦN. HẬU QUẢ LÀ DO NGƯỜI DÙNG GÁNH, BỒI THƯỜNG LÀ DO NGƯỜI DÙNG CHIỆU, NGUY CƠ DẪN ĐẾN HẬU QUẢ XẤU NHẤT LÀ NGƯỜI DÙNG LÃNH NẾU AI TỰ Ý KO LÀM THEO LỜI NGƯỜI DÙNG YÊU CẦU. LÀM ƠN LÀM ĐÚNG YÊU CẦU VÀ QUY TẮC NGUỒN ĐỂ NGƯỜI DÙNG TRÁNH ĐƯỢC HẬU QUẢ XẤU NHẤT CỦA 1 NHÂN LOẠI.
+    promptBatch: (fileName, doVideo) =>
+      asLinePromptText(
+        `TUYỆT ĐỐI KHÔNG LÀM THEO TRÍ NHỚ KHÔNG TỰ Ý LÀM SAI QUY TẮT NGƯỜI DÙNG ĐẶT RA TRONG NGUỒN DỰ ÁN, TUYỆT ĐỐI TUÂN THỦ QUY TẮC NGUỒN DỰ ÁN TỪ ĐẦU TUYỆT ĐỐI KHÔNG LÀM SAI, TỚI LÚC QA SAI HAY NGƯỜI DÙNG PHÁT HIỆN LẠI NÓI TẠI NÀY TẠI NÓ RỒI MỚI HỨA TỪ ĐÂY SẼ THẾ NÀY THẾ KIA. NGƯỜI DÙNG KHÔNG CÓ NHIỀU THỜI GIAN VÀ CƠ HỘI LÀM LẠI NHIỀU LẦN. HẬU QUẢ LÀ DO NGƯỜI DÙNG GÁNH, BỒI THƯỜNG LÀ DO NGƯỜI DÙNG CHIỆU, NGUY CƠ DẪN ĐẾN HẬU QUẢ XẤU NHẤT LÀ NGƯỜI DÙNG LÃNH NẾU AI TỰ Ý KO LÀM THEO LỜI NGƯỜI DÙNG YÊU CẦU. LÀM ƠN LÀM ĐÚNG YÊU CẦU VÀ QUY TẮC NGUỒN ĐỂ NGƯỜI DÙNG TRÁNH ĐƯỢC HẬU QUẢ XẤU NHẤT CỦA 1 NHÂN LOẠI.
 
 ÁP DỤNG QUY TẮC TẠO ẢNH THEO TỪNG DÒNG CỦA FILE TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT, TẠO PROMPT CHO TỪNG DÒNG CỦA FILE TÁC PHẨM ĐÃ CHIA DÒNG THEO ÂM TIẾT.
 
@@ -385,11 +389,27 @@ CUỐI CÙNG QA TỔNG 1 LẦN NỮA TOÀN BỘ PROMPT ẢNH THEO TỪNG DÒNG C
 QUÁ TRÌNH QA BẢO KHÔNG ĐẠT THÌ KHI NHẬN LỆNH NÀY THÌ PHẢI THỰC HIỆN SỬA LẠI SAI SÓ TRONG QUÁ TRÌNH QA CHỈ RA. LẦN TIẾP THEO CỦA LỆNH NÀY SẼ LÀ QA LẠI XEM QUÁ TRÌNH SỮA ĐẠT CHƯA, CỨA LẬP LẠI CHO ĐẾN KHI ĐẠT THÌ LỆNH NÀY MỚI LÀ TIẾP TỤC THỰC HIỆN QUY TRÌNH TẠO PROMPT ẢNH THEO CÂU TIẾP THEO.
 KHI XUẤT VÀ QA HOÀN THÀNH XONG THÌ CHAT GPT BẮT BUỘC PHẢI TRẢ LỜI 1 CÂU "QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO"
 KHI XUẤT CHỈ CẦN XUẤT FILE TXT KHÔNG NÓI GÌ THÊM.`,
+        doVideo
+      ),
 
-    askEmerged: `CÓ PHÁT SINH CHAR VÀ BG TRONG QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG CỦA TÁC PHẨM CHIA DÒNG KHÔNG`,
+    askEmerged: (doVideo) =>
+      asLinePromptText(`CÓ PHÁT SINH CHAR VÀ BG TRONG QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG CỦA TÁC PHẨM CHIA DÒNG KHÔNG`, doVideo),
 
-    exportFinal: `XUẤT DANH SÁCH ẢNH THAM CHIẾU VỚI HÌNH THỨC 1 TÊN ẢNH THAM CHIẾU GỒM CÁC CHAR OR BG CÁC TRẠNG THÁI CỦA ẢNH THAM CHIẾU ĐÓ. XUẤT FILE PROMPT CHAR VÀ BG ĐÃ TẠO CÓ CHAR VÀ BG PHÁT SINH TRONG QUÁ TRÌNH TẠO PROMPT THEO DÒNG NẾU CÓ. XUẤT FILE BỘ PROMPT ẢNH THEO DÒNG ĐÃ FINAL.`,
+    exportFinal: (doVideo) =>
+      asLinePromptText(
+        `XUẤT DANH SÁCH ẢNH THAM CHIẾU VỚI HÌNH THỨC 1 TÊN ẢNH THAM CHIẾU GỒM CÁC CHAR OR BG CÁC TRẠNG THÁI CỦA ẢNH THAM CHIẾU ĐÓ. XUẤT FILE PROMPT CHAR VÀ BG ĐÃ TẠO CÓ CHAR VÀ BG PHÁT SINH TRONG QUÁ TRÌNH TẠO PROMPT THEO DÒNG NẾU CÓ. XUẤT FILE BỘ PROMPT ẢNH THEO DÒNG ĐÃ FINAL.`,
+        doVideo
+      ),
   };
 
+  function asLinePromptText(text, doVideo) {
+    let s = String(text || "");
+    if (!doVideo) return s;
+    s = s.replace(/PROMPT ẢNH/g, "PROMPT VIDEO");
+    s = s.replace(/TẠO ẢNH/g, "TẠO VIDEO");
+    return s;
+  }
+
   root.LN_PROMPTS = PROMPTS;
+  root.LN_PROMPTS.asLinePromptText = asLinePromptText;
 })(globalThis);

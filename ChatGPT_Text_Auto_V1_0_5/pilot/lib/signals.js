@@ -37,9 +37,14 @@
     PROMPT_QA_FAIL: "QA PROMPT ẢNH CHƯA ĐẠT CẦN SỬA LẠI",
     PROMPT_ALL_DONE:
       "QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO",
+    PROMPT_CONTINUE_VIDEO: "TẠO PROMPT VIDEO THEO DÒNG XONG THỰC HIỆN BƯỚC TIẾP THEO",
+    PROMPT_QA_FAIL_VIDEO: "QA PROMPT VIDEO CHƯA ĐẠT CẦN SỬA LẠI",
+    PROMPT_ALL_DONE_VIDEO:
+      "QUÁ TRÌNH TẠO PROMPT VIDEO THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO",
   };
 
   const PROGRESS_PREFIX = "TIẾN ĐỘ PROMPT ẢNH:";
+  const PROGRESS_PREFIX_VIDEO = "TIẾN ĐỘ PROMPT VIDEO:";
   const SPLIT_COUNT_PREFIX = "TỔNG SỐ DÒNG ĐÃ CHIA:";
   const SPLIT_REPORT_PATTERN = /TÁC PHẨM CHIA(?: DÒNG)? XONG CÓ\s+(\d+)\s+DÒNG/i;
 
@@ -174,7 +179,25 @@
     return findSignal(text, allowed);
   }
 
+  function promptPhrases(doVideo) {
+    if (doVideo) {
+      return {
+        continue: SIGNAL.PROMPT_CONTINUE_VIDEO,
+        fail: SIGNAL.PROMPT_QA_FAIL_VIDEO,
+        done: SIGNAL.PROMPT_ALL_DONE_VIDEO,
+        progress: PROGRESS_PREFIX_VIDEO,
+      };
+    }
+    return {
+      continue: SIGNAL.PROMPT_CONTINUE,
+      fail: SIGNAL.PROMPT_QA_FAIL,
+      done: SIGNAL.PROMPT_ALL_DONE,
+      progress: PROGRESS_PREFIX,
+    };
+  }
+
   function promptBatchFooter(ctx) {
+    const phrases = promptPhrases(!!ctx?.doVideo);
     const total = Number(ctx?.totalLines) || 0;
     const done = Number(ctx?.promptLinesDone) || 0;
     const remain = Math.max(0, total - done);
@@ -188,22 +211,22 @@
         ? `LẦN NÀY CHỈ PHÂN TÍCH VÀ TẠO PROMPT CHO DÒNG ${from} ĐẾN DÒNG ${to} (ĐÚNG ${count} CÂU, LƯỢT ${batchNo}/${batchTotal}). CẤM LÀM DÒNG TRƯỚC ${from} HOẶC SAU ${to}.`
         : `ĐÃ ĐỦ ${total} DÒNG. LẦN NÀY CHỈ QA THEO B6, KHÔNG TẠO THÊM DÒNG MỚI.`;
     return [
-      FOOTERS.promptBatch,
+      FOOTER_CHOICE([phrases.continue, phrases.fail, phrases.done]),
       "",
       `TOOL ĐÃ GHI NHỚ TỪ BƯỚC CHIA DÒNG: TÁC PHẨM CÓ ${total} DÒNG.`,
       rangeLine,
       `TOOL ĐÃ GHI NHẬN: ${done}/${total}. CÒN LẠI: ${remain}.`,
-      `TRƯỚC DÒNG CHỐT, BẮT BUỘC IN ĐÚNG MỘT DÒNG: ${PROGRESS_PREFIX} {số_dòng_đã_có_prompt}/${total}.`,
+      `TRƯỚC DÒNG CHỐT, BẮT BUỘC IN ĐÚNG MỘT DÒNG: ${phrases.progress} {số_dòng_đã_có_prompt}/${total}.`,
       "ĐÚNG QUY TẮC NGUỒN: MỖI LẦN CHAT CHỈ TẠO TỐI ĐA 20 PROMPT. LƯỢT CUỐI LẤY PHẦN CÒN LẠI. QA CHƯA ĐẠT THÌ KHÔNG TĂNG SỐ DÒNG ĐÃ XONG.",
-      `CHỈ ĐƯỢC IN "${SIGNAL.PROMPT_ALL_DONE}" KHI SỐ DÒNG ĐÃ CÓ PROMPT >= ${total} VÀ QA CUỐI ĐÃ XONG.`,
+      `CHỈ ĐƯỢC IN "${phrases.done}" KHI SỐ DÒNG ĐÃ CÓ PROMPT >= ${total} VÀ QA CUỐI ĐÃ XONG.`,
       remain > 0
-        ? `CÒN THIẾU ${remain} DÒNG THÌ CẤM IN CÂU HOÀN TẤT. SAU LƯỢT NÀY IN "${SIGNAL.PROMPT_CONTINUE}" HOẶC "${SIGNAL.PROMPT_QA_FAIL}".`
-        : `ĐỦ ${total} DÒNG RỒI: NẾU QA CUỐI CHƯA XONG THÌ IN "${SIGNAL.PROMPT_CONTINUE}" HOẶC "${SIGNAL.PROMPT_QA_FAIL}"; CHỈ IN CÂU HOÀN TẤT KHI QA CUỐI ĐÃ XONG.`,
+        ? `CÒN THIẾU ${remain} DÒNG THÌ CẤM IN CÂU HOÀN TẤT. SAU LƯỢT NÀY IN "${phrases.continue}" HOẶC "${phrases.fail}".`
+        : `ĐỦ ${total} DÒNG RỒI: NẾU QA CUỐI CHƯA XONG THÌ IN "${phrases.continue}" HOẶC "${phrases.fail}"; CHỈ IN CÂU HOÀN TẤT KHI QA CUỐI ĐÃ XONG.`,
     ].join("\n");
   }
 
   function parsePromptProgress(text) {
-    const m = String(text || "").match(/TIẾN ĐỘ PROMPT ẢNH:\s*(\d+)\s*\/\s*(\d+)/i);
+    const m = String(text || "").match(/TIẾN ĐỘ PROMPT (?:ẢNH|VIDEO):\s*(\d+)\s*\/\s*(\d+)/i);
     if (!m) return null;
     return { done: Number(m[1]), total: Number(m[2]) };
   }
@@ -274,9 +297,24 @@
     { id: "SUPPORT_DONE", phrase: SIGNAL.SUPPORT_DONE, kind: "xong" },
     { id: "EMERGED_DONE", phrase: SIGNAL.EMERGED_DONE, kind: "xong" },
     { id: "EXPORT_FINAL_DONE", phrase: SIGNAL.EXPORT_FINAL_DONE, kind: "xong" },
-    { id: "PROMPT_CONTINUE", phrase: SIGNAL.PROMPT_CONTINUE, kind: "xong" },
-    { id: "PROMPT_QA_FAIL", phrase: SIGNAL.PROMPT_QA_FAIL, kind: "chua" },
-    { id: "PROMPT_ALL_DONE", phrase: SIGNAL.PROMPT_ALL_DONE, kind: "done" },
+    {
+      id: "PROMPT_CONTINUE",
+      phrase: SIGNAL.PROMPT_CONTINUE,
+      altPhrases: [SIGNAL.PROMPT_CONTINUE_VIDEO],
+      kind: "xong",
+    },
+    {
+      id: "PROMPT_QA_FAIL",
+      phrase: SIGNAL.PROMPT_QA_FAIL,
+      altPhrases: [SIGNAL.PROMPT_QA_FAIL_VIDEO],
+      kind: "chua",
+    },
+    {
+      id: "PROMPT_ALL_DONE",
+      phrase: SIGNAL.PROMPT_ALL_DONE,
+      altPhrases: [SIGNAL.PROMPT_ALL_DONE_VIDEO],
+      kind: "done",
+    },
   ].sort((a, b) => b.phrase.length - a.phrase.length);
 
   function lastLines(text, n = 10) {
@@ -299,18 +337,26 @@
       .trim();
   }
 
+  function signalPhrases(s) {
+    return [s?.phrase, ...(s?.altPhrases || [])].filter(Boolean);
+  }
+
   function findSignal(text, allowedIds) {
     const allow = new Set(allowedIds);
     const pool = CATALOG.filter((s) => allow.has(s.id));
     const tail = lastLines(text, 40);
     const hayTail = folded(tail);
     for (const s of pool) {
-      if (tail.includes(s.phrase) || hayTail.includes(folded(s.phrase))) return s;
+      for (const phrase of signalPhrases(s)) {
+        if (tail.includes(phrase) || hayTail.includes(folded(phrase))) return { ...s, phrase };
+      }
     }
     const full = String(text || "");
     const hayFull = folded(full);
     for (const s of pool) {
-      if (full.includes(s.phrase) || hayFull.includes(folded(s.phrase))) return s;
+      for (const phrase of signalPhrases(s)) {
+        if (full.includes(phrase) || hayFull.includes(folded(phrase))) return { ...s, phrase };
+      }
     }
     return null;
   }
@@ -320,7 +366,10 @@
     FOOTERS,
     CATALOG,
     PROGRESS_PREFIX,
+    PROGRESS_PREFIX_VIDEO,
     SPLIT_COUNT_PREFIX,
+    promptPhrases,
+    signalPhrases,
     findSignal,
     matchStepSignal,
     folded,

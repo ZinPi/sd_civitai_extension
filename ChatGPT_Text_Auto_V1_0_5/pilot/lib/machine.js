@@ -316,7 +316,7 @@
       needsFile: true,
       allowed: ["SUPPORT_DONE"],
       transitions: { SUPPORT_DONE: "promptBatch" },
-      build: (ctx) => withFooter(P.supportFile(ctx.fileName), FOOTERS.supportFile),
+      build: (ctx) => withFooter(P.supportFile(ctx.fileName, ctx.doVideo), FOOTERS.supportFile),
     },
     {
       id: "promptBatch",
@@ -330,7 +330,7 @@
         PROMPT_QA_FAIL: "promptBatch",
         PROMPT_ALL_DONE: "askEmerged",
       },
-      build: (ctx) => withFooter(P.promptBatch(ctx.fileName), promptBatchFooter(ctx)),
+      build: (ctx) => withFooter(P.promptBatch(ctx.fileName, ctx.doVideo), promptBatchFooter(ctx)),
     },
     {
       id: "askEmerged",
@@ -339,7 +339,7 @@
       kind: "xong",
       allowed: ["EMERGED_DONE"],
       transitions: { EMERGED_DONE: "exportFinal" },
-      build: () => withFooter(P.askEmerged, FOOTERS.askEmerged),
+      build: (ctx) => withFooter(P.askEmerged(ctx.doVideo), FOOTERS.askEmerged),
     },
     {
       id: "exportFinal",
@@ -348,7 +348,7 @@
       kind: "xong",
       allowed: ["EXPORT_FINAL_DONE"],
       transitions: { EXPORT_FINAL_DONE: "done" },
-      build: () => withFooter(P.exportFinal, FOOTERS.exportFinal),
+      build: (ctx) => withFooter(P.exportFinal(ctx.doVideo), FOOTERS.exportFinal),
     },
     {
       id: "done",
@@ -372,6 +372,7 @@
       fileName: "",
       condensePercent: 40,
       doLatin: false,
+      doVideo: false,
       startStep: "",
       refFileName: "",
       refFileText: "",

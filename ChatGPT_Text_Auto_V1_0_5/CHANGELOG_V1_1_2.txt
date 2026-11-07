@@ -1,0 +1,10 @@
+ChatGPT Text Auto V1.1.2
+Date: 2026-11-07
+
+Tab Pilot: thêm ô "Tạo prompt video theo dòng".
+
+- Không tích: bước file hỗ trợ + tạo prompt theo dòng giữ nguyên (TẠO ẢNH / PROMPT ẢNH).
+- Có tích: cùng ô tên file XXXX.txt, cùng 20 dòng/lô, cùng chờ câu hoàn tất — đổi TẠO ẢNH thành TẠO VIDEO và PROMPT ẢNH thành PROMPT VIDEO.
+- Câu chốt video: "QUÁ TRÌNH TẠO PROMPT VIDEO THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO".
+
+Cài: Reload unpacked, phải thấy V1.1.2, Ctrl+R tab ChatGPT.

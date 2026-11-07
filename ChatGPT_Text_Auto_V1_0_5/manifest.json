@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Text Auto V1.1.1",
-  "version": "1.1.1",
+  "name": "ChatGPT Text Auto V1.1.2",
+  "version": "1.1.2",
   "description": "Văn bản lặp, tạo ảnh CHAR/BG, và pipeline Pilot Tác Phẩm trên tab ChatGPT hiện tại.",
   "minimum_chrome_version": "120",
   "permissions": [

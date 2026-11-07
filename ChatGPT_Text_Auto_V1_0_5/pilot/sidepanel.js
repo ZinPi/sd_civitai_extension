@@ -34,6 +34,7 @@
     condensePercent: document.getElementById("condensePercent"),
     waitMinutes: document.getElementById("waitMinutes"),
     doLatin: document.getElementById("doLatin"),
+    doVideo: document.getElementById("doVideo"),
     refFileName: document.getElementById("refFileName"),
     refFile: document.getElementById("refFile"),
     refFileHint: document.getElementById("refFileHint"),
@@ -107,6 +108,7 @@
       condensePercent: normalizePercent(els.condensePercent && els.condensePercent.value),
       waitMinutes: normalizeWaitMinutes(els.waitMinutes && els.waitMinutes.value),
       doLatin: !!(els.doLatin && els.doLatin.checked),
+      doVideo: !!(els.doVideo && els.doVideo.checked),
       refFileName: String((els.refFileName && els.refFileName.value) || state.refFileName || "").trim(),
       startStep: els.startStep && els.startStep.value ? els.startStep.value : state.startStep,
       fileName: normalizeFileName((els.fileName && els.fileName.value) || state.fileName),
@@ -144,6 +146,7 @@
       els.waitMinutes.value = String(normalizeWaitMinutes(next.waitMinutes));
     }
     if (focused !== "doLatin" && els.doLatin) els.doLatin.checked = !!next.doLatin;
+    if (focused !== "doVideo" && els.doVideo) els.doVideo.checked = !!next.doVideo;
     if (focused !== "refFileName" && els.refFileName) els.refFileName.value = next.refFileName || "";
   }
 
@@ -202,12 +205,17 @@
         const cls = [s.id === state.stepId ? "active" : "", i < current ? "done" : "", stuck ? "stuck" : ""]
           .filter(Boolean)
           .join(" ");
-        const group = s.group !== lastGroup ? `<span class="group">${s.group}</span>` : "";
-        lastGroup = s.group;
-        return `<li class="${cls}">${group}${s.title}</li>`;
+        const groupName = state.doVideo && s.id === "promptBatch" ? "6. Prompt video" : s.group;
+        const stepTitle =
+          state.doVideo && s.id === "promptBatch" ? "Tạo / QA prompt video từng dòng" : s.title;
+        const group = groupName !== lastGroup ? `<span class="group">${escapeHtml(groupName)}</span>` : "";
+        lastGroup = groupName;
+        return `<li class="${cls}">${group}${escapeHtml(stepTitle)}</li>`;
       })
       .join("");
     const step = STEP_MAP[state.stepId];
+    const stepTitle =
+      step && state.doVideo && step.id === "promptBatch" ? "Tạo / QA prompt video từng dòng" : step?.title;
     const batch = currentBatch(state);
     const progress =
       state.stepId === "batchAdapt" && state.adaptBatchTotal > 0
@@ -223,10 +231,10 @@
     els.nowText.textContent = !step
       ? "Bước hiện tại: chưa chạy"
       : state.lastError && !state.running
-        ? `Dừng ở: ${step.title}${progress}. Chạy tiếp gửi lại đúng bước này.${signalNote}`
+        ? `Dừng ở: ${stepTitle}${progress}. Chạy tiếp gửi lại đúng bước này.${signalNote}`
         : resume && !state.running
-          ? `Đã đến: ${step.title}${progress}. Chạy tiếp làm tiếp bước này.${signalNote}`
-          : `Bước hiện tại: ${step.title}${progress}${signalNote}${waitNote}`;
+          ? `Đã đến: ${stepTitle}${progress}. Chạy tiếp làm tiếp bước này.${signalNote}`
+          : `Bước hiện tại: ${stepTitle}${progress}${signalNote}${waitNote}`;
     if (els.resumeHint) {
       els.resumeHint.textContent =
         resume && !state.running
@@ -410,6 +418,7 @@
   bindForm(els.condensePercent, "condensePercent");
   bindForm(els.waitMinutes, "waitMinutes");
   bindForm(els.doLatin, "doLatin");
+  bindForm(els.doVideo, "doVideo");
   bindForm(els.startStep, "startStep");
   bindForm(els.refFileName, "refFileName");
   bindForm(els.totalLines, "totalLines");
