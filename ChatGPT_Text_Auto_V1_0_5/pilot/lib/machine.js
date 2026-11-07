@@ -16,8 +16,13 @@
     return trimmed.toLowerCase().endsWith(".txt") ? trimmed : `${trimmed}.txt`;
   }
 
-  function withFooter(body, footer) {
-    return footer ? `${body}${footer}` : body;
+  function withFooter(body, footer, extraClause) {
+    const mid = extraClause ? `\n\n${extraClause}` : "";
+    return footer ? `${body}${mid}${footer}` : `${body}${mid}`;
+  }
+
+  function txtOut(ctx, kind) {
+    return P.exportTxtClause(ctx && ctx.extraExport, kind);
   }
 
   function normalizePercent(raw) {
@@ -104,7 +109,7 @@
       kind: "xong",
       allowed: ["SOURCE_ANALYSIS_DONE"],
       transitions: { SOURCE_ANALYSIS_DONE: "batchAdapt" },
-      build: () => withFooter(P.sourceAnalysis, FOOTERS.sourceAnalysis),
+      build: (ctx) => withFooter(P.sourceAnalysis, FOOTERS.sourceAnalysis, txtOut(ctx, "convert")),
     },
     {
       id: "batchAdapt",
@@ -116,7 +121,8 @@
       build: (ctx) =>
         withFooter(
           P.batchAdapt({ ...ctx, condensePercent: normalizePercent(ctx?.condensePercent) }),
-          adaptBatchFooter(ctx)
+          adaptBatchFooter(ctx),
+          txtOut(ctx, "convert")
         ),
     },
     {
@@ -126,7 +132,7 @@
       kind: "xong",
       allowed: ["CONTINUITY_MERGE_DONE"],
       transitions: { CONTINUITY_MERGE_DONE: "globalBalance" },
-      build: () => withFooter(P.continuityMerge, FOOTERS.continuityMerge),
+      build: (ctx) => withFooter(P.continuityMerge, FOOTERS.continuityMerge, txtOut(ctx, "convert")),
     },
     {
       id: "globalBalance",
@@ -136,7 +142,7 @@
       allowed: ["GLOBAL_BALANCE_DONE"],
       transitions: { GLOBAL_BALANCE_DONE: "finalJpQa" },
       build: (ctx) =>
-        withFooter(P.globalBalance(normalizePercent(ctx?.condensePercent)), FOOTERS.globalBalance),
+        withFooter(P.globalBalance(normalizePercent(ctx?.condensePercent)), FOOTERS.globalBalance, txtOut(ctx, "convert")),
     },
     {
       id: "finalJpQa",
@@ -145,7 +151,7 @@
       kind: "xong",
       allowed: ["FINAL_JP_QA_DONE"],
       transitions: { FINAL_JP_QA_DONE: "jpLineSplit" },
-      build: () => withFooter(P.finalJpQa, FOOTERS.finalJpQa),
+      build: (ctx) => withFooter(P.finalJpQa, FOOTERS.finalJpQa, txtOut(ctx, "convert")),
     },
     {
       id: "latConvert",
@@ -155,7 +161,7 @@
       gate: "latin",
       allowed: ["LAT_CONVERT_DONE"],
       transitions: { LAT_CONVERT_DONE: "latQa" },
-      build: () => withFooter(P.latConvert, FOOTERS.latConvert),
+      build: (ctx) => withFooter(P.latConvert, FOOTERS.latConvert, txtOut(ctx, "convert")),
     },
     {
       id: "latQa",
@@ -176,7 +182,7 @@
       allowed: ["LAT_FIX_DONE"],
       afterIdle: "latQa",
       transitions: { LAT_FIX_DONE: "latQa" },
-      build: () => withFooter(P.latFix, FOOTERS.latFix),
+      build: (ctx) => withFooter(P.latFix, FOOTERS.latFix, txtOut(ctx, "convert")),
     },
     {
       id: "lineSplit",
@@ -186,7 +192,7 @@
       gate: "latin",
       allowed: ["LINE_SPLIT_DONE"],
       transitions: { LINE_SPLIT_DONE: "chunkPlan" },
-      build: () => withFooter(P.lineSplit, FOOTERS.lineSplit),
+      build: (ctx) => withFooter(P.lineSplit, FOOTERS.lineSplit, txtOut(ctx, "convert")),
       rememberLines: true,
     },
     {
@@ -197,7 +203,7 @@
       gate: "jpSplit",
       allowed: ["JP_LINE_SPLIT_DONE"],
       transitions: { JP_LINE_SPLIT_DONE: "chunkPlan" },
-      build: () => withFooter(P.jpLineSplit, FOOTERS.jpLineSplit),
+      build: (ctx) => withFooter(P.jpLineSplit, FOOTERS.jpLineSplit, txtOut(ctx, "convert")),
       rememberLines: true,
     },
     {
@@ -279,7 +285,7 @@
       kind: "xong",
       allowed: ["B3_FINAL_DONE"],
       transitions: { B3_FINAL_DONE: "attachIds" },
-      build: () => withFooter(P.b3Final, FOOTERS.b3Final),
+      build: (ctx) => withFooter(P.b3Final, FOOTERS.b3Final, txtOut(ctx)),
     },
     {
       id: "attachIds",
@@ -297,7 +303,7 @@
       kind: "xong",
       allowed: ["CHAR_PROMPT_DONE"],
       transitions: { CHAR_PROMPT_DONE: "bgPrompt" },
-      build: () => withFooter(P.charPrompt, FOOTERS.charPrompt),
+      build: (ctx) => withFooter(P.charPrompt, FOOTERS.charPrompt, txtOut(ctx)),
     },
     {
       id: "bgPrompt",
@@ -306,7 +312,7 @@
       kind: "xong",
       allowed: ["BG_PROMPT_DONE"],
       transitions: { BG_PROMPT_DONE: "supportFile" },
-      build: () => withFooter(P.bgPrompt, FOOTERS.bgPrompt),
+      build: (ctx) => withFooter(P.bgPrompt, FOOTERS.bgPrompt, txtOut(ctx)),
     },
     {
       id: "supportFile",
@@ -316,7 +322,7 @@
       needsFile: true,
       allowed: ["SUPPORT_DONE"],
       transitions: { SUPPORT_DONE: "promptBatch" },
-      build: (ctx) => withFooter(P.supportFile(ctx.fileName, ctx.doVideo), FOOTERS.supportFile),
+      build: (ctx) => withFooter(P.supportFile(ctx.fileName, ctx.doVideo), FOOTERS.supportFile, txtOut(ctx)),
     },
     {
       id: "promptBatch",
@@ -330,7 +336,8 @@
         PROMPT_QA_FAIL: "promptBatch",
         PROMPT_ALL_DONE: "askEmerged",
       },
-      build: (ctx) => withFooter(P.promptBatch(ctx.fileName, ctx.doVideo), promptBatchFooter(ctx)),
+      build: (ctx) =>
+        withFooter(P.promptBatch(ctx.fileName, ctx.doVideo, ctx.extraExport), promptBatchFooter(ctx)),
     },
     {
       id: "askEmerged",
@@ -348,7 +355,7 @@
       kind: "xong",
       allowed: ["EXPORT_FINAL_DONE"],
       transitions: { EXPORT_FINAL_DONE: "done" },
-      build: (ctx) => withFooter(P.exportFinal(ctx.doVideo), FOOTERS.exportFinal),
+      build: (ctx) => withFooter(P.exportFinal(ctx.doVideo), FOOTERS.exportFinal, txtOut(ctx)),
     },
     {
       id: "done",
@@ -373,6 +380,7 @@
       condensePercent: 40,
       doLatin: false,
       doVideo: false,
+      extraExport: "",
       startStep: "",
       refFileName: "",
       refFileText: "",

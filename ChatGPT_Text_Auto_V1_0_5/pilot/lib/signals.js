@@ -227,7 +227,9 @@
     const rangeLine =
       remain > 0
         ? `LẦN NÀY CHỈ PHÂN TÍCH VÀ TẠO PROMPT CHO DÒNG ${from} ĐẾN DÒNG ${to} (ĐÚNG ${count} CÂU, LƯỢT ${batchNo}/${batchTotal}). CẤM LÀM DÒNG TRƯỚC ${from} HOẶC SAU ${to}.`
-        : `ĐÃ ĐỦ ${total} DÒNG. LẦN NÀY CHỈ QA THEO B6, KHÔNG TẠO THÊM DÒNG MỚI.`;
+        : `ĐÃ ĐỦ ${total} DÒNG. LẦN NÀY CHỈ QA THEO ${
+            ctx?.doVideo ? "BUOC_QA_VIDEO_PROMPT_DAN_Y_CACH_VIET_SIMPLE.TXT" : "B6.TXT"
+          }, KHÔNG TẠO THÊM DÒNG MỚI.`;
     return [
       FOOTER_CHOICE([phrases.continue, phrases.fail, phrases.done]),
       "",

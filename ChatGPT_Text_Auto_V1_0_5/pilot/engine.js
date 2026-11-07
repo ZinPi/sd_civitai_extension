@@ -43,6 +43,7 @@
     pstate.adaptBatchTotal = Number(pstate.adaptBatchTotal) || 0;
     pstate.adaptBatchDone = Number(pstate.adaptBatchDone) || 0;
     pstate.condensePercent = M.normalizePercent(pstate.condensePercent);
+    pstate.extraExport = String(pstate.extraExport || "");
     pstate.waitMinutes = M.normalizeWaitMinutes(pstate.waitMinutes);
     pstate.timeoutMs = pstate.waitMinutes * 60 * 1000;
     if (["jpConvert", "jpQa", "jpFix"].includes(pstate.stepId) || (pstate.stepId && !M.STEP_MAP[pstate.stepId])) {
@@ -115,6 +116,7 @@
     }
     if (cfg.doLatin != null) pstate.doLatin = !!cfg.doLatin;
     if (cfg.doVideo != null) pstate.doVideo = !!cfg.doVideo;
+    if (cfg.extraExport != null) pstate.extraExport = String(cfg.extraExport || "");
     if (cfg.startStep != null) pstate.startStep = String(cfg.startStep || "");
     if (cfg.refFileName != null) pstate.refFileName = String(cfg.refFileName || "").trim();
     if (cfg.refFileText != null) pstate.refFileText = String(cfg.refFileText || "");
@@ -168,6 +170,7 @@
       refFileText: pstate.refFileText,
       doLatin: pstate.doLatin,
       doVideo: pstate.doVideo,
+      extraExport: pstate.extraExport || "",
       adaptBatchTotal: pstate.adaptBatchTotal || 0,
       adaptBatchDone: pstate.adaptBatchDone || 0,
     };

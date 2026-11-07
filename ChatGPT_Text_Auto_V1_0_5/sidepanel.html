@@ -10,7 +10,7 @@
 <body>
   <header>
     <h1>ChatGPT Text Auto</h1>
-    <div class="sub">V1.1.5 • văn bản lặp, tạo ảnh, hoặc pipeline tác phẩm</div>
+    <div class="sub">V1.1.6 • văn bản lặp, tạo ảnh, hoặc pipeline tác phẩm</div>
   </header>
 
   <nav class="tabs" aria-label="Chế độ">
@@ -191,9 +191,12 @@
       <input id="fileName" type="text" placeholder="ví dụ: sakura_tap1" autocomplete="off">
       <label class="check spaced" for="doVideo">
         <input id="doVideo" type="checkbox">
-        <span>Tạo prompt video theo dòng — bước file hỗ trợ và bước tạo prompt đổi TẠO ẢNH thành TẠO VIDEO</span>
+        <span>Tạo prompt video theo dòng — đọc quy tắc B8.TXT và QA file BUOC_QA_VIDEO_PROMPT_DAN_Y_CACH_VIET_SIMPLE.TXT</span>
       </label>
-      <p class="hint">Không tích: tạo prompt ảnh theo dòng như hiện tại. Có tích: cùng ô tên file, cùng 20 dòng/lô, cùng chờ câu hoàn tất — chỉ đổi TẠO ẢNH / PROMPT ẢNH thành TẠO VIDEO / PROMPT VIDEO.</p>
+      <p class="hint">Không tích: tạo prompt ảnh theo dòng theo B5.TXT / B6.TXT. Có tích: cùng ô tên file, cùng 20 dòng/lô — bước tạo prompt đọc B8.TXT và QA video, không dùng trí nhớ.</p>
+      <label for="extraExport" class="spaced">Yêu cầu thêm khi xuất file TXT</label>
+      <textarea id="extraExport" rows="5" placeholder="Mọi yêu cầu thêm sẽ được ghi vào câu xuất file TXT. Không giới hạn độ dài — nhất là khi chuyển đổi văn bản."></textarea>
+      <p class="hint">Tool gắn nguyên đoạn này vào lệnh xuất TXT của các bước, đặc biệt bước chuyển đổi. ChatGPT phải xuất file TXT đầy đủ, không cắt vì văn bản dài.</p>
       <label for="totalLines" class="spaced">Số dòng tool ghi nhớ sau khi chia dòng</label>
       <input id="totalLines" type="number" min="1" step="1" placeholder="tự điền sau bước chia dòng">
       <p class="hint">Không cần nhập tay. Sau chia dòng ChatGPT phải báo <code>TÁC PHẨM CHIA DÒNG XONG CÓ N DÒNG</code>. Tool quét số N, rồi bước prompt theo dòng làm 20 dòng/lần đến hết.</p>

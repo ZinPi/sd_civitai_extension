@@ -368,11 +368,24 @@ CẤM XUẤT B3 FINAL Ở LẦN NÀY.`,
         doVideo
       ),
 
-    promptBatch: (fileName, doVideo) =>
-      asLinePromptText(
-        `TUYỆT ĐỐI KHÔNG LÀM THEO TRÍ NHỚ KHÔNG TỰ Ý LÀM SAI QUY TẮT NGƯỜI DÙNG ĐẶT RA TRONG NGUỒN DỰ ÁN, TUYỆT ĐỐI TUÂN THỦ QUY TẮC NGUỒN DỰ ÁN TỪ ĐẦU TUYỆT ĐỐI KHÔNG LÀM SAI, TỚI LÚC QA SAI HAY NGƯỜI DÙNG PHÁT HIỆN LẠI NÓI TẠI NÀY TẠI NÓ RỒI MỚI HỨA TỪ ĐÂY SẼ THẾ NÀY THẾ KIA. NGƯỜI DÙNG KHÔNG CÓ NHIỀU THỜI GIAN VÀ CƠ HỘI LÀM LẠI NHIỀU LẦN. HẬU QUẢ LÀ DO NGƯỜI DÙNG GÁNH, BỒI THƯỜNG LÀ DO NGƯỜI DÙNG CHIỆU, NGUY CƠ DẪN ĐẾN HẬU QUẢ XẤU NHẤT LÀ NGƯỜI DÙNG LÃNH NẾU AI TỰ Ý KO LÀM THEO LỜI NGƯỜI DÙNG YÊU CẦU. LÀM ƠN LÀM ĐÚNG YÊU CẦU VÀ QUY TẮC NGUỒN ĐỂ NGƯỜI DÙNG TRÁNH ĐƯỢC HẬU QUẢ XẤU NHẤT CỦA 1 NHÂN LOẠI.
+    promptBatch: (fileName, doVideo, extra) => {
+      const head = `TUYỆT ĐỐI KHÔNG LÀM THEO TRÍ NHỚ KHÔNG TỰ Ý LÀM SAI QUY TẮT NGƯỜI DÙNG ĐẶT RA TRONG NGUỒN DỰ ÁN, TUYỆT ĐỐI TUÂN THỦ QUY TẮC NGUỒN DỰ ÁN TỪ ĐẦU TUYỆT ĐỐI KHÔNG LÀM SAI, TỚI LÚC QA SAI HAY NGƯỜI DÙNG PHÁT HIỆN LẠI NÓI TẠI NÀY TẠI NÓ RỒI MỚI HỨA TỪ ĐÂY SẼ THẾ NÀY THẾ KIA. NGƯỜI DÙNG KHÔNG CÓ NHIỀU THỜI GIAN VÀ CƠ HỘI LÀM LẠI NHIỀU LẦN. HẬU QUẢ LÀ DO NGƯỜI DÙNG GÁNH, BỒI THƯỜNG LÀ DO NGƯỜI DÙNG CHIỆU, NGUY CƠ DẪN ĐẾN HẬU QUẢ XẤU NHẤT LÀ NGƯỜI DÙNG LÃNH NẾU AI TỰ Ý KO LÀM THEO LỜI NGƯỜI DÙNG YÊU CẦU. LÀM ƠN LÀM ĐÚNG YÊU CẦU VÀ QUY TẮC NGUỒN ĐỂ NGƯỜI DÙNG TRÁNH ĐƯỢC HẬU QUẢ XẤU NHẤT CỦA 1 NHÂN LOẠI.`;
+      const mid = doVideo
+        ? `ÁP DỤNG QUY TẮC TẠO VIDEO THEO TỪNG DÒNG TRONG TÁC PHẨM CHIA DÒNG NGƯỜI DÙNG CUNG CẤP,
+THỰC TẾ MỞ QUY TẮC VÀ ĐỌC QUY TẮC FILE B8.TXT TRONG NGUỒN DỰ ÁN VÀ FILE DỮ LIỆU HỔ TRỢ TẠO PROMPT "${fileName}". TẠO PROMPT VIDEO TỪNG CÂU THEO QUY TẮC NGUỒN B8.TXT. TUÂN THỦ TUYỆT ĐỐI KHÔNG TỰ LÀM THEO TRÍ NHỚ, Ý RIÊNG.
 
-ÁP DỤNG QUY TẮC TẠO ẢNH THEO TỪNG DÒNG CỦA FILE TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT, TẠO PROMPT CHO TỪNG DÒNG CỦA FILE TÁC PHẨM ĐÃ CHIA DÒNG THEO ÂM TIẾT.
+PHÂN TÍCH FILE  TÁC PHẨM VÀ FILE "${fileName}" , TẠO PROMPT ẢNH THEO TIÊU CHUẨN QUY TẮC NGUỒN B8.TXT CỦA DỰ ÁN.
+
+YÊU CẦU MỖI LẦN CHAT CHỈ PHÂN TÍCH 20 CÂU TẠO 20 PROMPT THEO QUY TẮC NGUỒN CỦA DỰ ÁN.
+
+SAU 5 LẦN TỨC 100 PROMPT TẠO RA PHẢI QA ĐẦY ĐỦ THEO QUY TẮC NGUỒN TRONG FILE CÓ TÊN "BUOC_QA_VIDEO_PROMPT_DAN_Y_CACH_VIET_SIMPLE.TXT"
+
+LẦN CUỐI CÙNG ĐÙ CHƯA ĐỦ 20 PROMPT HAY 5 LƯỢC THÌ CŨNG QA THEO QUY TẮC NGUỒN TRONG FILE CÓ TÊN "BUOC_QA_VIDEO_PROMPT_DAN_Y_CACH_VIET_SIMPLE.TXT".QA ĐẢM BẢO ĐẦY ĐỦ CÁC QUY TẮC TRONG NGUỒN QUY ĐỊNH.
+
+CUỐI CÙNG QA TỔNG 1 LẦN NỮA TOÀN BỘ PROMPT VIDEO THEO FILE TÁC PHẨM CHIA DÒNG ĐÃ TẠO.
+
+QUÁ TRÌNH QA BẢO KHÔNG ĐẠT THÌ KHI NHẬN LỆNH NÀY THÌ PHẢI THỰC HIỆN SỬA LẠI SAI SÓT TRONG QUÁ TRÌNH QA CHỈ RA. LẦN TIẾP THEO CỦA LỆNH NÀY SẼ LÀ QA LẠI XEM QUÁ TRÌNH SỬA ĐẠT CHƯA, CỨ LẬP LẠI CHO ĐẾN KHI ĐẠT THÌ LỆNH NÀY MỚI LÀ TIẾP TỤC THỰC HIỆN QUY TRÌNH TẠO PROMPT VIDEO THEO DÒNG TIẾP THEO.`
+        : `ÁP DỤNG QUY TẮC TẠO ẢNH THEO TỪNG DÒNG CỦA FILE TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT, TẠO PROMPT CHO TỪNG DÒNG CỦA FILE TÁC PHẨM ĐÃ CHIA DÒNG THEO ÂM TIẾT.
 
 THỰC TẾ MỞ QUY TẮC VÀ ĐỌC QUY TẮC FILE B5.TXT TRONG NGUỒN DỰ ÁN VÀ FILE DỮ LIỆU HỔ TRỢ TẠO PROMPT "${fileName}". TẠO PROMPT ẢNH TỪNG CÂU THEO QUY TẮC NGUỒN B5.TXT. TUÂN THỦ TUYỆT ĐỐI KHÔNG TỰ LÀM THEO TRÍ NHỚ, Ý RIÊNG.
 
@@ -386,11 +399,16 @@ LẦN CUỐI CÙNG ĐÙ CHƯA ĐỦ 20 PROMPT HAY 5 LƯỢC THÌ CŨNG QA THEO Q
 
 CUỐI CÙNG QA TỔNG 1 LẦN NỮA TOÀN BỘ PROMPT ẢNH THEO TỪNG DÒNG CỦA FILE TÁC PHẨM CHIA DÒNG THEO ÂM TIẾT ĐÃ TẠO.
 
-QUÁ TRÌNH QA BẢO KHÔNG ĐẠT THÌ KHI NHẬN LỆNH NÀY THÌ PHẢI THỰC HIỆN SỬA LẠI SAI SÓ TRONG QUÁ TRÌNH QA CHỈ RA. LẦN TIẾP THEO CỦA LỆNH NÀY SẼ LÀ QA LẠI XEM QUÁ TRÌNH SỮA ĐẠT CHƯA, CỨA LẬP LẠI CHO ĐẾN KHI ĐẠT THÌ LỆNH NÀY MỚI LÀ TIẾP TỤC THỰC HIỆN QUY TRÌNH TẠO PROMPT ẢNH THEO CÂU TIẾP THEO.
-KHI XUẤT VÀ QA HOÀN THÀNH XONG THÌ CHAT GPT BẮT BUỘC PHẢI TRẢ LỜI 1 CÂU "QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO"
-KHI XUẤT CHỈ CẦN XUẤT FILE TXT KHÔNG NÓI GÌ THÊM.`,
-        doVideo
-      ),
+QUÁ TRÌNH QA BẢO KHÔNG ĐẠT THÌ KHI NHẬN LỆNH NÀY THÌ PHẢI THỰC HIỆN SỬA LẠI SAI SÓ TRONG QUÁ TRÌNH QA CHỈ RA. LẦN TIẾP THEO CỦA LỆNH NÀY SẼ LÀ QA LẠI XEM QUÁ TRÌNH SỮA ĐẠT CHƯA, CỨA LẬP LẠI CHO ĐẾN KHI ĐẠT THÌ LỆNH NÀY MỚI LÀ TIẾP TỤC THỰC HIỆN QUY TRÌNH TẠO PROMPT ẢNH THEO CÂU TIẾP THEO.`;
+      const donePhrase = doVideo
+        ? "QUÁ TRÌNH TẠO PROMPT VIDEO THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO"
+        : "QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG ĐÃ HOÀN TẤT THÌ MỚI THỰC HIỆN BƯỚC TIẾP THEO";
+      return `${head}
+
+${mid}
+KHI XUẤT VÀ QA HOÀN THÀNH XONG THÌ CHAT GPT BẮT BUỘC PHẢI TRẢ LỜI 1 CÂU "${donePhrase}"
+${exportTxtClause(extra, doVideo ? "video" : "image")}`;
+    },
 
     askEmerged: (doVideo) =>
       asLinePromptText(`CÓ PHÁT SINH CHAR VÀ BG TRONG QUÁ TRÌNH TẠO PROMPT ẢNH THEO DÒNG CỦA TÁC PHẨM CHIA DÒNG KHÔNG`, doVideo),
@@ -410,6 +428,20 @@ KHI XUẤT CHỈ CẦN XUẤT FILE TXT KHÔNG NÓI GÌ THÊM.`,
     return s;
   }
 
+  function exportTxtClause(extra, kind) {
+    const add = String(extra || "").trim();
+    const convertHint =
+      kind === "convert"
+        ? " NHẤT LÀ PHẦN CHUYỂN ĐỔI VĂN BẢN: XUẤT NGUYÊN TOÀN BỘ VĂN BẢN ĐÃ CHUYỂN, KHÔNG RÚT GỌN, KHÔNG TÓM TẮT, KHÔNG CẮT GIỮA."
+        : "";
+    let s = `KHI XUẤT CHỈ CẦN XUẤT FILE TXT, KHÔNG NÓI GÌ THÊM. XUẤT ĐẦY ĐỦ TOÀN BỘ NỘI DUNG VỪA LÀM. KHÔNG RÚT NGẮN, KHÔNG TÓM TẮT, KHÔNG CẮT BỚT, KHÔNG BỎ PHẦN GIỮA. KHÔNG CẦN BIẾT VĂN BẢN DÀI BAO NHIÊU.${convertHint}`;
+    if (add) {
+      s += `\nYÊU CẦU THÊM CỦA NGƯỜI DÙNG PHẢI ĐƯỢC GHI VÀO CÂU XUẤT FILE TXT VÀ VÀO NỘI DUNG FILE TXT:\n${add}`;
+    }
+    return s;
+  }
+
   root.LN_PROMPTS = PROMPTS;
   root.LN_PROMPTS.asLinePromptText = asLinePromptText;
+  root.LN_PROMPTS.exportTxtClause = exportTxtClause;
 })(globalThis);

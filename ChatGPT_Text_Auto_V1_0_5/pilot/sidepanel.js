@@ -35,6 +35,7 @@
     waitMinutes: document.getElementById("waitMinutes"),
     doLatin: document.getElementById("doLatin"),
     doVideo: document.getElementById("doVideo"),
+    extraExport: document.getElementById("extraExport"),
     refFileName: document.getElementById("refFileName"),
     refFile: document.getElementById("refFile"),
     refFileHint: document.getElementById("refFileHint"),
@@ -109,6 +110,7 @@
       waitMinutes: normalizeWaitMinutes(els.waitMinutes && els.waitMinutes.value),
       doLatin: !!(els.doLatin && els.doLatin.checked),
       doVideo: !!(els.doVideo && els.doVideo.checked),
+      extraExport: String((els.extraExport && els.extraExport.value) || state.extraExport || ""),
       refFileName: String((els.refFileName && els.refFileName.value) || state.refFileName || "").trim(),
       startStep: els.startStep && els.startStep.value ? els.startStep.value : state.startStep,
       fileName: normalizeFileName((els.fileName && els.fileName.value) || state.fileName),
@@ -147,6 +149,9 @@
     }
     if (focused !== "doLatin" && els.doLatin) els.doLatin.checked = !!next.doLatin;
     if (focused !== "doVideo" && els.doVideo) els.doVideo.checked = !!next.doVideo;
+    if (focused !== "extraExport" && els.extraExport) {
+      els.extraExport.value = next.extraExport || "";
+    }
     if (focused !== "refFileName" && els.refFileName) els.refFileName.value = next.refFileName || "";
   }
 
@@ -441,6 +446,7 @@
   bindForm(els.waitMinutes, "waitMinutes");
   bindForm(els.doLatin, "doLatin");
   bindForm(els.doVideo, "doVideo");
+  bindForm(els.extraExport, "extraExport");
   bindForm(els.startStep, "startStep");
   bindForm(els.refFileName, "refFileName");
   bindForm(els.totalLines, "totalLines");
