@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -136,7 +137,7 @@ class AppTests(unittest.TestCase):
             before = self.client.get("/api/settings")
             self.assertEqual(before.json()["api_state"], "invalid")
             Path(self.root, "config.json").write_text(
-                "\ufeff" + json.dumps({"provider": "teamsoclo", "api_key": "sk-test"}),
+                "\ufeff" + json.dumps({"provider": "teamsoclo", "api_key": "key-test"}),
                 encoding="utf-8",
             )
             after = self.client.get("/api/settings")
@@ -144,13 +145,13 @@ class AppTests(unittest.TestCase):
         self.assertEqual(after.json()["models"], ["m"])
 
     def test_tuansu_uses_its_chat_endpoint_without_showing_the_address(self):
-        self.write_config(provider="tuansu", api_key="sk-or-v1-secret")
+        self.write_config(provider="tuansu", api_key="vendor-secret-value")
         with mock.patch.object(HttpLlm, "list_models", lambda self: ["vendor/m"]):
             response = self.client.get("/api/settings")
             picked = self.client.put("/api/settings", json={"model": "vendor/m"})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertNotIn("tuansuapi", response.text)
-        self.assertNotIn("sk-or-v1-secret", response.text)
+        self.assertNotIn("vendor-secret-value", response.text)
         self.assertEqual(picked.status_code, 200)
         self.assertEqual(picked.json()["model"], "vendor/m")
         stored = json.loads(Path(self.tmp.name, "data", "settings.json").read_text(encoding="utf-8"))
@@ -158,7 +159,55 @@ class AppTests(unittest.TestCase):
         self.assertEqual(stored["api_style"], "chat")
         self.assertNotIn("api_key", stored)
         self.assertNotIn("tuansuapi", picked.text)
-        self.assertNotIn("sk-or-v1-secret", picked.text)
+        self.assertNotIn("vendor-secret-value", picked.text)
+
+
+    def test_env_key_is_used_and_not_echoed(self):
+        self.write_config(api_key="file-secret")
+        with mock.patch.dict(os.environ, {"PROMPT_API_KEY": "env-secret-key"}, clear=False):
+            with mock.patch.object(HttpLlm, "list_models", lambda self: ["mock"]):
+                saved = self.client.get("/api/settings")
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.json()["api_state"], "ok")
+        self.assertNotIn("env-secret-key", saved.text)
+        self.assertNotIn("file-secret", saved.text)
+
+    def test_published_api_requires_a_cursor_viewer(self):
+        with mock.patch.dict(os.environ, {"CURSOR_APP_ID": "app_test"}, clear=False):
+            with mock.patch("app.identify", return_value={"verified": False, "reason": "missing_header"}):
+                denied = self.client.get("/api/settings")
+            with mock.patch("app.identify", return_value={"verified": True, "sub": "user-a", "kind": "person"}):
+                blocked = self.client.put("/api/settings", json={"model": "mock"})
+        self.assertEqual(denied.status_code, 401)
+        self.assertEqual(blocked.status_code, 403)
+        self.assertNotIn("app_test", denied.text)
+
+    def test_published_viewers_keep_separate_settings(self):
+        self.write_config(api_key="secret-key")
+
+        def ident(headers):
+            token = headers.get("x-cursor-identity") or ""
+            return {"verified": True, "sub": "user-" + token, "kind": "person"}
+
+        with mock.patch.dict(os.environ, {"CURSOR_APP_ID": "app_test"}, clear=False):
+            with mock.patch("app.identify", ident):
+                with mock.patch.object(HttpLlm, "list_models", lambda self: ["mock"]):
+                    first = self.client.put(
+                        "/api/settings",
+                        json={
+                            "model": "mock",
+                            "max_input_tokens": 120000,
+                            "max_output_tokens": 8192,
+                            "request_timeout_seconds": 180,
+                        },
+                        headers={"x-cursor-identity": "a", "x-prompt-request": "1"},
+                    )
+                    second = self.client.get("/api/settings", headers={"x-cursor-identity": "b"})
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(first.json()["model"], "mock")
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(second.json()["model"], "")
+        self.assertNotIn("secret-key", first.text + second.text)
 
 
 if __name__ == "__main__":

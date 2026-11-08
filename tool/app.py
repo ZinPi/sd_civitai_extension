@@ -1,20 +1,26 @@
-"""Giao diện local cho bốn bước tạo prompt.
+"""Giao diện cho bốn bước tạo prompt.
 
-Chạy: python app.py
+Chạy local: python app.py
 Mở: http://127.0.0.1:8765
+
+Trên Cursor, cổng lấy từ PORT và khóa API lấy từ PROMPT_API_KEY.
 """
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
+import subprocess
+import threading
+import time
 import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -23,9 +29,22 @@ from llm import PROVIDERS, HttpLlm, LlmError
 from runner import AlreadyRunning, Job
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_RULES = Path(os.environ.get("QUY_TAC_DIR", ROOT.parent / "quy-tac-tool"))
 DEFAULT_DATA = Path(os.environ.get("TOOL_DATA_DIR", ROOT / "data"))
 STATIC = ROOT / "static"
+_IDENTITY_CACHE: dict[str, tuple[float, dict]] = {}
+_IDENTITY_LOCK = threading.Lock()
+
+
+def default_rules_dir() -> Path:
+    chosen = os.environ.get("QUY_TAC_DIR", "").strip()
+    if chosen:
+        return Path(chosen)
+    parent = ROOT.parent / "quy-tac-tool"
+    bundled = ROOT / "quy-tac"
+    marker = "01_TRICH_NHAN_VAT_VA_BOI_CANH.txt"
+    if (parent / marker).is_file():
+        return parent
+    return bundled
 
 NEED_KEY = "API không hợp lệ"
 NEED_NETWORK = "Không nối được API."
@@ -71,6 +90,12 @@ def read_config(path: Path) -> dict:
         if isinstance(raw, dict):
             provider = str(raw.get("provider") or provider).strip() or provider
             api_key = str(raw.get("api_key") or "").strip()
+    env_provider = os.environ.get("PROMPT_PROVIDER", "").strip()
+    env_key = os.environ.get("PROMPT_API_KEY", "").strip()
+    if env_provider:
+        provider = env_provider
+    if env_key:
+        api_key = env_key
     if provider not in PROVIDERS:
         provider = "teamsoclo"
     spec = PROVIDERS[provider]
@@ -137,39 +162,113 @@ def valid_base_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc) and " " not in value
 
 
+def identify(headers: dict[str, str]) -> dict:
+    """Người đang mở app. Local thì một người dùng giả. Trên Cursor thì hỏi helper ký tên."""
+    if not os.environ.get("CURSOR_APP_ID"):
+        return {"verified": True, "sub": "local", "kind": "person"}
+    token = headers.get("x-cursor-identity-v2") or headers.get("x-cursor-identity") or ""
+    if not token:
+        return {"verified": False, "reason": "missing_header"}
+    cache_key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = time.time()
+    with _IDENTITY_LOCK:
+        cached = _IDENTITY_CACHE.get(cache_key)
+        if cached and cached[0] > now:
+            return dict(cached[1])
+    script = ROOT / "cursor" / "who.mjs"
+    try:
+        result = subprocess.run(
+            ["node", str(script)],
+            input=json.dumps({"x-cursor-identity-v2": headers.get("x-cursor-identity-v2", ""), "x-cursor-identity": headers.get("x-cursor-identity", "")}),
+            text=True,
+            capture_output=True,
+            timeout=15,
+            check=False,
+            cwd=str(ROOT),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"verified": False, "reason": "verifier_unavailable"}
+    if result.returncode != 0:
+        return {"verified": False, "reason": "verifier_failed"}
+    line = ""
+    for candidate in reversed(result.stdout.splitlines()):
+        if candidate.strip().startswith("{"):
+            line = candidate.strip()
+            break
+    try:
+        data = json.loads(line or result.stdout or "{}")
+    except json.JSONDecodeError:
+        return {"verified": False, "reason": "verifier_failed"}
+    if not data.get("verified") or not data.get("sub"):
+        return {"verified": False, "reason": str(data.get("reason") or "missing_header")}
+    safe = {"verified": True, "sub": str(data["sub"]), "kind": str(data.get("kind") or "person")}
+    if len(safe["sub"]) > 512:
+        return {"verified": False, "reason": "invalid_claims"}
+    with _IDENTITY_LOCK:
+        _IDENTITY_CACHE[cache_key] = (now + 60, safe)
+        if len(_IDENTITY_CACHE) > 200:
+            _IDENTITY_CACHE.clear()
+            _IDENTITY_CACHE[cache_key] = (now + 60, safe)
+    return dict(safe)
+
+
 def create_app(
     rules_dir: Path | None = None,
     data_dir: Path | None = None,
     config_path: Path | None = None,
 ) -> FastAPI:
-    rules_path = Path(rules_dir or DEFAULT_RULES)
+    rules_path = Path(rules_dir or default_rules_dir())
     data = Path(data_dir or DEFAULT_DATA)
     data.mkdir(parents=True, exist_ok=True)
-    settings_path = data / "settings.json"
     secret_path = Path(config_path) if config_path is not None else ROOT / "config.json"
-    job = Job(rules_path, data)
+    jobs: dict[str, Job] = {}
+    jobs_lock = threading.Lock()
     probe = {"state": "invalid", "message": NEED_KEY, "models": []}
-    app = FastAPI(title="Tạo prompt ảnh")
+    app = FastAPI(title="Tạo prompt ảnh", docs_url=None, redoc_url=None, openapi_url=None)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
-    def read_saved() -> dict:
-        return load_settings(settings_path)
+    def folder_for(sub: str) -> Path:
+        if os.environ.get("CURSOR_APP_ID"):
+            digest = hashlib.sha256(sub.encode("utf-8")).hexdigest()[:32]
+            folder = data / digest
+        else:
+            folder = data
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
 
-    def store(settings: dict) -> None:
+    def job_for(sub: str) -> Job:
+        folder = folder_for(sub)
+        key = str(folder.resolve())
+        with jobs_lock:
+            found = jobs.get(key)
+            if found is None:
+                found = Job(rules_path, folder)
+                jobs[key] = found
+            return found
+
+    def viewer_of(request: Request) -> str:
+        sub = getattr(request.state, "viewer", "") or "local"
+        return str(sub)
+
+    def read_saved(folder: Path) -> dict:
+        return load_settings(folder / "settings.json")
+
+    def store(folder: Path, settings: dict) -> None:
+        settings_path = folder / "settings.json"
         atomic_write(settings_path, json.dumps(settings, ensure_ascii=False, indent=2))
         try:
             settings_path.chmod(0o600)
         except OSError:
             pass
 
-    def ensure_probe() -> dict:
+    def ensure_probe(folder: Path | None = None) -> dict:
         secret = read_config(secret_path)
         if not secret["api_key"]:
             probe["state"] = "invalid"
             probe["message"] = NEED_KEY
             probe["models"] = []
             return probe
-        current = read_saved()
+        current = read_saved(folder or data)
         client = HttpLlm({**current, **secret, "model": current.get("model") or "probe"})
         try:
             models = client.list_models()
@@ -186,10 +285,10 @@ def create_app(
             client.close()
         return probe
 
-    def runtime_settings(body: SettingsBody | None = None) -> dict:
-        current = read_saved()
+    def runtime_settings(folder: Path, body: SettingsBody | None = None) -> dict:
+        current = read_saved(folder)
         secret = read_config(secret_path)
-        checked = ensure_probe()
+        checked = ensure_probe(folder)
         models = list(checked["models"]) if checked["state"] == "ok" else []
         model = body.model.strip() if body is not None else str(current.get("model") or "")
         if model not in models:
@@ -213,9 +312,38 @@ def create_app(
             "request_timeout_seconds": timeout,
         }
 
-    def store_public(settings: dict) -> None:
+    def store_public(folder: Path, settings: dict) -> None:
         stored = {key: value for key, value in settings.items() if key != "api_key"}
-        store(stored)
+        store(folder, stored)
+
+    @app.middleware("http")
+    async def cursor_gate(request: Request, call_next):
+        request.state.viewer = "local"
+        if request.url.path.startswith("/api") and os.environ.get("CURSOR_APP_ID"):
+            picked = {}
+            for name in ("x-cursor-identity-v2", "x-cursor-identity"):
+                value = request.headers.get(name)
+                if value:
+                    picked[name] = value[:20000]
+            ident = identify(picked)
+            sub = str(ident.get("sub") or "")
+            if not ident.get("verified") or not sub or len(sub) > 512:
+                return JSONResponse(
+                    {"detail": "Cần đăng nhập Cursor."},
+                    status_code=401,
+                    headers={"Cache-Control": "private, no-store"},
+                )
+            if request.method not in {"GET", "HEAD", "OPTIONS"} and request.headers.get("x-prompt-request") != "1":
+                return JSONResponse(
+                    {"detail": "Thiếu tiêu đề của trang."},
+                    status_code=403,
+                    headers={"Cache-Control": "private, no-store"},
+                )
+            request.state.viewer = sub
+        response = await call_next(request)
+        if request.url.path.startswith("/api"):
+            response.headers["Cache-Control"] = "private, no-store"
+        return response
 
     @app.get("/")
     def index():
@@ -234,33 +362,38 @@ def create_app(
                     "missing": not path.is_file(),
                 }
             )
-        return {"directory": str(rules_path), "files": files}
+        shown = "quy-tac" if os.environ.get("CURSOR_APP_ID") else str(rules_path)
+        return {"directory": shown, "files": files}
 
     @app.get("/api/settings")
-    def get_settings():
-        ensure_probe()
-        return public_settings(read_saved(), probe)
+    def get_settings(request: Request):
+        folder = folder_for(viewer_of(request))
+        ensure_probe(folder)
+        return public_settings(read_saved(folder), probe)
 
     @app.put("/api/settings")
-    def put_settings(body: SettingsBody):
-        settings = runtime_settings(body)
-        store_public(settings)
+    def put_settings(body: SettingsBody, request: Request):
+        folder = folder_for(viewer_of(request))
+        settings = runtime_settings(folder, body)
+        store_public(folder, settings)
         return public_settings(settings, probe)
 
     @app.get("/api/job")
-    def get_job(source: int = 0):
-        return job.snapshot(include_source=bool(source))
+    def get_job(request: Request, source: int = 0):
+        return job_for(viewer_of(request)).snapshot(include_source=bool(source))
 
     @app.post("/api/job")
-    def start_job(body: JobBody):
-        settings = runtime_settings()
-        checked = ensure_probe()
+    def start_job(body: JobBody, request: Request):
+        folder = folder_for(viewer_of(request))
+        settings = runtime_settings(folder)
+        checked = ensure_probe(folder)
         if checked["state"] == "network":
             raise HTTPException(status_code=400, detail=NEED_NETWORK)
         if checked["state"] != "ok" or not settings.get("api_key"):
             raise HTTPException(status_code=400, detail=NEED_KEY)
         if not settings.get("model"):
             raise HTTPException(status_code=400, detail=NEED_MODEL)
+        job = job_for(viewer_of(request))
         try:
             job.begin(body.source_text, settings, body.mode, body.prior_text)
         except AlreadyRunning as exc:
@@ -270,12 +403,14 @@ def create_app(
         return job.snapshot()
 
     @app.post("/api/job/stop")
-    def stop_job():
+    def stop_job(request: Request):
+        job = job_for(viewer_of(request))
         job.request_stop()
         return job.snapshot()
 
     @app.post("/api/job/clear")
-    def clear_job():
+    def clear_job(request: Request):
+        job = job_for(viewer_of(request))
         try:
             job.clear()
         except AlreadyRunning as exc:
@@ -283,7 +418,7 @@ def create_app(
         return job.snapshot(include_source=True)
 
     @app.get("/api/file/tat-ca")
-    def download_all():
+    def download_all(request: Request):
         names = [
             "DANH_SACH_CHAR_BG.txt",
             "PROMPT_CHAR.txt",
@@ -292,10 +427,11 @@ def create_app(
             "FILE_TONG_HOP.txt",
             "NHAT_KY.txt",
         ]
+        folder = job_for(viewer_of(request)).data_dir
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for name in names:
-                path = data / name
+                path = folder / name
                 if path.is_file() and path.stat().st_size > 0:
                     archive.write(path, name)
             if not archive.namelist():
@@ -303,15 +439,18 @@ def create_app(
         return Response(
             content=buffer.getvalue(),
             media_type="application/zip",
-            headers={"Content-Disposition": 'attachment; filename="TAT_CA_FILE.zip"'},
+            headers={
+                "Content-Disposition": 'attachment; filename="TAT_CA_FILE.zip"',
+                "Cache-Control": "private, no-store",
+            },
         )
 
     @app.get("/api/file/{key}")
-    def download(key: str, preview: int = 0):
+    def download(key: str, request: Request, preview: int = 0):
         filename = OUTPUT_FILES.get(key)
         if not filename:
             raise HTTPException(status_code=404, detail="Không có file này.")
-        path = job.output_path(filename)
+        path = job_for(viewer_of(request)).output_path(filename)
         if not path.is_file():
             raise HTTPException(status_code=404, detail="Chưa có file này.")
         text = path.read_text(encoding="utf-8")
@@ -327,7 +466,10 @@ def create_app(
         return Response(
             content=text,
             media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "private, no-store",
+            },
         )
 
     return app
@@ -336,7 +478,13 @@ def create_app(
 app = create_app()
 
 
-if __name__ == "__main__":
+def serve() -> None:
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=int(os.environ.get("TOOL_PORT", "8765")))
+    port = int(os.environ.get("PORT") or os.environ.get("TOOL_PORT") or "8765")
+    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    uvicorn.run(app, host=host, port=port)
+
+
+if __name__ == "__main__":
+    serve()
