@@ -13,6 +13,18 @@ const FILE_NAMES = {
   dong: "PROMPT_THEO_DONG.txt",
 };
 
+const pageFetch = window.fetch.bind(window);
+window.fetch = (input, init) => {
+  const next = init ? { ...init } : {};
+  const method = String(next.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") {
+    const headers = new Headers(next.headers || {});
+    headers.set("x-prompt-request", "1");
+    next.headers = headers;
+  }
+  return pageFetch(input, next);
+};
+
 const source = document.querySelector("#source");
 const prior = document.querySelector("#prior");
 const count = document.querySelector("#count");

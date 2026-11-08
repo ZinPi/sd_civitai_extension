@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 
@@ -214,10 +215,7 @@ class HttpLlm:
                     "timeout",
                 )
             if response.status_code in {401, 403}:
-                raise LlmError(
-                    f"{self._label()} từ chối API. Mở config.json cạnh Chay.bat, dán lại api_key, lưu, rồi mở lại tool.",
-                    "auth",
-                )
+                raise LlmError(self._rejected_key_message(), "auth")
             if response.status_code >= 400:
                 if self._is_context_limit(response.text):
                     raise LlmError("Lượt này dài quá giới hạn. Không tự gửi lại nguyên lượt.", "context")
@@ -278,10 +276,7 @@ class HttpLlm:
             body = response.text
             if response.status_code == 403 and "1010" in body:
                 raise LlmError("Không nối được API.", "network")
-            raise LlmError(
-                f"{self._label()} từ chối API. Mở config.json cạnh Chay.bat, dán lại api_key, lưu, rồi mở lại tool.",
-                "auth",
-            )
+            raise LlmError(self._rejected_key_message(), "auth")
         if response.status_code >= 400:
             raise LlmError(f"Không lấy được danh sách model của {self._label()}.", "bad")
         try:
@@ -300,6 +295,14 @@ class HttpLlm:
             timeout = float(self.settings.get("request_timeout_seconds") or 180)
             self._client = httpx.Client(timeout=httpx.Timeout(connect=30, read=timeout, write=60, pool=30))
         return self._client
+
+    def _rejected_key_message(self) -> str:
+        if os.environ.get("PROMPT_API_KEY", "").strip():
+            return f"{self._label()} từ chối API. Kiểm tra lại khóa API đã gắn cho app."
+        return (
+            f"{self._label()} từ chối API. Mở config.json cạnh Chay.bat, "
+            "dán lại api_key, lưu, rồi mở lại tool."
+        )
 
     def _headers(self) -> dict:
         key = str(self.settings.get("api_key") or "")
